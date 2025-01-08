@@ -1,0 +1,33 @@
+[project]
+name            = "blockhash-oracle"
+version         = "0.1.0"
+description     = "Add your description here"
+readme          = "README.md"
+requires-python = ">=3.12"
+
+# Requirements
+dependencies = [
+    "vyper>=0.4.0",
+    "snekmate==0.1.0",
+    "titanoboa",       # Keep this as a placeholder in the dependencies array
+    "web3>=7.6.0",
+]
+
+[tool.uv.sources]
+titanoboa = { git = "https://github.com/vyperlang/titanoboa.git", rev = "b6baf252603c70531e26208c06172b8c82d36033" }
+
+[tool.uv]
+dev-dependencies = [
+    "pytest-xdist>=3.6.1",
+    "mamushi==0.0.4a3",
+    "pre-commit==3.8.0",
+    "ruff==0.6.9",
+    "pytest==8.2.2",
+    "plyvel-ci==1.5.1",
+    "curve-dao>=1.0.0",
+    "jupyter>=1.0.0",
+    "python-dotenv>=1.0.1",
+]
+
+[tool.ruff]
+line-length = 100
