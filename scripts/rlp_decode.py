@@ -107,7 +107,7 @@ w3 = Web3(
 block_num = 21579069
 block = w3.eth.get_block(block_num)
 encoded_header, calculated_hash, fields = create_proof(block)
-
+print(encoded_header.hex())
 print(block["number"], len(encoded_header))
 
 # Decode the RLP-encoded header
