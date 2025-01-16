@@ -2,11 +2,12 @@ import pytest
 from web3 import Web3
 
 
+@pytest.mark.gas_profile
 def test_default_behavior(block_headers_decoder, block_data, encoded_block_header):
     """Test parent hash extraction from RLP"""
     # Get parent hash via contract
-    parent_hash, state_root, block_number, timestamp = block_headers_decoder.decode_block_headers(
-        encoded_block_header
+    self_hash, parent_hash, state_root, block_number, timestamp = (
+        block_headers_decoder.decode_block_headers(encoded_block_header)
     )
 
     # Get expected values from block data
