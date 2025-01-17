@@ -3,37 +3,10 @@ import pytest
 import os
 from web3 import Web3
 from rlp import encode
+import pickle
 
 
-@pytest.fixture(scope="session")
-def drpc_api_key():
-    api_key = os.getenv("DRPC_API_KEY")
-    assert api_key is not None, "DRPC_API_KEY environment variable not set"
-    return api_key
-
-
-@pytest.fixture(scope="session")
-def web3_client(drpc_api_key):
-    rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
-    return Web3(Web3.HTTPProvider(rpc_url))
-
-
-@pytest.fixture(scope="session")
-def block_number():
-    return 21579069
-
-
-@pytest.fixture(scope="session")
-def block_data(web3_client, block_number):
-    """Fetch a real block from mainnet"""
-    block = web3_client.eth.get_block(block_number, full_transactions=False)
-    return block
-
-
-@pytest.fixture(scope="session")
-def encoded_block_header(block_data):
-    """Encode block header fields in RLP format"""
-    # print(block_data)  # debug line
+def encode_headers(block_data):
     fields = [
         block_data["parentHash"],  # 1. parentHash
         block_data["sha3Uncles"],  # 2. uncleHash
@@ -67,6 +40,80 @@ def encoded_block_header(block_data):
         fields.append(block_data["requestsHash"])
 
     return encode(fields)
+
+
+@pytest.fixture(scope="session")
+def drpc_api_key():
+    api_key = os.getenv("DRPC_API_KEY")
+    assert api_key is not None, "DRPC_API_KEY environment variable not set"
+    return api_key
+
+
+@pytest.fixture(scope="session")
+def web3_client(drpc_api_key):
+    rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
+    return Web3(Web3.HTTPProvider(rpc_url))
+
+
+@pytest.fixture(scope="session")
+def block_number():
+    return 21579069
+
+
+@pytest.fixture(scope="session")
+def blocks_cache_file():
+    return "blocks.pklcache"
+
+
+@pytest.fixture(scope="session")
+def block_data(web3_client, block_number):
+    """Fetch a real block from mainnet"""
+    block = web3_client.eth.get_block(block_number, full_transactions=False)
+    return block
+
+
+@pytest.fixture(scope="session")
+def n_blocks_data(web3_client, block_number, request, blocks_cache_file):
+    """Fetch a real block from mainnet"""
+    n_blocks = request.param
+    res = []
+    should_save = False
+    # Check if cache exists
+    if os.path.exists(blocks_cache_file):
+        with open(blocks_cache_file, "rb") as f:
+            cache_dict = pickle.load(f)
+            print("Blocks cache loaded from file")
+    else:
+        cache_dict = {}
+
+    for i in range(block_number, block_number - n_blocks, -1):
+        if i in cache_dict:
+            block = cache_dict[i]
+        else:
+            block = web3_client.eth.get_block(i, full_transactions=False)
+            cache_dict[i] = block
+            should_save = True
+            print(f"Block {i} fetched from RPC")
+        res.append(block)
+    if should_save:
+        with open(blocks_cache_file, "wb") as f:
+            pickle.dump(cache_dict, f)
+            print("Blocks cache saved to file")
+    return res
+
+
+@pytest.fixture(scope="session")
+def n_encoded_blocks_headers(n_blocks_data):
+    """Encode block header fields in RLP format"""
+    # print(block_data)  # debug line
+    return [encode_headers(block_data) for block_data in n_blocks_data]
+
+
+@pytest.fixture(scope="session")
+def encoded_block_header(block_data):
+    """Encode block header fields in RLP format"""
+    # print(block_data)  # debug line
+    return encode_headers(block_data)
 
 
 @pytest.fixture()

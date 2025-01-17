@@ -59,7 +59,7 @@ def _decode_block_headers(encoded_header: Bytes[768]) -> BlockHeader:
          - Long strings (length >= 56) start with 0xb7 + length_of_length, followed by length
          - Lists follow similar rules but with 0xc0 and 0xf7 as starting points
     @param encoded_header RLP encoded block header
-    @return (parent_hash, state_root, block_number, timestamp)
+    @return BlockHeader( block_hash, parent_hash, state_root, number, timestamp)
     """
     # 1. Parse RLP list header
     first_byte: uint256 = convert(slice(encoded_header, 0, 1), uint256)
@@ -178,7 +178,7 @@ def decode_block_headers(encoded_header: Bytes[768])-> BlockHeader:
 
 @view
 @external
-def decode_many_blocks(encoded_headers: Bytes[49152]) -> uint256:
+def decode_many_blocks(encoded_headers: Bytes[49152], forward_direction: bool = True) -> BlockHeader:
     first_byte: uint256 = convert(slice(encoded_headers, 0, 1), uint256)
     assert first_byte >= RLP_LIST_SHORT_START, "Not a list"
     
@@ -196,10 +196,12 @@ def decode_many_blocks(encoded_headers: Bytes[49152]) -> uint256:
         )
         current_pos = 1 + len_of_len
     
-    blocks_processed: uint256 = 0
     end_pos: uint256 = current_pos + total_length
-
-    for i: uint256 in range(128):
+    prev_block: BlockHeader = empty(BlockHeader)
+    cur_block: BlockHeader = empty(BlockHeader)
+    
+    for blocks_processed: uint256 in range(128):
+        # No more than 128 blocks in one call
         if current_pos >= end_pos:
             break
 
@@ -218,9 +220,17 @@ def decode_many_blocks(encoded_headers: Bytes[49152]) -> uint256:
             abi_encode(slice(encoded_headers, block_start, block_length)),
             (Bytes[768])
         )
-        
-        self._decode_block_headers(block_data)
+        cur_block = self._decode_block_headers(block_data)
         current_pos = block_start + block_length
-        blocks_processed += 1
-    
-    return blocks_processed
+
+        # Assert chain validity
+        if forward_direction:
+            if blocks_processed > 0:
+                # In direct order parent hash should match previous block hash
+                assert cur_block.parent_hash == prev_block.block_hash, "Invalid chain"
+        else:
+            if blocks_processed > 0:
+                # In reverse order parent hash should match next block hash
+                assert prev_block.parent_hash == cur_block.block_hash, "Invalid chain"
+        prev_block = cur_block
+    return cur_block
