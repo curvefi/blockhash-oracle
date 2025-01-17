@@ -1,7 +1,7 @@
 import pytest
 import rlp
 
-N_BLOCKS_PROVE = 2
+N_BLOCKS_PROVE = 64
 
 
 @pytest.mark.gas_profile
