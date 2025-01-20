@@ -3,7 +3,6 @@ import pytest
 import os
 import json
 
-boa.set_etherscan(api_key=os.getenv("ETHERSCAN_API_KEY"))
 BOA_CACHE = False
 
 ALL_CHAINS = []
@@ -72,12 +71,6 @@ def forked_env(rpc_url):
             boa.fork(url=rpc_url, block_identifier=block_to_fork, cache_file=None)
         boa.env.enable_fast_mode()
         yield
-
-
-@pytest.fixture()
-def oracle():
-    _oracle = boa.load("contracts/BlockhashOracle.vy")
-    return _oracle
 
 
 @pytest.fixture()

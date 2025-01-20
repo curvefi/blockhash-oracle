@@ -27,7 +27,26 @@ dev-dependencies = [
     "curve-dao>=1.0.0",
     "jupyter>=1.0.0",
     "python-dotenv>=1.0.1",
+    "natrix",
 ]
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+markers = [
+    "mainnet: mainnet (Ethereum) tests",
+    "optimism: Optimism mainnet tests",
+    "base: Base mainnet tests",
+    "fraxtal: Fraxtal mainnet tests",
+    "mantle: Mantle mainnet tests",
+    "arbitrum: Arbitrum One tests",
+    "taiko: Taiko mainnet tests",
+    "sonic: Sonic mainnet tests",
+    "polygon: Polygon mainnet tests",
+    "bsc: BNB Smart Chain tests",
+    "gnosis: Gnosis Chain tests",
+    "xlayer: OKX X Layer tests",
+    "op_chains: Tests for all OP Stack chains", # optimism, base, fraxtal, mantle
+    "non_op_chains: Tests for non-OP chains",   # others
+]

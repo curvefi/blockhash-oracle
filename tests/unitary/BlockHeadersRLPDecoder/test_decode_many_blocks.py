@@ -4,15 +4,20 @@ import rlp
 N_BLOCKS_PROVE = 64
 
 
-@pytest.mark.gas_profile
+# @pytest.mark.gas_profile
 @pytest.mark.parametrize("n_blocks_data", [N_BLOCKS_PROVE], indirect=True)
 def test_default_behavior(
-    block_headers_decoder, n_blocks_data, n_encoded_blocks_headers, encoded_block_header
+    block_headers_decoder,
+    n_blocks_data,
+    n_encoded_blocks_headers,
+    encoded_block_header,
+    block_number,
 ):
     """Test RLP block chain decoding"""
     # n_blocks_data and n_encoded_blocks_headers are backwards ordered chain of blocks
     # Backwards decoding
     call_param_rlp = rlp.encode(n_encoded_blocks_headers)
+    print(len(call_param_rlp.hex()))
     block_hash, parent_hash, state_root, number, timestamp = (
         block_headers_decoder.decode_many_blocks(call_param_rlp, False)
     )

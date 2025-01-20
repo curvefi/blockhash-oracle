@@ -37,7 +37,7 @@ def __init__():
     pass
 
 
-@view
+@pure
 @external
 def calculate_block_hash(encoded_header: Bytes[768]) -> bytes32:
     """
@@ -48,7 +48,7 @@ def calculate_block_hash(encoded_header: Bytes[768]) -> bytes32:
     return keccak256(encoded_header)
 
 
-@view
+@pure
 @internal
 def _decode_block_headers(encoded_header: Bytes[768]) -> BlockHeader:
     """
@@ -175,13 +175,13 @@ def _decode_block_headers(encoded_header: Bytes[768]) -> BlockHeader:
     )
 
 
-@view
+@pure
 @external
 def decode_block_headers(encoded_header: Bytes[768]) -> BlockHeader:
     return self._decode_block_headers(encoded_header)
 
 
-@view
+@pure
 @external
 def decode_many_blocks(
     encoded_headers: Bytes[65536], forward_direction: bool = True
@@ -245,7 +245,7 @@ def decode_many_blocks(
 
 
 ### More streamlined way that uses util functions below, but eats more gas because passes lots of calldata
-@view
+@pure
 @internal
 def _decode_block_headers_v2(encoded_header: Bytes[768]) -> BlockHeader:
     """
@@ -302,7 +302,7 @@ def _decode_block_headers_v2(encoded_header: Bytes[768]) -> BlockHeader:
         timestamp=timestamp,
     )
 
-@view
+@pure
 @internal
 def _read_rlp_list_header(encoded: Bytes[768]) -> uint256:
     """@dev Returns position after list header"""
@@ -316,7 +316,7 @@ def _read_rlp_list_header(encoded: Bytes[768]) -> uint256:
         return 1 + len_of_len
 
 
-@view
+@pure
 @internal
 def _read_hash32(encoded: Bytes[768], pos: uint256) -> (bytes32, uint256):
     """@dev Read 32-byte hash field, returns (hash, next_pos)"""
@@ -324,7 +324,7 @@ def _read_hash32(encoded: Bytes[768], pos: uint256) -> (bytes32, uint256):
     return extract32(encoded, pos + 1), pos + 33
 
 
-@view
+@pure
 @internal
 def _read_rlp_number(encoded: Bytes[768], pos: uint256) -> (uint256, uint256):
     """@dev Read RLP-encoded number, returns (value, next_pos)"""
@@ -339,7 +339,7 @@ def _read_rlp_number(encoded: Bytes[768], pos: uint256) -> (uint256, uint256):
     return value, pos + 1 + length
 
 
-@view
+@pure
 @internal
 def _skip_rlp_string(encoded: Bytes[768], pos: uint256) -> uint256:
     """@dev Skip RLP string field, returns next_pos"""

@@ -5,6 +5,8 @@ from web3 import Web3
 from rlp import encode
 import pickle
 
+boa.set_etherscan(api_key=os.getenv("ETHERSCAN_API_KEY"))
+
 
 def encode_headers(block_data):
     fields = [
@@ -50,14 +52,20 @@ def drpc_api_key():
 
 
 @pytest.fixture(scope="session")
-def web3_client(drpc_api_key):
-    rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
+def eth_web3_client(drpc_api_key):
+    if drpc_api_key:
+        rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
+    else:
+        rpc_url = "https://rpc.ankr.com/eth"
     return Web3(Web3.HTTPProvider(rpc_url))
 
 
 @pytest.fixture(scope="session")
-def block_number():
-    return 21579069
+def block_number(request):
+    if hasattr(request, "param"):
+        return request.param
+    else:
+        return 21579069
 
 
 @pytest.fixture(scope="session")
@@ -66,14 +74,14 @@ def blocks_cache_file():
 
 
 @pytest.fixture(scope="session")
-def block_data(web3_client, block_number):
+def block_data(eth_web3_client, block_number):
     """Fetch a real block from mainnet"""
-    block = web3_client.eth.get_block(block_number, full_transactions=False)
+    block = eth_web3_client.eth.get_block(block_number, full_transactions=False)
     return block
 
 
 @pytest.fixture(scope="session")
-def n_blocks_data(web3_client, block_number, request, blocks_cache_file):
+def n_blocks_data(eth_web3_client, block_number, request, blocks_cache_file):
     """Fetch a real block from mainnet"""
     n_blocks = request.param
     res = []
@@ -85,12 +93,13 @@ def n_blocks_data(web3_client, block_number, request, blocks_cache_file):
             print("Blocks cache loaded from file")
     else:
         cache_dict = {}
-
+    if block_number == "latest":
+        block_number = eth_web3_client.eth.block_number
     for i in range(block_number, block_number - n_blocks, -1):
         if i in cache_dict:
             block = cache_dict[i]
         else:
-            block = web3_client.eth.get_block(i, full_transactions=False)
+            block = eth_web3_client.eth.get_block(i, full_transactions=False)
             cache_dict[i] = block
             should_save = True
             print(f"Block {i} fetched from RPC")
@@ -125,3 +134,9 @@ def dev_deployer():
 def block_headers_decoder(dev_deployer):
     with boa.env.prank(dev_deployer):
         return boa.load("contracts/BlockHeadersRLPDecoder.vy")
+
+
+@pytest.fixture()
+def mainnet_block_view(dev_deployer):
+    with boa.env.prank(dev_deployer):
+        return boa.load("contracts/MainnetBlockView.vy")

@@ -1,10 +1,10 @@
 # pragma version ~=0.4
 
 """
-@title L1 Block Oracle
+@title OP L1 Block Oracle
 
 @notice A contract for fetching and storing L1 block data including block hash,
-timestamp, and block number. Fetches data from an L1 Oracle contract.
+timestamp, and block number. Fetches data from an L1 Oracle precompile contract.
 
 @license Copyright (c) Curve.Fi, 2020-2024 - all rights reserved
 
@@ -158,7 +158,3 @@ def peek_l1block_number() -> uint64:
     @return The latest block number from the L1 oracle.
     """
     return staticcall L1BLOCK_ORACLE.number()
-
-
-# todo tomorrow
-# develop blockhash prover, that would use checkpointed block and submitted headers of previous block to hash them and prove they are correct
