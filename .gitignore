@@ -15,3 +15,5 @@ wheels/
 
 # dotenv
 .env
+
+*scan-results.json
