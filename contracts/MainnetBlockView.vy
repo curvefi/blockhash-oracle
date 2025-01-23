@@ -27,6 +27,5 @@ def get_blockhash(_block_number: uint256 = block.number-65) ->  (bytes32, uint25
     """
     assert _block_number <= block.number-65, "Block is too recent"
     assert _block_number > block.number-256, "Block is too old"
-
-    # return BlockData(block_hash=blockhash(_block_number), block_number=_block_number)
+    # lzread seems sensitive to reverts, probably need to if (old) return (0,0)
     return (blockhash(_block_number), _block_number)
