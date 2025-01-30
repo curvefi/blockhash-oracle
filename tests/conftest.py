@@ -133,7 +133,7 @@ def dev_deployer():
 @pytest.fixture()
 def block_oracle(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/BlockOracle.vy")
+        return boa.load("contracts/BlockOracle.vy", 1)
 
 
 @pytest.fixture()
