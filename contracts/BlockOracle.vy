@@ -1,5 +1,23 @@
 # pragma version ~=0.4
 
+"""
+@title Block Oracle
+
+@notice Decentralized block hash oracle with multi-committer consensus
+Uses a threshold-based commitment system where trusted committers can submit and validate block hashes
+Notable features are:
+    - Committers can submit block hashes and optionally trigger validation
+    - Each block requires threshold number of matching commitments to be confirmed
+    - Committers can update their votes before confirmation
+    - Once confirmed, block hashes are immutable
+    - Owner can manage committers and adjust threshold
+
+@license Copyright (c) Curve.Fi, 2025 - all rights reserved
+
+@author curve.fi
+
+@custom:security security@curve.fi
+"""
 
 ################################################################
 #                            MODULES                           #
@@ -33,6 +51,11 @@ event ApplyBlock:
     block_number: indexed(uint256)
     block_hash: bytes32
 
+event AddCommitter:
+    committer: indexed(address)
+
+event RemoveCommitter:
+    committer: indexed(address)
 
 ################################################################
 #                            STORAGE                           #
@@ -72,7 +95,8 @@ def add_committer(_committer: address):
     """
     ownable._check_owner()
     self.is_committer[_committer] = True
-
+    self.num_committers += 1
+    log AddCommitter(_committer)
 
 @external
 def remove_committer(_committer: address):
@@ -82,6 +106,8 @@ def remove_committer(_committer: address):
     """
     ownable._check_owner()
     self.is_committer[_committer] = False
+    self.num_committers -= 1
+    log RemoveCommitter(_committer)
 
 
 @external
