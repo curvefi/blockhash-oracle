@@ -44,7 +44,7 @@ def test_multiple_committers_consensus(block_oracle, committers, dev_deployer):
     for i in range(2):
         with boa.env.prank(committers[i]):
             assert not block_oracle.commit_block(mock_block_num, mock_block_hash)
-            assert block_oracle.get_commitment_count(mock_block_num, mock_block_hash) == i + 1
+            assert block_oracle.commitment_count(mock_block_num, mock_block_hash) == i + 1
             assert block_oracle.block_hash(mock_block_num) == b"\x00" * 32
 
     # Third commit should apply
@@ -64,13 +64,13 @@ def test_vote_changes(block_oracle, committers):
     # First committer votes for hash1
     with boa.env.prank(committers[0]):
         block_oracle.commit_block(mock_block_num, mock_block_hash1, False)
-        assert block_oracle.get_commitment_count(mock_block_num, mock_block_hash1) == 1
+        assert block_oracle.commitment_count(mock_block_num, mock_block_hash1) == 1
 
     # Same committer changes vote to hash2
     with boa.env.prank(committers[0]):
         block_oracle.commit_block(mock_block_num, mock_block_hash2, False)
-        assert block_oracle.get_commitment_count(mock_block_num, mock_block_hash1) == 0
-        assert block_oracle.get_commitment_count(mock_block_num, mock_block_hash2) == 1
+        assert block_oracle.commitment_count(mock_block_num, mock_block_hash1) == 0
+        assert block_oracle.commitment_count(mock_block_num, mock_block_hash2) == 1
 
 
 def test_competing_hashes(block_oracle, committers):
@@ -91,8 +91,8 @@ def test_competing_hashes(block_oracle, committers):
         with boa.env.prank(committers[i]):
             block_oracle.commit_block(block_num, hash2, False)
 
-    assert block_oracle.get_commitment_count(block_num, hash1) == 2
-    assert block_oracle.get_commitment_count(block_num, hash2) == 2
+    assert block_oracle.commitment_count(block_num, hash1) == 2
+    assert block_oracle.commitment_count(block_num, hash2) == 2
 
     # Final vote for hash1 should confirm it
     with boa.env.prank(committers[4]):
