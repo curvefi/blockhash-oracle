@@ -233,18 +233,16 @@ def _prepare_message_options(_gas: uint256, _value: uint256) -> Bytes[LZ_OPTION_
     """
 
     gas_option: bytes16 = convert(convert(_gas, uint128), bytes16)  # gas
-    option_len: uint256 = 16  # base length for gas option
-    option_data: Bytes[32] = concat(gas_option, empty(bytes16))  # explicitly create Bytes[32]
+    option_data: Bytes[32] = concat(gas_option, b'')  # explicitly create Bytes[32]
 
     if _value > 0:
-        option_len = 32
         option_data = concat(gas_option, convert(convert(_value, uint128), bytes16))
 
     return concat(
         OPTIONS_HEADER,
-        convert(convert(option_len + 1, uint16), bytes2),  # length (option + 1 [type])
+        convert(convert(len(option_data) + 1, uint16), bytes2),  # length (option) + 1 [type]
         OPTION_TYPE_LZRECEIVE,
-        slice(option_data, 0, option_len),
+        option_data,
     )
 
 
@@ -264,18 +262,16 @@ def _prepare_read_options(
         convert(convert(_gas, uint128), bytes16),  # gas
         convert(_data_size, bytes4),  # data size
     )
-    option_len: uint256 = 20  # base length for gas+data option
-    option_data: Bytes[36] = concat(gas_data_option, empty(bytes16))  # pad to full size
+    option_data: Bytes[36] = concat(gas_data_option, b'')  # explicitly create Bytes[32]
 
     if _value > 0:
-        option_len = 36  # full length when including value
         option_data = concat(gas_data_option, convert(convert(_value, uint128), bytes16))
 
     return concat(
         OPTIONS_HEADER,
-        convert(convert(option_len + 1, uint16), bytes2),  # length (option + 1 [type])
+        convert(convert(len(option_data) + 1, uint16), bytes2),  # length (option) + 1 [type]
         OPTION_TYPE_LZREAD,
-        slice(option_data, 0, option_len),
+        option_data,
     )
 
 
