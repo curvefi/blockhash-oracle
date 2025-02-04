@@ -19,7 +19,7 @@ def __init__():
 
 @view
 @external
-def get_blockhash(_block_number: uint256 = block.number-65, _avoid_failure: Bool = True) ->  (bytes32, uint256):
+def get_blockhash(_block_number: uint256 = block.number-65, _avoid_failure: bool = True) ->  (bytes32, uint256):
     """
     @notice Get block hash for a given block number
     @param _block_number Block number to get hash for, defaults to block.number-65
@@ -30,5 +30,7 @@ def get_blockhash(_block_number: uint256 = block.number-65, _avoid_failure: Bool
             # lzread is sensitive to reverts, so return (0,0) instead of reverting
             return (empty(bytes32), 0)
         else:
-            revert("Block is too recent or too old")
+            raise("Block is too recent or too old")
+            # assert _block_number < block.number-64, "Block is too recent"
+            # assert _block_number > block.number-256, "Block is too old"
     return (blockhash(_block_number), _block_number)

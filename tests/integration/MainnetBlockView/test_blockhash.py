@@ -37,9 +37,20 @@ def test_out_of_range_failures(mainnet_block_view):
     current_block = boa.env.evm.patch.block_number
 
     # Too recent
-    with boa.reverts("Block is too recent"):
-        mainnet_block_view.get_blockhash(current_block - 64)
+    with boa.reverts():
+        mainnet_block_view.get_blockhash(current_block - 64, False)
 
     # Too old
-    with boa.reverts("Block is too old"):
-        mainnet_block_view.get_blockhash(current_block - 256)
+    with boa.reverts():
+        mainnet_block_view.get_blockhash(current_block - 256, False)
+
+
+@pytest.mark.mainnet
+def test_out_of_range_safe(mainnet_block_view):
+    current_block = boa.env.evm.patch.block_number
+
+    # Too recent
+    assert mainnet_block_view.get_blockhash(current_block - 64) == (b"\x00" * 32, 0)
+
+    # Too old
+    assert mainnet_block_view.get_blockhash(current_block - 256) == (b"\x00" * 32, 0)
