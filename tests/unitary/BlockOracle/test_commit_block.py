@@ -98,3 +98,44 @@ def test_competing_hashes(block_oracle, committers):
     with boa.env.prank(committers[4]):
         assert block_oracle.commit_block(block_num, hash1)
         assert block_oracle.block_hash(block_num) == hash1
+
+
+def test_permission_commit(block_oracle):
+    """Test that non-committers cannot commit blocks"""
+    random_address = boa.env.generate_address()
+    mock_block_hash = b"\x01" * 32
+    mock_block_num = 11223344
+
+    with boa.reverts("Not authorized"):
+        with boa.env.prank(random_address):
+            block_oracle.commit_block(mock_block_num, mock_block_hash)
+
+
+def test_double_commit_same_hash(block_oracle, committers):
+    """Test that same committer cannot commit same hash twice"""
+    mock_block_hash = b"\x01" * 32
+    mock_block_num = 11223344
+
+    with boa.env.prank(committers[0]):
+        block_oracle.commit_block(mock_block_num, mock_block_hash, False)
+        # Second commit should fail or have no effect
+        assert not block_oracle.commit_block(mock_block_num, mock_block_hash, False)
+        assert block_oracle.commitment_count(mock_block_num, mock_block_hash) == 1
+
+
+def test_block_already_committed(block_oracle, committers):
+    """Test that block hash cannot be changed once committed"""
+    mock_block_hash1 = b"\x01" * 32
+    mock_block_hash2 = b"\x02" * 32
+    mock_block_num = 11223344
+
+    # First commit and apply hash1
+    with boa.env.prank(committers[0]):
+        block_oracle.commit_block(mock_block_num, mock_block_hash1)
+
+    # Try to commit different hash
+    with boa.reverts("Already applied"):
+        block_oracle.commit_block(mock_block_num, mock_block_hash2, sender=committers[1])
+
+    # Hash should remain unchanged
+    assert block_oracle.block_hash(mock_block_num) == mock_block_hash1
