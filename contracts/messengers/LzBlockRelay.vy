@@ -367,7 +367,7 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[lz.LZ_MESSAGE_SIZE_CA
 
 @view
 @external
-def quote_read_fee(_block_number: uint256 = 0, _gas_limit: uint256 = 0) -> uint256:
+def quote_read_fee(_block_number: uint256 = 0, _gas_limit: uint256 = 0, _value: uint256 = 0, _data_size: uint32 = 64) -> uint256:
     """
     @notice Quote fee for reading block hash from mainnet
     @param _block_number Optional block number (0 means latest)
@@ -380,7 +380,7 @@ def quote_read_fee(_block_number: uint256 = 0, _gas_limit: uint256 = 0) -> uint2
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = self._prepare_read_request(_block_number)
 
     return lz._quote_lz_fee(
-        lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, 0, 64  # Expected response size
+        lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _value, _data_size  # Expected response size
     )
 
 
@@ -417,8 +417,8 @@ def quote_broadcast_fees(
 @external
 def request_block_hash(
     _target_eids: DynArray[uint32, N_CHAINS_MAX] = empty(DynArray[uint32, N_CHAINS_MAX]),
-    _block_number: uint256 = 0,
-    _gas_limit: uint256 = 0,
+    _block_number: uint256 = 0, # 0 means latest-65
+    _gas_limit: uint256 = 0, # 0 means default
     _value: uint256 = 0,
 ):
     """
@@ -489,9 +489,11 @@ def lzReceive(
                 target: address = self.broadcast_targets[eid]
                 if target == empty(address):
                     continue
-
+                fee: uint256 = lz._quote_lz_fee(
+                    eid, convert(target, bytes32), _message  # Expected response size
+                )
                 lz._send_message(
-                    eid, convert(target, bytes32), _message  # Forward the same message format
+                    eid, convert(target, bytes32), _message, 0, fee  # Forward the same message format
                 )
 
             # Clear cache after broadcasting
