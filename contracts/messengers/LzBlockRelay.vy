@@ -122,13 +122,14 @@ event BlockHashBroadcast:
 ################################################################
 
 @deploy
-def __init__(_endpoint: address, _gas_limit: uint256):
+def __init__(_endpoint: address, _gas_limit: uint256, _read_channel: uint32):
     """
     @notice Initialize messenger with LZ endpoint and default gas settings
     @param _endpoint LayerZero endpoint address
     @param _gas_limit Default gas limit for cross-chain messages
+    @param _read_channel LZ Read channel ID
     """
-    lz.__init__(_endpoint, _gas_limit, 4294967295)
+    lz.__init__(_endpoint, _gas_limit, _read_channel)
     lz._set_delegate(msg.sender)
     ownable.__init__()
     ownable_2step.__init__()
@@ -415,7 +416,7 @@ def quote_broadcast_fees(
 @payable
 @external
 def request_block_hash(
-    _target_eids: DynArray[uint32, N_CHAINS_MAX],
+    _target_eids: DynArray[uint32, N_CHAINS_MAX] = empty(DynArray[uint32, N_CHAINS_MAX]),
     _block_number: uint256 = 0,
     _gas_limit: uint256 = 0,
     _value: uint256 = 0,
@@ -432,7 +433,6 @@ def request_block_hash(
     """
     assert self.is_read_enabled, "Read not enabled - call set_read_config"
     assert self.mainnet_block_view != empty(address), "Mainnet view not set - call set_read_config"
-    assert len(_target_eids) > 0, "No target chains specified"
 
     # Cache target EIDs for lzReceive
     self.cached_broadcast_targets = _target_eids
@@ -493,7 +493,6 @@ def lzReceive(
                 lz._send_message(
                     eid, convert(target, bytes32), _message  # Forward the same message format
                 )
-
 
             # Clear cache after broadcasting
             self.cached_broadcast_targets = empty(DynArray[uint32, N_CHAINS_MAX])
