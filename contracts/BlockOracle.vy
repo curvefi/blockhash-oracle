@@ -90,9 +90,10 @@ def add_committer(_committer: address):
     """
 
     ownable._check_owner()
-    self.is_committer[_committer] = True
-    self.num_committers += 1
-    log AddCommitter(_committer)
+    if not self.is_committer[_committer]:
+        self.is_committer[_committer] = True
+        self.num_committers += 1
+        log AddCommitter(_committer)
 
 
 @external
@@ -103,9 +104,10 @@ def remove_committer(_committer: address):
     """
 
     ownable._check_owner()
-    self.is_committer[_committer] = False
-    self.num_committers -= 1
-    log RemoveCommitter(_committer)
+    if self.is_committer[_committer]:
+        self.is_committer[_committer] = False
+        self.num_committers -= 1
+        log RemoveCommitter(_committer)
 
 
 @external
