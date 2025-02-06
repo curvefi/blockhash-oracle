@@ -25,16 +25,12 @@ Notable features are:
 
 # Import ownership management
 from snekmate.auth import ownable
-from snekmate.auth import ownable_2step
 
 initializes: ownable
-initializes: ownable_2step[ownable := ownable]
 exports: (
-    ownable_2step.owner,
-    ownable_2step.pending_owner,
-    ownable_2step.transfer_ownership,
-    ownable_2step.accept_ownership,
-    ownable_2step.renounce_ownership,
+    ownable.owner,
+    ownable.transfer_ownership,
+    ownable.renounce_ownership,
 )
 
 ################################################################
@@ -71,12 +67,11 @@ threshold: public(uint256)
 
 
 @deploy
-def __init__(_threshold: uint256):
+def __init__(_threshold: uint256, _owner: address):
     self.threshold = _threshold
     self.num_committers = 0
     ownable.__init__()
-    ownable_2step.__init__()
-
+    ownable._transfer_ownership(_owner)
 
 ################################################################
 #                      OWNER FUNCTIONS                         #

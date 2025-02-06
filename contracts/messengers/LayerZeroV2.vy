@@ -65,7 +65,7 @@ LZ_DOUBLE_OPTION_SIZE: constant(uint256) = LZ_OPTION_SIZE * 2
 
 #
 MAX_DVNS: constant(uint8) = 10
-MAX_PEERS_AT_CONFIG_CALL: constant(uint256) = 30
+MAX_INIT_PEERS: constant(uint256) = 30
 ################################################################
 #                           STORAGE                            #
 ################################################################
@@ -155,7 +155,7 @@ def __init__():
 # being able to bridge any message/command (=loss of funds).
 
 @internal
-def _initialize(_endpoint: address, _default_gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, MAX_PEERS_AT_CONFIG_CALL], _peers: DynArray[address, MAX_PEERS_AT_CONFIG_CALL]):
+def _initialize(_endpoint: address, _default_gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, MAX_INIT_PEERS], _peers: DynArray[address, MAX_INIT_PEERS]):
     """
     @notice Configure the contract with core settings
     @param _endpoint LayerZero endpoint address
@@ -170,7 +170,7 @@ def _initialize(_endpoint: address, _default_gas_limit: uint256, _read_channel: 
     self.LZ_ENDPOINT = _endpoint
     self._set_default_gas_limit(_default_gas_limit)
     self._set_lz_read_channel(_read_channel)
-    for i:uint256 in range(0, len(_peer_eids), bound=MAX_PEERS_AT_CONFIG_CALL):
+    for i:uint256 in range(0, len(_peer_eids), bound=MAX_INIT_PEERS):
         self._set_peer(_peer_eids[i], _peers[i])
     self.is_initialized = True
 

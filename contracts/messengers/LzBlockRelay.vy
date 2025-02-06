@@ -125,17 +125,17 @@ event BlockHashBroadcast:
 ################################################################
 
 @deploy
-def __init__(owner: address):
+def __init__(_owner: address):
     """
     @notice Empty constructor for deterministic deployment
     """
     lz.__init__()
     ownable.__init__()
-    ownable._transfer_ownership(owner)
+    ownable._transfer_ownership(_owner)
 
 
 @external
-def initialize(_endpoint: address, _gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, 30], _peers: DynArray[address, 30]):
+def initialize(_endpoint: address, _gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, lz.MAX_INIT_PEERS], _peers: DynArray[address, lz.MAX_INIT_PEERS]):
     """
     @notice Initialize contract with core settings
     @dev Can only be called once, assumes caller is owner, sets as delegate
