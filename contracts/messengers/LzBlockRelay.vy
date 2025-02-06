@@ -45,16 +45,12 @@ exports: (
 
 # Import ownership management
 from snekmate.auth import ownable
-from snekmate.auth import ownable_2step
 
 initializes: ownable
-initializes: ownable_2step[ownable := ownable]
 exports: (
-    ownable_2step.owner,
-    ownable_2step.pending_owner,
-    ownable_2step.transfer_ownership,
-    ownable_2step.accept_ownership,
-    ownable_2step.renounce_ownership,
+    ownable.owner,
+    ownable.transfer_ownership,
+    ownable.renounce_ownership,
 )
 
 ################################################################
@@ -68,6 +64,8 @@ GET_BLOCKHASH_WITH_ARG_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(u
 ################################################################
 #                            STORAGE                           #
 ################################################################
+
+is_initialized: public(bool)
 
 # Broadcast targets
 broadcast_targets: public(HashMap[uint32, address])  # eid => target address
@@ -127,17 +125,35 @@ event BlockHashBroadcast:
 ################################################################
 
 @deploy
-def __init__(_endpoint: address, _gas_limit: uint256, _read_channel: uint32):
+def __init__(owner: address):
     """
-    @notice Initialize messenger with LZ endpoint and default gas settings
+    @notice Empty constructor for deterministic deployment
+    """
+    lz.__init__()
+    ownable.__init__()
+    ownable._transfer_ownership(owner)
+
+
+@external
+def initialize(_endpoint: address, _gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, 30], _peers: DynArray[address, 30]):
+    """
+    @notice Initialize contract with core settings
+    @dev Can only be called once, assumes caller is owner, sets as delegate
     @param _endpoint LayerZero endpoint address
     @param _gas_limit Default gas limit for cross-chain messages
     @param _read_channel LZ Read channel ID
     """
-    lz.__init__(_endpoint, _gas_limit, _read_channel)
+    ownable._check_owner()
+    assert not self.is_initialized, "Already initialized"
+    assert _endpoint != empty(address), "Invalid endpoint"
+
+    self.is_initialized = True
+
+    # Initialize LayerZero module
+    lz._initialize(_endpoint, _gas_limit, _read_channel, _peer_eids, _peers)
+
+    # Set owner as delegate
     lz._set_delegate(msg.sender)
-    ownable.__init__()
-    ownable_2step.__init__()
 
 
 ################################################################
@@ -333,8 +349,17 @@ def set_block_oracle(_oracle: address):
 
 
 ################################################################
-#                    MESSAGING FUNCTIONS                       #
+#                     INTERNAL FUNCTIONS                       #
 ################################################################
+
+@internal
+def _commit_block(_block_number: uint256, _block_hash: bytes32):
+    """
+    @notice Commit block hash to oracle
+    """
+    assert self.block_oracle != empty(address), "Oracle not configured"
+    extcall IBlockOracle(self.block_oracle).commit_block(_block_number, _block_hash)
+
 
 @view
 @internal
@@ -362,6 +387,10 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[lz.LZ_MESSAGE_SIZE_CA
         1,  # Default confirmations
     )
 
+
+################################################################
+#                     EXTERNAL FUNCTIONS                       #
+################################################################
 
 @view
 @external
@@ -523,12 +552,3 @@ def lzReceive(
         self._commit_block(block_number, block_hash)
 
     return True
-
-
-@internal
-def _commit_block(_block_number: uint256, _block_hash: bytes32):
-    """
-    @notice Commit block hash to oracle
-    """
-    assert self.block_oracle != empty(address), "Oracle not configured"
-    extcall IBlockOracle(self.block_oracle).commit_block(_block_number, _block_hash)

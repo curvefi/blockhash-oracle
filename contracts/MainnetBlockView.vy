@@ -6,7 +6,7 @@
 
 @notice A contract that exposes recent blockhashes via view function.
 
-@license Copyright (c) Curve.Fi, 2020-2025 - all rights reserved
+@license Copyright (c) Curve.Fi, 2025 - all rights reserved
 
 @author curve.fi
 

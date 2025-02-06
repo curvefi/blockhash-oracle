@@ -63,16 +63,19 @@ RESOLVER_TYPE: constant(uint16) = 1
 LZ_OPTION_SIZE: constant(uint256) = 64
 LZ_DOUBLE_OPTION_SIZE: constant(uint256) = LZ_OPTION_SIZE * 2
 
+#
+MAX_DVNS: constant(uint8) = 10
+MAX_PEERS_AT_CONFIG_CALL: constant(uint256) = 30
 ################################################################
 #                           STORAGE                            #
 ################################################################
 
-LZ_ENDPOINT: public(immutable(address))
+LZ_ENDPOINT: public(address)  # No longer immutable
 LZ_PEERS: public(HashMap[uint32, address])
 LZ_READ_CHANNEL: public(uint32)
 LZ_DELEGATE: public(address)
 default_gas_limit: public(uint256)
-
+is_initialized: public(bool)
 
 ################################################################
 #                           STRUCTS                            #
@@ -118,8 +121,8 @@ struct ULNConfig:
     required_dvn_count: uint8
     optional_dvn_count: uint8
     optional_dvn_threshold: uint8
-    required_dvns: DynArray[address, 10]  # Max 10 DVNs
-    optional_dvns: DynArray[address, 10]  # Max 10 DVNs
+    required_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
+    optional_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
 
 
 struct ULNReadConfig:
@@ -127,8 +130,8 @@ struct ULNReadConfig:
     required_dvn_count: uint8
     optional_dvn_count: uint8
     optional_dvn_threshold: uint8
-    required_dvns: DynArray[address, 10]  # Max 10 DVNs
-    optional_dvns: DynArray[address, 10]  # Max 10 DVNs
+    required_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
+    optional_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
 
 
 ################################################################
@@ -136,12 +139,11 @@ struct ULNReadConfig:
 ################################################################
 
 @deploy
-def __init__(_endpoint: address, _gas_limit: uint256, _read_channel: uint32):
-    """@notice Initialize with endpoint and default gas limit"""
-
-    LZ_ENDPOINT = _endpoint
-    self._set_default_gas_limit(_gas_limit)
-    self._set_lz_read_channel(_read_channel)
+def __init__():
+    """
+    @notice Empty constructor for deterministic deployment
+    """
+    pass
 
 
 ################################################################
@@ -151,6 +153,27 @@ def __init__(_endpoint: address, _gas_limit: uint256, _read_channel: uint32):
 # proper authorization.
 # Exposing these functions without ownership check will lead to anyone
 # being able to bridge any message/command (=loss of funds).
+
+@internal
+def _initialize(_endpoint: address, _default_gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, MAX_PEERS_AT_CONFIG_CALL], _peers: DynArray[address, MAX_PEERS_AT_CONFIG_CALL]):
+    """
+    @notice Configure the contract with core settings
+    @param _endpoint LayerZero endpoint address
+    @param _default_gas_limit Default gas limit for messages
+    @param _read_channel LZ Read channel ID
+    @dev can only be called once
+    """
+    assert _endpoint != empty(address), "Invalid endpoint"
+    assert len(_peer_eids) == len(_peers), "Invalid peer arrays"
+    assert not self.is_initialized, "Already initialized"
+
+    self.LZ_ENDPOINT = _endpoint
+    self._set_default_gas_limit(_default_gas_limit)
+    self._set_lz_read_channel(_read_channel)
+    for i:uint256 in range(0, len(_peer_eids), bound=MAX_PEERS_AT_CONFIG_CALL):
+        self._set_peer(_peer_eids[i], _peers[i])
+    self.is_initialized = True
+
 
 @internal
 def _set_peer(_srcEid: uint32, _peer: address):
@@ -177,7 +200,7 @@ def _set_lz_read_channel(_read_channel: uint32):
 def _set_delegate(_delegate: address):
     """@notice Set delegate that can change any LZ setting"""
 
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setDelegate(_delegate)
+    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setDelegate(_delegate)
     self.LZ_DELEGATE = _delegate
 
 
@@ -185,14 +208,14 @@ def _set_delegate(_delegate: address):
 def _set_send_lib(_eid: uint32, _lib: address):
     """@notice Set new send library for send requests"""
 
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setSendLibrary(self, _eid, _lib)
+    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setSendLibrary(self, _eid, _lib)
 
 
 @internal
 def _set_receive_lib(_eid: uint32, _lib: address):
     """@notice Set new receive library for receive requests"""
 
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
+    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
     # 0 is for grace period, not used in this contract
 
 
@@ -203,8 +226,8 @@ def _set_uln_config(
     _lib: address,
     _config_type: uint32,
     _confirmations: uint64,
-    _required_dvns: DynArray[address, 10],
-    _optional_dvns: DynArray[address, 10],
+    _required_dvns: DynArray[address, MAX_DVNS],
+    _optional_dvns: DynArray[address, MAX_DVNS],
     _optional_dvn_threshold: uint8,
 ):
     """
@@ -217,7 +240,7 @@ def _set_uln_config(
     )
 
     # Call endpoint to set config
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setConfig(_oapp, _lib, [config_param])
+    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setConfig(_oapp, _lib, [config_param])
 
 
 ################################################################
@@ -367,6 +390,7 @@ def _encode_read_request(_request: EVMCallRequestV1) -> Bytes[LZ_MESSAGE_SIZE_CA
 ################################################################
 #                       CORE FUNCTIONS                         #
 ################################################################
+
 @internal
 @view
 def _prepare_messaging_params(
@@ -471,7 +495,7 @@ def _quote_lz_fee(
     params: MessagingParams = self._prepare_messaging_params(
         _dstEid, convert(_receiver, bytes32), _message, _gas_limit, _value, _data_size
     )
-    fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
+    fees: MessagingFee = staticcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).quote(params, self)
     return fees.nativeFee
 
 
@@ -502,10 +526,10 @@ def _send_message(
         message_value = _request_msg_value
 
     if _perform_fee_check:
-        fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
+        fees: MessagingFee = staticcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, _refund_address, value=message_value)
+    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).send(params, _refund_address, value=message_value)
 
 
 @payable
@@ -522,7 +546,7 @@ def _lz_receive(
     @dev Must be called by importing contract's lzReceive
     """
 
-    assert msg.sender == LZ_ENDPOINT, "Not LZ endpoint"
+    assert msg.sender == self.LZ_ENDPOINT, "Not LZ endpoint"
     assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
     assert (
         convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid]
