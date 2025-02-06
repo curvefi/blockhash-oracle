@@ -482,29 +482,30 @@ def _send_message(
     _receiver: bytes32,
     _message: Bytes[LZ_MESSAGE_SIZE_CAP],
     _gas_limit: uint256 = 0,
-    _value: uint256 = 0,
+    _lz_receive_value: uint256 = 0,
     _data_size: uint32 = 0,
-    _msg_value: uint256 = 0,
+    _request_msg_value: uint256 = 0,
+    _refund_address: address = msg.sender,
     _perform_fee_check: bool = False,
 ):
     """@notice Send message using prepared parameters"""
 
     params: MessagingParams = self._prepare_messaging_params(
-        _dstEid, _receiver, _message, _gas_limit, _value, _data_size
+        _dstEid, _receiver, _message, _gas_limit, _lz_receive_value, _data_size
     )
 
     # optional logic to call send as part of larger transaction
     message_value: uint256 = 0
-    if _msg_value == 0:
+    if _request_msg_value == 0:
         message_value = msg.value
     else:
-        message_value = _msg_value
+        message_value = _request_msg_value
 
     if _perform_fee_check:
         fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, msg.sender, value=message_value)
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, _refund_address, value=message_value)
 
 
 @payable
