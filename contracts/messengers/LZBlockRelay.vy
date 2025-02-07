@@ -45,7 +45,6 @@ exports: (
 
 # Import ownership management
 from snekmate.auth import ownable
-
 initializes: ownable
 exports: (
     ownable.owner,
@@ -53,12 +52,14 @@ exports: (
     ownable.renounce_ownership,
 )
 
+
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
 
 N_CHAINS_MAX: constant(uint256) = 100
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
+
 
 ################################################################
 #                            STORAGE                           #
@@ -68,7 +69,6 @@ is_initialized: public(bool)
 
 # Broadcast targets
 broadcast_targets: public(HashMap[uint32, address])  # eid => target address
-known_eids: public(DynArray[uint32, N_CHAINS_MAX])  # List of configured EIDs
 
 # Struct for cached broadcast info
 struct BroadcastTarget:
@@ -277,29 +277,6 @@ def withdraw_eth(_amount: uint256):
     send(msg.sender, _amount)
 
 
-@internal
-def _add_known_eid(_eid: uint32):
-    """
-    @notice Add EID to known list if not present
-    """
-    for existing_eid: uint32 in self.known_eids:
-        if existing_eid == _eid:
-            return
-    self.known_eids.append(_eid)
-
-
-@internal
-def _remove_known_eid(_eid: uint32):
-    """
-    @notice Remove EID from known list
-    """
-    new_eids: DynArray[uint32, N_CHAINS_MAX] = []
-    for existing_eid: uint32 in self.known_eids:
-        if existing_eid != _eid:
-            new_eids.append(existing_eid)
-    self.known_eids = new_eids
-
-
 @external
 def add_broadcast_target(_eid: uint32, _target: address):
     """
@@ -310,7 +287,6 @@ def add_broadcast_target(_eid: uint32, _target: address):
     ownable._check_owner()
     assert self.broadcast_targets[_eid] == empty(address), "Already added"
     self.broadcast_targets[_eid] = _target
-    self._add_known_eid(_eid)
 
 
 @external
@@ -321,7 +297,6 @@ def remove_broadcast_target(_eid: uint32):
     ownable._check_owner()
     assert self.broadcast_targets[_eid] != empty(address), "Not a target"
     self.broadcast_targets[_eid] = empty(address)
-    self._remove_known_eid(_eid)
 
 
 @external
