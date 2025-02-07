@@ -559,42 +559,6 @@ def _lz_receive(
 
 @view
 @external
-def prepare_read_message_bytes(
-    _dst_eid: uint32,
-    _target: address,
-    _calldata: Bytes[LZ_READ_CALLDATA_SIZE],
-    _isBlockNum: bool = False,  # Use timestamp by default
-    _blockNumOrTimestamp: uint64 = 0,  # Uses latest ts (or block!) if 0
-    _confirmations: uint16 = 15,
-) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
-    """
-    @notice Prepare read request message from basic parameters
-    @dev Constructs EVMCallRequestV1, encodes it into message and returns Bytes
-    Uses current block timestamp and default confirmations.
-    """
-
-    return self._prepare_read_message_bytes(
-        _dst_eid, _target, _calldata, _isBlockNum, _blockNumOrTimestamp, _confirmations
-    )
-
-
-@view
-@external
-def quote_lz_fee(
-    _dstEid: uint32,
-    _receiver: address,
-    _message: Bytes[LZ_MESSAGE_SIZE_CAP],
-    _gas_limit: uint256 = 0,
-    _value: uint256 = 0,
-    _data_size: uint32 = 0,
-) -> uint256:
-    """@notice Quote fee for sending message"""
-
-    return self._quote_lz_fee(_dstEid, _receiver, _message, _gas_limit, _value, _data_size)
-
-
-@view
-@external
 def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
     """@notice Protocol endpoint for nonce tracking"""
 

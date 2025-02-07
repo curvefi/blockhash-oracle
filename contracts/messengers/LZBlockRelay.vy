@@ -35,8 +35,6 @@ exports: (
     lz.LZ_ENDPOINT,
     lz.LZ_PEERS,
     lz.LZ_DELEGATE,
-    lz.LZ_MESSAGE_SIZE_CAP,
-    lz.LZ_READ_CALLDATA_SIZE,
     lz.LZ_READ_CHANNEL,
     lz.default_gas_limit,
     lz.nextNonce,
@@ -57,7 +55,7 @@ exports: (
 #                           CONSTANTS                          #
 ################################################################
 
-N_CHAINS_MAX: constant(uint256) = 100
+MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
 
 
@@ -76,7 +74,7 @@ struct BroadcastTarget:
     fee: uint256
 
 # Cached broadcast targets
-cached_broadcast_targets: DynArray[BroadcastTarget, N_CHAINS_MAX]
+cached_broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
 
 # Read configuration
 is_read_enabled: public(bool)
@@ -95,7 +93,7 @@ event BlockHashBroadcast:
     source_eid: uint32
     block_number: uint256
     block_hash: bytes32
-    targets: DynArray[BroadcastTarget, N_CHAINS_MAX]
+    targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
 
 
 ################################################################
@@ -397,8 +395,8 @@ def quote_read_fee(
 @view
 @external
 def quote_broadcast_fees(
-    _target_eids: DynArray[uint32, N_CHAINS_MAX], _gas_limit: uint256 = 0
-) -> DynArray[uint256, N_CHAINS_MAX]:
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST], _gas_limit: uint256 = 0
+) -> DynArray[uint256, MAX_N_BROADCAST]:
     """
     @notice Quote fees for broadcasting block hash to specified targets
     @param _target_eids List of chain IDs to broadcast to
@@ -409,7 +407,7 @@ def quote_broadcast_fees(
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = abi_encode(empty(uint256), empty(bytes32))
 
     # Get fees per chain
-    fees: DynArray[uint256, N_CHAINS_MAX] = []
+    fees: DynArray[uint256, MAX_N_BROADCAST] = []
 
     for eid: uint32 in _target_eids:
         target: address = self.broadcast_targets[eid]
@@ -426,8 +424,8 @@ def quote_broadcast_fees(
 @payable
 @external
 def request_block_hash(
-    _target_eids: DynArray[uint32, N_CHAINS_MAX],
-    _target_fees: DynArray[uint256, N_CHAINS_MAX],  # Add fees array parameter
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],  # Add fees array parameter
     _block_number: uint256 = 0,
     _gas_limit: uint256 = 0,
 ):
@@ -446,9 +444,9 @@ def request_block_hash(
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
     # Cache target EIDs and fees for lzReceive
-    cached_targets: DynArray[BroadcastTarget, N_CHAINS_MAX] = []
+    cached_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     sum_target_fees: uint256 = 0
-    for i: uint256 in range(0, len(_target_eids), bound=N_CHAINS_MAX):
+    for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
         cached_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
     self.cached_broadcast_targets = cached_targets
@@ -499,7 +497,7 @@ def lzReceive(
         self._commit_block(block_number, block_hash)
 
         # Get cached targets and broadcast if we have any
-        broadcast_targets: DynArray[BroadcastTarget, N_CHAINS_MAX] = self.cached_broadcast_targets
+        broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.cached_broadcast_targets
         if len(broadcast_targets) > 0:
             for target: BroadcastTarget in broadcast_targets:
                 target_address: address = self.broadcast_targets[target.eid]
@@ -517,9 +515,8 @@ def lzReceive(
                     False,  # _perform_fee_check: No fee check
                 )
 
-
             # Clear cache after broadcasting
-            self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, N_CHAINS_MAX])
+            self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, MAX_N_BROADCAST])
 
             # Extract eids for event
             log BlockHashBroadcast(_origin.srcEid, block_number, block_hash, broadcast_targets)
