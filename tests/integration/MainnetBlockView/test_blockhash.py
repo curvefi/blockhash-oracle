@@ -50,7 +50,7 @@ def test_out_of_range_safe(mainnet_block_view):
     current_block = boa.env.evm.patch.block_number
 
     # Too recent
-    assert mainnet_block_view.get_blockhash(current_block - 64) == (0, b"\x00" * 32)
+    assert mainnet_block_view.get_blockhash(current_block - 64, True) == (0, b"\x00" * 32)
 
     # Too old
-    assert mainnet_block_view.get_blockhash(current_block - 256) == (0, b"\x00" * 32)
+    assert mainnet_block_view.get_blockhash(current_block - 256, True) == (0, b"\x00" * 32)
