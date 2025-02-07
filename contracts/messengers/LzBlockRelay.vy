@@ -58,8 +58,7 @@ exports: (
 ################################################################
 
 N_CHAINS_MAX: constant(uint256) = 100
-GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash()")
-GET_BLOCKHASH_WITH_ARG_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256)")
+GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
 
 ################################################################
 #                            STORAGE                           #
@@ -71,13 +70,13 @@ is_initialized: public(bool)
 broadcast_targets: public(HashMap[uint32, address])  # eid => target address
 known_eids: public(DynArray[uint32, N_CHAINS_MAX])  # List of configured EIDs
 
-# Add new struct for cached broadcast info
+# Struct for cached broadcast info
 struct BroadcastTarget:
     eid: uint32
     fee: uint256
 
-# Modify storage
-cached_broadcast_targets: DynArray[BroadcastTarget, N_CHAINS_MAX]  # Replace simple eid array
+# Cached broadcast targets
+cached_broadcast_targets: DynArray[BroadcastTarget, N_CHAINS_MAX]
 
 # Read configuration
 is_read_enabled: public(bool)
@@ -87,31 +86,10 @@ mainnet_block_view: public(address)
 # Block oracle
 block_oracle: public(address)
 
+
 ################################################################
 #                            EVENTS                            #
 ################################################################
-
-event MessageSent:
-    destination: uint32
-    payload: String[128]
-    fees: uint256
-
-
-event MessageReceived:
-    source: uint32
-    payload: String[128]
-
-
-event ReadRequestSent:
-    destination: uint32
-    target: address
-    payload: Bytes[128]
-
-
-event ReadResponseReceived:
-    source: uint32
-    response: String[128]
-
 
 event BlockHashBroadcast:
     source_eid: uint32
@@ -135,7 +113,18 @@ def __init__(_owner: address):
 
 
 @external
-def initialize(_endpoint: address, _gas_limit: uint256, _read_channel: uint32, _peer_eids: DynArray[uint32, lz.MAX_INIT_PEERS], _peers: DynArray[address, lz.MAX_INIT_PEERS]):
+def initialize(
+    _endpoint: address,
+    _gas_limit: uint256,
+    _read_channel: uint32,
+    # Can optionally initialize with peers
+    _peer_eids: DynArray[uint32, lz.MAX_INIT_PEERS],
+    _peers: DynArray[address, lz.MAX_INIT_PEERS],
+    # Also can provide libs (must provide lib types: 1 for lzsend, 2 for lzreceive)
+    _channels: DynArray[uint32, lz.MAX_INIT_PEERS],
+    _libs: DynArray[address, lz.MAX_INIT_PEERS],
+    _lib_types: DynArray[uint16, lz.MAX_INIT_PEERS],
+):
     """
     @notice Initialize contract with core settings
     @dev Can only be called once, assumes caller is owner, sets as delegate
@@ -154,6 +143,17 @@ def initialize(_endpoint: address, _gas_limit: uint256, _read_channel: uint32, _
 
     # Set owner as delegate
     lz._set_delegate(msg.sender)
+
+    # Set libs if provided
+    assert len(_channels) == len(_libs), "Libs-channels length mismatch"
+    assert len(_libs) == len(_lib_types), "Libs-types length mismatch"
+    for i: uint256 in range(0, len(_channels), bound=lz.MAX_INIT_PEERS):
+        if _lib_types[i] == 1:
+            lz._set_send_lib(_channels[i], _libs[i])
+        elif _lib_types[i] == 2:
+            lz._set_receive_lib(_channels[i], _libs[i])
+        else:
+            raise("Invalid lib type")
 
 
 ################################################################
@@ -370,11 +370,9 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[lz.LZ_MESSAGE_SIZE_CA
     @return Prepared LayerZero message bytes
     """
     # Build calldata
-    calldata: Bytes[lz.LZ_READ_CALLDATA_SIZE] = empty(Bytes[lz.LZ_READ_CALLDATA_SIZE])
-    if _block_number == 0:
-        calldata = GET_BLOCKHASH_SELECTOR
-    else:
-        calldata = abi_encode(_block_number, method_id=GET_BLOCKHASH_WITH_ARG_SELECTOR)
+    calldata: Bytes[lz.LZ_READ_CALLDATA_SIZE] = abi_encode(
+        _block_number, True, method_id=GET_BLOCKHASH_SELECTOR
+    )
 
 
     # Prepare read message
@@ -394,7 +392,12 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[lz.LZ_MESSAGE_SIZE_CA
 
 @view
 @external
-def quote_read_fee(_block_number: uint256 = 0, _gas_limit: uint256 = 0, _value: uint256 = 0, _data_size: uint32 = 64) -> uint256:
+def quote_read_fee(
+    _block_number: uint256 = 0,
+    _gas_limit: uint256 = 0,
+    _value: uint256 = 0,
+    _data_size: uint32 = 64,
+) -> uint256:
     """
     @notice Quote fee for reading block hash from mainnet
     @param _block_number Optional block number (0 means latest)
@@ -407,7 +410,12 @@ def quote_read_fee(_block_number: uint256 = 0, _gas_limit: uint256 = 0, _value: 
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = self._prepare_read_request(_block_number)
 
     return lz._quote_lz_fee(
-        lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _value, _data_size  # Expected response size
+        lz.LZ_READ_CHANNEL,
+        empty(address),
+        message,
+        _gas_limit,
+        _value,
+        _data_size,  # Expected response size
     )
 
 
@@ -446,7 +454,7 @@ def request_block_hash(
     _target_eids: DynArray[uint32, N_CHAINS_MAX],
     _target_fees: DynArray[uint256, N_CHAINS_MAX],  # Add fees array parameter
     _block_number: uint256 = 0,
-    _gas_limit: uint256 = 0
+    _gas_limit: uint256 = 0,
 ):
     """
     @notice Request block hash from mainnet and broadcast to specified targets
@@ -466,10 +474,7 @@ def request_block_hash(
     cached_targets: DynArray[BroadcastTarget, N_CHAINS_MAX] = []
     sum_target_fees: uint256 = 0
     for i: uint256 in range(0, len(_target_eids), bound=N_CHAINS_MAX):
-        cached_targets.append(BroadcastTarget(
-            eid = _target_eids[i],
-            fee = _target_fees[i]
-        ))
+        cached_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
     self.cached_broadcast_targets = cached_targets
 
@@ -485,7 +490,7 @@ def request_block_hash(
         64,  # _data_size: Expected read size (uint256: block number, bytes32: block hash)
         msg.value,  # _request_msg_value: Use cached fee as send message value
         msg.sender,  # _refund_address: Refund unspent fees to read requestor
-        False  # _perform_fee_check: No fee check
+        False,  # _perform_fee_check: No fee check
     )
 
 
@@ -516,8 +521,6 @@ def lzReceive(
         if block_hash == empty(bytes32):
             return True  # Invalid response
 
-
-        # First commit locally
         self._commit_block(block_number, block_hash)
 
         # Get cached targets and broadcast if we have any
@@ -538,6 +541,7 @@ def lzReceive(
                     self,  # _refund_address: shouldn't refund executor (can call withdraw_eth later)
                     False,  # _perform_fee_check: No fee check
                 )
+
 
             # Clear cache after broadcasting
             self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, N_CHAINS_MAX])

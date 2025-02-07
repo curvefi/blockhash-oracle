@@ -8950,6 +8950,7 @@
             "chainLayer": "L3",
             "nativeCurrency": {
                 "symbol": "BERA",
+                "cmcId": 24647,
                 "decimals": 18
             }
         },
@@ -9005,7 +9006,12 @@
                 "canonicalName": "MIM",
                 "id": "mim"
             }
-        }
+        },
+        "blockExplorers": [
+            {
+                "url": "https://berascan.com"
+            }
+        ]
     },
     "bera-testnet": {
         "deployments": [
@@ -20589,10 +20595,25 @@
             }
         },
         "dvns": {
+            "0x049e0ecaa2b3b4fc1966b06481d0b584e983327f4e55b185a73b8bd2eb7650e2": {
+                "version": 2,
+                "canonicalName": "Horizen",
+                "id": "horizen-labs"
+            },
+            "0x0bdb39aae986f3fad5c19a9a9c888f8cc4c3e2c042c23533b71b701db62633a7": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
+            },
             "0x0d122dec4ec8bd66c68344faf0dd471d727a7d57a21b62051705bbe2e4c272a7": {
                 "version": 2,
                 "canonicalName": "LayerZero Labs",
                 "id": "layerzero-labs"
+            },
+            "0x04b9f9836004d7f53e52e01602d9c07c14cdf38b8a946b6e813cfea8de10927d": {
+                "version": 2,
+                "canonicalName": "USDT0",
+                "id": "usdt0"
             }
         },
         "blockExplorers": [
@@ -21148,6 +21169,16 @@
                 "canonicalName": "TSS",
                 "id": "tss"
             },
+            "0x54dd79f5ce72b51fcbbcb170dd01e32034323565": {
+                "version": 2,
+                "canonicalName": "Horizen",
+                "id": "horizen-labs"
+            },
+            "0xdfbb5c677db41b5ef3a180509cde27b5c9784655": {
+                "version": 2,
+                "canonicalName": "Bitgo",
+                "id": "bitgo"
+            },
             "0xdd7b5e1db4aafd5c8ec3b764efb8ed265aa5445b": {
                 "version": 2,
                 "canonicalName": "Stargate",
@@ -21157,11 +21188,6 @@
                 "version": 2,
                 "canonicalName": "Nethermind",
                 "id": "nethermind"
-            },
-            "0x54dd79f5ce72b51fcbbcb170dd01e32034323565": {
-                "version": 2,
-                "canonicalName": "Horizen",
-                "id": "horizen-labs"
             },
             "0x282b3386571f7f794450d5789911a9804fa346b4": {
                 "version": 2,
@@ -21245,6 +21271,11 @@
             }
         },
         "dvns": {
+            "0x2e6be93a9a50eeb5fb0cbd83323b2509e7be15ab": {
+                "version": 2,
+                "canonicalName": "Bitgo",
+                "id": "bitgo"
+            },
             "0x88b27057a9e00c5f05dda29241027aff63f9e6e0": {
                 "version": 2,
                 "canonicalName": "LayerZero Labs",
@@ -21390,12 +21421,6 @@
             "shortName": "Base"
         },
         "dvns": {
-            "0xd77a62b54ee18bcd667b6cd158d5a000182af5cf": {
-                "id": "bcw",
-                "lzReadCompatible": true,
-                "version": 2,
-                "canonicalName": "BCW"
-            },
             "0x9e930731cb4a6bf7ecc11f695a295c60bdd212eb": {
                 "id": "zenrock",
                 "version": 2,
@@ -21411,6 +21436,60 @@
                 "version": 2,
                 "canonicalName": "Superform",
                 "id": "superform"
+            },
+            "0xcd37ca043f8479064e10635020c65ffc005d36f6": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
+            },
+            "0xd56e4eab23cb81f43168f9f45211eb027b9ac7cc": {
+                "version": 2,
+                "canonicalName": "Google",
+                "id": "google-cloud"
+            },
+            "0xaab5a48cfc03efa9cc34a2c1aacccb84b4b770e4": {
+                "version": 1,
+                "canonicalName": "TSS",
+                "id": "tss"
+            },
+            "0xcdf31d62140204c08853b547e64707110fbc6680": {
+                "version": 2,
+                "canonicalName": "Stargate",
+                "id": "stargate"
+            },
+            "0xe014fe8c4d5c23edb7ac4011f226e869ac7ef5cc": {
+                "version": 1,
+                "canonicalName": "Polyhedra",
+                "id": "polyhedra-network"
+            },
+            "0x8deec5b3deb8640bf79b334b59227454e0901953": {
+                "id": "altlayer",
+                "lzReadCompatible": true,
+                "version": 2,
+                "canonicalName": "AltLayer",
+                "deprecated": true
+            },
+            "0x41ef29f974fc9f6772654f005271c64210425391": {
+                "id": "animoca-blockdaemon",
+                "lzReadCompatible": true,
+                "version": 2,
+                "canonicalName": "ABDB"
+            },
+            "0x5b6735c66d97479ccd18294fc96b3084ecb2fa3f": {
+                "version": 2,
+                "canonicalName": "P2P",
+                "id": "p2p"
+            },
+            "0xa7b5189bca84cd304d8553977c7c614329750d99": {
+                "version": 2,
+                "canonicalName": "Horizen",
+                "id": "horizen-labs"
+            },
+            "0xd77a62b54ee18bcd667b6cd158d5a000182af5cf": {
+                "id": "bcw",
+                "lzReadCompatible": true,
+                "version": 2,
+                "canonicalName": "BCW"
             },
             "0x658947bc7956aea0067a62cf87ab02ae199ef3f3": {
                 "id": "nethermind",
@@ -21433,11 +21512,6 @@
                 "canonicalName": "Bitgo",
                 "id": "bitgo"
             },
-            "0xcd37ca043f8479064e10635020c65ffc005d36f6": {
-                "version": 2,
-                "canonicalName": "Nethermind",
-                "id": "nethermind"
-            },
             "0xc50a49186aa80427aa3b0d3c2cec19ba64222a29": {
                 "version": 2,
                 "canonicalName": "Lagrange",
@@ -21448,11 +21522,6 @@
                 "lzReadCompatible": true,
                 "version": 2,
                 "canonicalName": "LayerZero Labs"
-            },
-            "0xd56e4eab23cb81f43168f9f45211eb027b9ac7cc": {
-                "version": 2,
-                "canonicalName": "Google",
-                "id": "google-cloud"
             },
             "0x6498b0632f3834d7647367334838111c8c889703": {
                 "id": "lz-dead-dvn",
@@ -21465,49 +21534,16 @@
                 "canonicalName": "Omnix",
                 "id": "omni-x"
             },
-            "0xaab5a48cfc03efa9cc34a2c1aacccb84b4b770e4": {
-                "version": 1,
-                "canonicalName": "TSS",
-                "id": "tss"
-            },
             "0x9e059a54699a285714207b43b055483e78faac25": {
                 "version": 2,
                 "canonicalName": "LayerZero Labs",
                 "id": "layerzero-labs"
-            },
-            "0xcdf31d62140204c08853b547e64707110fbc6680": {
-                "version": 2,
-                "canonicalName": "Stargate",
-                "id": "stargate"
             },
             "0x7a3d18e2324536294cd6f054cdde7c994f40391a": {
                 "id": "bitgo",
                 "version": 2,
                 "canonicalName": "Bitgo",
                 "deprecated": true
-            },
-            "0xe014fe8c4d5c23edb7ac4011f226e869ac7ef5cc": {
-                "version": 1,
-                "canonicalName": "Polyhedra",
-                "id": "polyhedra-network"
-            },
-            "0x8deec5b3deb8640bf79b334b59227454e0901953": {
-                "id": "altlayer",
-                "lzReadCompatible": true,
-                "version": 2,
-                "canonicalName": "AltLayer",
-                "deprecated": true
-            },
-            "0x41ef29f974fc9f6772654f005271c64210425391": {
-                "id": "animoca-blockdaemon",
-                "lzReadCompatible": true,
-                "version": 2,
-                "canonicalName": "ABDB"
-            },
-            "0xa7b5189bca84cd304d8553977c7c614329750d99": {
-                "version": 2,
-                "canonicalName": "Horizen",
-                "id": "horizen-labs"
             },
             "0xdd7b5e1db4aafd5c8ec3b764efb8ed265aa5445b": {
                 "version": 2,
@@ -28916,6 +28952,11 @@
             }
         },
         "dvns": {
+            "0x91e698871030d0e1b6c9268c20bb57e2720618dd": {
+                "version": 1,
+                "canonicalName": "TSS",
+                "id": "tss"
+            },
             "0x88b27057a9e00c5f05dda29241027aff63f9e6e0": {
                 "version": 2,
                 "canonicalName": "LayerZero Labs",

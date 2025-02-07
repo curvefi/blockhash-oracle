@@ -61,11 +61,10 @@ RESOLVER_TYPE: constant(uint16) = 1
 
 # Options size cap
 LZ_OPTION_SIZE: constant(uint256) = 64
-LZ_DOUBLE_OPTION_SIZE: constant(uint256) = LZ_OPTION_SIZE * 2
 
 #
 MAX_DVNS: constant(uint8) = 10
-MAX_INIT_PEERS: constant(uint256) = 30
+MAX_INIT_PEERS: constant(uint256) = 32
 ################################################################
 #                           STORAGE                            #
 ################################################################
@@ -285,7 +284,7 @@ def _prepare_read_options(
         convert(convert(_gas, uint128), bytes16),  # gas
         convert(_data_size, bytes4),  # data size
     )
-    option_data: Bytes[36] = concat(gas_data_option, b'')  # explicitly create Bytes[32]
+    option_data: Bytes[36] = concat(gas_data_option, b'')  # explicitly create Bytes[36]
 
     if _value > 0:
         option_data = concat(gas_data_option, convert(convert(_value, uint128), bytes16))
@@ -557,6 +556,7 @@ def _lz_receive(
 ################################################################
 #                     EXTERNAL FUNCTIONS                       #
 ################################################################
+
 @view
 @external
 def prepare_read_message_bytes(
