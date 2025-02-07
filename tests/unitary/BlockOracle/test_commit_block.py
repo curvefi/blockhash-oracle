@@ -8,7 +8,7 @@ def committers(block_oracle, dev_deployer):
     for i in range(5):
         committer_address = boa.env.generate_address()
         with boa.env.prank(dev_deployer):
-            block_oracle.add_committer(committer_address)
+            block_oracle.add_committer(committer_address, True if i == 0 else False)
         res.append(committer_address)
     return res
 
@@ -139,3 +139,71 @@ def test_block_already_committed(block_oracle, committers):
 
     # Hash should remain unchanged
     assert block_oracle.block_hash(mock_block_num) == mock_block_hash1
+
+
+def test_admin_apply_block(block_oracle, dev_deployer):
+    """Test admin_apply_block functionality"""
+    mock_block_num = 12345
+    mock_hash = b"\x01" * 32
+
+    # Non-owner cannot apply
+    with boa.reverts("ownable: caller is not the owner"):
+        block_oracle.admin_apply_block(mock_block_num, mock_hash)
+
+    # Owner can apply
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(mock_block_num, mock_hash)
+
+    assert block_oracle.block_hash(mock_block_num) == mock_hash
+    assert block_oracle.last_confirmed_block_number() == mock_block_num
+
+
+def test_commit_after_admin_apply(block_oracle, committers, dev_deployer):
+    """Test that commits are rejected after admin applies a block"""
+    mock_block_num = 12345
+    mock_hash = b"\x01" * 32
+    different_hash = b"\x02" * 32
+
+    # Admin applies block
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(mock_block_num, mock_hash)
+
+    # Try to commit same block
+    with boa.reverts("Already applied"):
+        with boa.env.prank(committers[0]):
+            block_oracle.commit_block(mock_block_num, different_hash)
+
+
+def test_last_confirmed_block_number(block_oracle, committers):
+    """Test last_confirmed_block_number updates correctly"""
+    blocks = [100, 200, 150, 300]  # Non-sequential blocks
+    mock_hash = b"\x01" * 32
+    max_committed = 0
+    for block_num in blocks:
+        with boa.env.prank(committers[0]):
+            block_oracle.commit_block(block_num, mock_hash)
+            max_committed = max(max_committed, block_num)
+            # Should update only if greater than current
+            assert block_oracle.last_confirmed_block_number() == max_committed
+
+
+def test_apply_block_permissionless(block_oracle, committers):
+    """Test permissionless apply_block function"""
+    mock_block_num = 12345
+    mock_hash = b"\x01" * 32
+
+    # Set threshold to 2
+    with boa.env.prank(block_oracle.owner()):
+        block_oracle.set_threshold(2)
+
+    # Have committers commit but not apply
+    for i in range(2):
+        with boa.env.prank(committers[i]):
+            block_oracle.commit_block(mock_block_num, mock_hash, False)
+
+    # Random address can trigger apply
+    random_address = boa.env.generate_address()
+    with boa.env.prank(random_address):
+        block_oracle.apply_block(mock_block_num, mock_hash)
+    result_hash = block_oracle.block_hash(mock_block_num)
+    assert result_hash == mock_hash

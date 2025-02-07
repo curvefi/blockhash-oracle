@@ -53,42 +53,60 @@ event RemoveCommitter:
     committer: indexed(address)
 
 ################################################################
+#                            CONSTANTS                          #
+################################################################
+
+MAX_COMMITTERS: constant(uint256) = 32
+
+################################################################
 #                            STORAGE                           #
 ################################################################
 
 block_hash: public(HashMap[uint256, bytes32])  # block_number => hash
 last_confirmed_block_number: public(uint256)
 
-num_committers: public(uint256)
+committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
 commitment_count: public(HashMap[uint256, HashMap[bytes32, uint256]])  # block_number => hash => count
 committer_votes: public(HashMap[address, HashMap[uint256, bytes32]])  # committer => block_number => committed_hash
 threshold: public(uint256)
 
 
+################################################################
+#                         CONSTRUCTOR                          #
+################################################################
+
 @deploy
-def __init__(_threshold: uint256, _owner: address):
-    self.threshold = _threshold
-    self.num_committers = 0
+def __init__(_owner: address):
+    """
+    @notice Initialize the contract with the owner
+    @param _owner The owner of the contract
+    """
     ownable.__init__()
     ownable._transfer_ownership(_owner)
+
 
 ################################################################
 #                      OWNER FUNCTIONS                         #
 ################################################################
 
 @external
-def add_committer(_committer: address):
+def add_committer(_committer: address, _bump_threshold: bool = False):
     """
     @notice Set trusted address that can commit block data
     @param _committer Address of trusted committer
+    @param _bump_threshold If True, bump threshold to 1 more (useful for initial setup)
     """
 
     ownable._check_owner()
     if not self.is_committer[_committer]:
+        assert len(self.committers) < MAX_COMMITTERS, "Max committers reached"
         self.is_committer[_committer] = True
-        self.num_committers += 1
+        self.committers.append(_committer)
         log AddCommitter(_committer)
+
+        if _bump_threshold:
+            self.threshold += 1
 
 
 @external
@@ -101,7 +119,14 @@ def remove_committer(_committer: address):
     ownable._check_owner()
     if self.is_committer[_committer]:
         self.is_committer[_committer] = False
-        self.num_committers -= 1
+
+        # Rebuild committers array excluding the removed committer
+        new_committers: DynArray[address, MAX_COMMITTERS] = []
+        for committer: address in self.committers:
+            if committer != _committer:
+                new_committers.append(committer)
+        self.committers = new_committers
+
         log RemoveCommitter(_committer)
 
 
@@ -113,7 +138,21 @@ def set_threshold(_new_threshold: uint256):
     """
 
     ownable._check_owner()
+    assert _new_threshold <= len(self.committers), "Threshold cannot be greater than number of committers"
     self.threshold = _new_threshold
+
+
+@external
+def admin_apply_block(block_number: uint256, block_hash: bytes32):
+    """
+    @notice Apply a block hash with admin rights
+    @param block_number The block number to apply
+    @param block_hash The hash to apply
+    @dev Only callable by owner
+    """
+
+    ownable._check_owner()
+    self._apply_block(block_number, block_hash)
 
 
 ################################################################
@@ -163,11 +202,9 @@ def commit_block(block_number: uint256, block_hash: bytes32, apply: bool = True)
     log CommitBlock(msg.sender, block_number, block_hash)
 
     # Optional attempt to apply block
-    if apply:
-        count: uint256 = self.commitment_count[block_number][block_hash]
-        if count >= self.threshold:
-            self._apply_block(block_number, block_hash)
-            return True
+    if apply and self.commitment_count[block_number][block_hash] >= self.threshold:
+        self._apply_block(block_number, block_hash)
+        return True
     return False
 
 
@@ -184,3 +221,12 @@ def apply_block(block_number: uint256, block_hash: bytes32):
     assert self.block_hash[block_number] == empty(bytes32), "Already applied"
     assert self.commitment_count[block_number][block_hash] >= self.threshold, "Insufficient commitments"
     self._apply_block(block_number, block_hash)
+
+
+@external
+def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
+    """
+    @notice Get all committers
+    @return All committers
+    """
+    return self.committers
