@@ -43,6 +43,7 @@ exports: (
 
 # Import ownership management
 from snekmate.auth import ownable
+
 initializes: ownable
 exports: (
     ownable.owner,
@@ -72,6 +73,7 @@ broadcast_targets: public(HashMap[uint32, address])  # eid => target address
 struct BroadcastTarget:
     eid: uint32
     fee: uint256
+
 
 # Cached broadcast targets
 cached_broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
@@ -151,7 +153,7 @@ def initialize(
         elif _lib_types[i] == 2:
             lz._set_receive_lib(_channels[i], _libs[i])
         else:
-            raise("Invalid lib type")
+            raise ("Invalid lib type")
 
 
 ################################################################
@@ -276,15 +278,36 @@ def withdraw_eth(_amount: uint256):
 
 
 @external
-def add_broadcast_target(_eid: uint32, _target: address):
+def add_broadcast_target(_eid: uint32, _target: address, _overwrite: bool = False):
     """
     @notice Add a chain/contract to broadcast block hashes to
     @param _eid Chain ID to broadcast to
     @param _target Target contract address on that chain
+    @param _overwrite if true, will overwrite existing targets and skip asserts
     """
     ownable._check_owner()
-    assert self.broadcast_targets[_eid] == empty(address), "Already added"
+    if not _overwrite:
+        assert self.broadcast_targets[_eid] == empty(address), "Already added"
     self.broadcast_targets[_eid] = _target
+
+
+@external
+def add_multiple_broadcast_targets(
+    _eids: DynArray[uint32, MAX_N_BROADCAST],
+    _targets: DynArray[address, MAX_N_BROADCAST],
+    _overwrite: bool = False
+):
+    """
+    @notice Add multiple broadcast targets
+    @dev batch add is useful for initializing with a list of targets
+    @dev _overwrite: if true, will overwrite existing targets and skip asserts
+    """
+    ownable._check_owner()
+    assert len(_eids) == len(_targets), "Length mismatch"
+    for i: uint256 in range(0, len(_eids), bound=MAX_N_BROADCAST):
+        if not _overwrite:
+            assert self.broadcast_targets[_eids[i]] == empty(address), "One of the targets already added"
+        self.broadcast_targets[_eids[i]] = _targets[i]
 
 
 @external
@@ -497,7 +520,9 @@ def lzReceive(
         self._commit_block(block_number, block_hash)
 
         # Get cached targets and broadcast if we have any
-        broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.cached_broadcast_targets
+        broadcast_targets: DynArray[
+            BroadcastTarget, MAX_N_BROADCAST
+        ] = self.cached_broadcast_targets
         if len(broadcast_targets) > 0:
             for target: BroadcastTarget in broadcast_targets:
                 target_address: address = self.broadcast_targets[target.eid]
@@ -514,6 +539,7 @@ def lzReceive(
                     self,  # _refund_address: shouldn't refund executor (can call withdraw_eth later)
                     False,  # _perform_fee_check: No fee check
                 )
+
 
             # Clear cache after broadcasting
             self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, MAX_N_BROADCAST])
