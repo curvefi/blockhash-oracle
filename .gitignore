@@ -17,3 +17,5 @@ wheels/
 .env
 
 *scan-results.json
+
+*.DS_Store

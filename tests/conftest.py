@@ -131,9 +131,9 @@ def dev_deployer():
 
 
 @pytest.fixture()
-def block_headers_decoder(dev_deployer):
+def block_oracle(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/BlockHeadersRLPDecoder.vy")
+        return boa.load("contracts/BlockOracle.vy", dev_deployer)
 
 
 @pytest.fixture()
