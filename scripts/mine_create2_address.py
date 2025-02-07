@@ -49,7 +49,7 @@ def mine_addresses(
     bytecode = get_contract_bytecode(contract_path, init_args)
     found_addresses = []
     start_time = time.time()
-
+    print(f"Codehash: {keccak256(bytecode).hex()}")
     for i in range(count):
         # Generate salt
         if guard_bytes:
@@ -73,7 +73,7 @@ def main():
     setup_env(rpc_url)
 
     # Contract details
-    contract_path = "contracts/BlockOracle.vy"
+    contract_path = "contracts/messengers/LzBlockRelay.vy"
     deployer = "0x73241E98090042A718f7eb1AF07FAD27ff09A3F3"
 
     # Create guard bytes from deployer address
@@ -83,7 +83,7 @@ def main():
     args_encoded = boa.util.abi.abi_encode("(uint256,address)", (1, deployer))
     # args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
     # Mine addresses
-    addresses = mine_addresses(contract_path, args_encoded, deployer, guard_bytes=None, count=10000)
+    addresses = mine_addresses(contract_path, args_encoded, deployer, guard_bytes=None, count=1)
 
     # Print results in a table format
     print("\nFound Addresses:")
