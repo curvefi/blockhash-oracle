@@ -34,7 +34,7 @@ interface ILayerZeroEndpointV2:
         _oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256
     ): nonpayable
     def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 1]): nonpayable
-
+    def eid() -> uint32: view
 
 ################################################################
 #                           CONSTANTS                          #
@@ -69,7 +69,8 @@ MAX_INIT_PEERS: constant(uint256) = 32
 #                           STORAGE                            #
 ################################################################
 
-LZ_ENDPOINT: public(address)  # No longer immutable
+LZ_ENDPOINT: public(ILayerZeroEndpointV2)  # Not immutable for init fcn
+EID: public(uint32)
 LZ_PEERS: public(HashMap[uint32, address])
 LZ_READ_CHANNEL: public(uint32)
 LZ_DELEGATE: public(address)
@@ -172,7 +173,8 @@ def _initialize(
     assert len(_peer_eids) == len(_peers), "Invalid peer arrays"
     assert not self.is_initialized, "Already initialized"
 
-    self.LZ_ENDPOINT = _endpoint
+    self.LZ_ENDPOINT = ILayerZeroEndpointV2(_endpoint)
+    self.EID = staticcall self.LZ_ENDPOINT.eid()
     self._set_default_gas_limit(_default_gas_limit)
     self._set_lz_read_channel(_read_channel)
     for i: uint256 in range(0, len(_peer_eids), bound=MAX_INIT_PEERS):
@@ -205,7 +207,7 @@ def _set_lz_read_channel(_read_channel: uint32):
 def _set_delegate(_delegate: address):
     """@notice Set delegate that can change any LZ setting"""
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setDelegate(_delegate)
+    extcall self.LZ_ENDPOINT.setDelegate(_delegate)
     self.LZ_DELEGATE = _delegate
 
 
@@ -213,14 +215,14 @@ def _set_delegate(_delegate: address):
 def _set_send_lib(_eid: uint32, _lib: address):
     """@notice Set new send library for send requests"""
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setSendLibrary(self, _eid, _lib)
+    extcall self.LZ_ENDPOINT.setSendLibrary(self, _eid, _lib)
 
 
 @internal
 def _set_receive_lib(_eid: uint32, _lib: address):
     """@notice Set new receive library for receive requests"""
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
+    extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, 0)
     # 0 is for grace period, not used in this contract
 
 
@@ -245,7 +247,7 @@ def _set_uln_config(
     )
 
     # Call endpoint to set config
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setConfig(_oapp, _lib, [config_param])
+    extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param])
 
 
 ################################################################
@@ -477,7 +479,7 @@ def _quote_lz_fee(
     params: MessagingParams = self._prepare_messaging_params(
         _dstEid, convert(_receiver, bytes32), _message, _gas_limit, _value, _data_size
     )
-    fees: MessagingFee = staticcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).quote(params, self)
+    fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
     return fees.nativeFee
 
 
@@ -519,10 +521,10 @@ def _send_message(
         message_value = _request_msg_value
 
     if _perform_fee_check:
-        fees: MessagingFee = staticcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).quote(params, self)
+        fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).send(
+    extcall self.LZ_ENDPOINT.send(
         params, _refund_address, value=message_value
     )
 
@@ -541,7 +543,7 @@ def _lz_receive(
     @dev Must be called by importing contract's lzReceive
     """
 
-    assert msg.sender == self.LZ_ENDPOINT, "Not LZ endpoint"
+    assert msg.sender == self.LZ_ENDPOINT.address, "Not LZ endpoint"
     assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
     assert (
         convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid]

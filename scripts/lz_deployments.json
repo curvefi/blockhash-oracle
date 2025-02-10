@@ -6738,6 +6738,11 @@
                 "canonicalName": "LZDeadDVN",
                 "deprecated": true
             },
+            "0x794c0b0071d4a926c443468f027912e693678151": {
+                "version": 2,
+                "canonicalName": "Stargate",
+                "id": "stargate"
+            },
             "0x965a80dc87cec5848310e612dead84b543aef874": {
                 "id": "layerzero-labs",
                 "lzReadCompatible": true,
@@ -10078,15 +10083,20 @@
                 "canonicalName": "Bitgo",
                 "deprecated": true
             },
-            "0xd9222cc3ccd1df7c070d700ea377d4ada2b86eb5": {
-                "version": 2,
-                "canonicalName": "Nethermind",
-                "id": "nethermind"
-            },
             "0xdf04abb599c7b37dd5ffc0f8e94f6898120874ef": {
                 "version": 2,
                 "canonicalName": "Bitgo",
                 "id": "bitgo"
+            },
+            "0x63ef73671245d1a290f2a675be9d906090f72a8d": {
+                "version": 2,
+                "canonicalName": "P2P",
+                "id": "p2p"
+            },
+            "0xd9222cc3ccd1df7c070d700ea377d4ada2b86eb5": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
             },
             "0xe1a12515f9ab2764b887bf60b923ca494ebbb2d6": {
                 "version": 2,
@@ -13312,6 +13322,11 @@
                 "canonicalName": "Bitgo",
                 "id": "bitgo"
             },
+            "0x9885110b909e88bb94f7f767a68ec2558b2afa73": {
+                "version": 2,
+                "canonicalName": "Stargate",
+                "id": "stargate"
+            },
             "0xdd7b5e1db4aafd5c8ec3b764efb8ed265aa5445b": {
                 "id": "bitgo",
                 "version": 2,
@@ -13328,6 +13343,11 @@
                 "version": 2,
                 "canonicalName": "LZDeadDVN",
                 "deprecated": true
+            },
+            "0x25e0e650a78e6304a3983fc4b7ffc6544b1beea6": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
             }
         }
     },
@@ -22966,6 +22986,16 @@
                 "version": 2,
                 "canonicalName": "LayerZero Labs",
                 "id": "layerzero-labs"
+            },
+            "0xa80aa110f05c9c6140018aae0c4e08a70f43350d": {
+                "version": 2,
+                "canonicalName": "Stargate",
+                "id": "stargate"
+            },
+            "0xdd7b5e1db4aafd5c8ec3b764efb8ed265aa5445b": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
             },
             "0xce8358bc28dd8296ce8caf1cd2b44787abd65887": {
                 "id": "lz-dead-dvn",

@@ -1,23 +1,7 @@
 import boa
 from vyper.utils import keccak256
-import logging
-import time
-from typing import Tuple, List, Optional
-from ABIs import createX_abi
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
-
-# Constants
-CREATEX_ADDRESS = "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
-MAX_ATTEMPTS = 100_000  # Reduced since we're finding multiple
-ADDRESSES_TO_FIND = 10
-
-
-def setup_env(rpc_url: str) -> None:
-    """Initialize boa environment with fork"""
-    boa.fork(rpc_url)
-    boa.env.enable_fast_mode()
+from eth_utils import to_checksum_address
+import os
 
 
 def get_contract_bytecode(contract_path: str, args: bytes = None) -> bytes:
@@ -28,70 +12,73 @@ def get_contract_bytecode(contract_path: str, args: bytes = None) -> bytes:
     return contract.compiler_data.bytecode
 
 
-def compute_create2_address(deployer: str, salt: bytes, bytecode: bytes) -> str:
-    """Compute the create2 address for given parameters"""
-    with boa.env.prank(deployer):
-        createx = boa.loads_abi(createX_abi).at(CREATEX_ADDRESS)
-        return createx.computeCreate2Address(salt, keccak256(bytecode))
-
-
-def mine_addresses(
-    contract_path: str,
-    init_args: bytes,
-    deployer: str,
-    guard_bytes: Optional[bytes] = None,
-    count: int = ADDRESSES_TO_FIND,
-) -> List[Tuple[str, bytes]]:
-    """
-    Mine multiple create2 addresses
-    Returns list of (address, salt) tuples
-    """
+def prepare_mining_command(
+    contract_path: str, deployer: str, init_args: bytes = None, pattern: str = None
+) -> str:
+    """Prepare command for createXcrunch miner"""
+    # Get bytecode and compute hash
     bytecode = get_contract_bytecode(contract_path, init_args)
-    found_addresses = []
-    start_time = time.time()
-    print(f"Codehash: {keccak256(bytecode).hex()}")
-    for i in range(count):
-        # Generate salt
-        if guard_bytes:
-            random_bytes = bytes.fromhex(hex(i)[2:].zfill(64 - len(guard_bytes) * 2))
-            salt = guard_bytes + random_bytes
-        else:
-            salt = bytes.fromhex(hex(i)[2:].zfill(64))
+    code_hash = keccak256(bytecode).hex()
 
-        # Compute address
-        address = compute_create2_address(deployer, salt, bytecode)
-        found_addresses.append((address, salt))
+    # Build command
+    cmd = f"""# Clone and build the miner:
+git clone https://github.com/HrikB/createXcrunch.git
+cd createXcrunch
+cargo build --release
 
-    duration = time.time() - start_time
-    logging.info(f"\nMined {len(found_addresses)} addresses in {duration:.2f}s")
-    return found_addresses
+# Run the miner:
+./target/release/createxcrunch create2 \\
+    --caller {deployer} \\
+    --code-hash {code_hash}"""
+
+    # Add pattern if specified
+    if pattern:
+        cmd += f" \\\n    --matching {pattern}"
+
+    return cmd
 
 
-def main():
-    # Example usage
-    rpc_url = "https://eth-sepolia.public.blastapi.io"
-    setup_env(rpc_url)
+def print_found_addresses(salt_file: str):
+    """Print checksummed addresses from salt file"""
+    if not os.path.exists(salt_file):
+        return
+
+    print("\nFound addresses from previous mining:")
+    print("-" * 100)
+    print(f"{'Salt':<66} | {'Checksummed Address':<42}")
+    print("-" * 100)
+
+    with open(salt_file, "r") as f:
+        for line in f:
+            if "=>" in line:
+                salt, address = line.strip().split(" => ")
+                checksummed = to_checksum_address(address)
+                print(f"{salt:<66} | {checksummed}")
+
+    print("-" * 100 + "\n")
+
+
+def main(salt_file: str = "scripts/vanity_salt.txt"):
+    # Print previously found addresses if file exists
+    print_found_addresses(salt_file)
 
     # Contract details
     contract_path = "contracts/messengers/LzBlockRelay.vy"
+    contract_path = "contracts/BlockOracle.vy"
     deployer = "0x73241E98090042A718f7eb1AF07FAD27ff09A3F3"
 
-    # Create guard bytes from deployer address
-    # guard_bytes = bytes.fromhex(deployer[2:] + "00")
+    # Optional: Prepare constructor args if needed
+    args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
 
-    # Prepare constructor args
-    args_encoded = boa.util.abi.abi_encode("(uint256,address)", (1, deployer))
-    # args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
-    # Mine addresses
-    addresses = mine_addresses(contract_path, args_encoded, deployer, guard_bytes=None, count=1)
+    # Optional: Specify desired address pattern
+    pattern = "FACEFEEDXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    pattern = "b10cb10cXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # Generate command
+    command = prepare_mining_command(
+        contract_path=contract_path, deployer=deployer, init_args=args_encoded, pattern=pattern
+    )
 
-    # Print results in a table format
-    print("\nFound Addresses:")
-    print("-" * 100)
-    print(f"{'Address':<42} | {'Salt':<64}")
-    print("-" * 100)
-    for addr, salt in addresses:
-        print(f"{addr:<42} | {salt.hex()}")
+    print(command)
 
 
 if __name__ == "__main__":

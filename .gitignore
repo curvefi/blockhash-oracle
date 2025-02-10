@@ -21,3 +21,4 @@ wheels/
 *.DS_Store
 
 blocks.pklcache
+scripts/vanity_salt.txt
