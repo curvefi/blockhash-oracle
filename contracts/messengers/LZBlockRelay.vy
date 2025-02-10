@@ -88,7 +88,8 @@ mainnet_block_view: public(address)
 # Block oracle
 block_oracle: public(address)
 
-
+# Refund address
+default_lz_refund_address: public(address)
 ################################################################
 #                            EVENTS                            #
 ################################################################
@@ -139,6 +140,7 @@ def initialize(
     assert _endpoint != empty(address), "Invalid endpoint"
 
     self.is_initialized = True
+    self.default_lz_refund_address = self
 
     # Initialize LayerZero module
     lz._initialize(_endpoint, _gas_limit, _read_channel, _peer_eids, _peers)
@@ -232,6 +234,28 @@ def set_lz_delegate(_delegate: address):
 
 
 @external
+def set_default_lz_refund_address(_refund_address: address):
+    """
+    @notice Set default refund address for LayerZero operations
+    @param _refund_address New refund address
+    """
+    ownable._check_owner()
+    self.default_lz_refund_address = _refund_address
+
+
+@external
+def withdraw_eth(_amount: uint256):
+    """
+    @notice Withdraw ETH from contract
+    @param _amount Amount to withdraw
+    """
+
+    ownable._check_owner()
+    assert self.balance >= _amount, "Insufficient balance"
+    send(msg.sender, _amount)
+
+
+@external
 def set_lz_uln_config(
     _eid: uint32,
     _oapp: address,
@@ -265,28 +289,6 @@ def set_lz_uln_config(
         _optional_dvns,
         _optional_dvn_threshold,
     )
-
-
-@external
-@payable
-def __default__():
-    """
-    @notice Default function to receive ETH
-    @dev This is needed to receive refunds from LayerZero
-    """
-    pass
-
-
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @param _amount Amount to withdraw
-    """
-
-    ownable._check_owner()
-    assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
 
 
 @external
@@ -476,6 +478,16 @@ def _request_block_hash(
 #                     EXTERNAL FUNCTIONS                       #
 ################################################################
 
+@external
+@payable
+def __default__():
+    """
+    @notice Default function to receive ETH
+    @dev This is needed to receive refunds from LayerZero
+    """
+    pass
+
+
 @view
 @external
 def quote_read_fee(
@@ -564,6 +576,66 @@ def request_block_hash(
 
 @payable
 @external
+def broadcast_latest_block(
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+):
+    """
+    @notice Broadcast latest confirmed block hash to specified chains
+    @param _target_eids List of chain IDs to broadcast to
+    @param _target_fees List of fees per chain (must match _target_eids length)
+    """
+    assert self.block_oracle != empty(address), "Oracle not configured"
+    assert len(_target_eids) == len(_target_fees), "Length mismatch"
+
+    # Get latest block from oracle
+    block_number: uint256 = staticcall IBlockOracle(self.block_oracle).last_confirmed_block_number()
+    block_hash: bytes32 = staticcall IBlockOracle(self.block_oracle).block_hash(block_number)
+    assert block_hash != empty(bytes32), "No confirmed blocks"
+
+    # Prepare broadcast targets
+    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
+        broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
+
+    # Perform broadcast
+    self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID)
+
+
+@payable
+@external
+def request_remote_read(_remote_eid: uint32, _read_fee: uint256, _broadcast_fee: uint256, _request_gas_limit: uint256 = 0):
+    """
+    @notice Request a chain to perform an lzread operation and broadcast the result back to us
+    @param _remote_eid Chain ID to request the read from
+    @param _read_fee Fee to cover the lzread operation on target chain
+    @param _broadcast_fee Fee to cover broadcasting the result back to us
+    @dev msg.value must cover both:
+         - fee to send request to target chain
+         - _read_fee + _broadcast_fee which will be used by target chain
+    """
+    # Prepare broadcast request message (magic bytes + fee)
+    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = concat(
+        BROADCAST_REQUEST_MESSAGE,  # 17 bytes
+        convert(_broadcast_fee, bytes32),  # 32 bytes
+    )
+
+    # Send message to target chain
+    lz._send_message(
+        _remote_eid,  # _dstEid
+        convert(lz.LZ_PEERS[_remote_eid], bytes32),  # _receiver - can only be configured peer (self)
+        message,  # _message
+        _request_gas_limit,  # _gas_limit for read request
+        _read_fee + _broadcast_fee,  # _lz_receive_value: must cover both read and broadcast
+        0,  # _data_size: Zero data size (not a read)
+        msg.value,  # _request_msg_value: Use full msg.value
+        msg.sender,  # _refund_address: Refund to sender
+        True,  # _perform_fee_check: Check fees
+    )
+
+
+@payable
+@external
 def lzReceive(
     _origin: lz.Origin,
     _guid: bytes32,
@@ -630,63 +702,3 @@ def lzReceive(
         self._commit_block(block_number, block_hash)
 
     return True
-
-
-@payable
-@external
-def broadcast_latest_block(
-    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
-    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
-):
-    """
-    @notice Broadcast latest confirmed block hash to specified chains
-    @param _target_eids List of chain IDs to broadcast to
-    @param _target_fees List of fees per chain (must match _target_eids length)
-    """
-    assert self.block_oracle != empty(address), "Oracle not configured"
-    assert len(_target_eids) == len(_target_fees), "Length mismatch"
-
-    # Get latest block from oracle
-    block_number: uint256 = staticcall IBlockOracle(self.block_oracle).last_confirmed_block_number()
-    block_hash: bytes32 = staticcall IBlockOracle(self.block_oracle).block_hash(block_number)
-    assert block_hash != empty(bytes32), "No confirmed blocks"
-
-    # Prepare broadcast targets
-    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
-    for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
-        broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
-
-    # Perform broadcast
-    self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID)
-
-
-@payable
-@external
-def request_remote_read(_remote_eid: uint32, _read_fee: uint256, _broadcast_fee: uint256, _request_gas_limit: uint256 = 0):
-    """
-    @notice Request a chain to perform an lzread operation and broadcast the result back to us
-    @param _remote_eid Chain ID to request the read from
-    @param _read_fee Fee to cover the lzread operation on target chain
-    @param _broadcast_fee Fee to cover broadcasting the result back to us
-    @dev msg.value must cover both:
-         - fee to send request to target chain
-         - _read_fee + _broadcast_fee which will be used by target chain
-    """
-    # Prepare broadcast request message (magic bytes + fee)
-    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = concat(
-        BROADCAST_REQUEST_MESSAGE,  # 17 bytes
-        convert(_broadcast_fee, bytes32),  # 32 bytes
-    )
-
-    # Send message to target chain
-    lz._send_message(
-        _remote_eid,  # _dstEid
-        convert(lz.LZ_PEERS[_remote_eid], bytes32),  # _receiver - can only be configured peer (self)
-        message,  # _message
-        _request_gas_limit,  # _gas_limit for read request
-        _read_fee + _broadcast_fee,  # _lz_receive_value: must cover both read and broadcast
-        0,  # _data_size: Zero data size (not a read)
-        msg.value,  # _request_msg_value: Use full msg.value
-        msg.sender,  # _refund_address: Refund to sender
-        True,  # _perform_fee_check: Check fees
-    )
