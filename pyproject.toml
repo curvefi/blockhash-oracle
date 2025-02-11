@@ -28,6 +28,8 @@ dev-dependencies = [
     "jupyter>=1.0.0",
     "python-dotenv>=1.0.1",
     "natrix",
+    "cryptography",
+    "keyring"
 ]
 
 [tool.ruff]

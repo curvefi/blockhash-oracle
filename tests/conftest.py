@@ -140,3 +140,9 @@ def block_oracle(dev_deployer):
 def mainnet_block_view(dev_deployer):
     with boa.env.prank(dev_deployer):
         return boa.load("contracts/MainnetBlockView.vy")
+
+
+@pytest.fixture()
+def lz_block_relay(dev_deployer):
+    with boa.env.prank(dev_deployer):
+        return boa.load("contracts/messengers/LZBlockRelay.vy", dev_deployer)

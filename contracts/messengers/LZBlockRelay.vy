@@ -25,6 +25,7 @@ interface IBlockOracle:
     def last_confirmed_block_number() -> uint256: view
     def block_hash(block_number: uint256) -> bytes32: view
 
+
 ################################################################
 #                            MODULES                           #
 ################################################################
@@ -40,6 +41,7 @@ exports: (
     lz.default_gas_limit,
     lz.nextNonce,
     lz.allowInitializePath,
+    lz.get_configured_eids,
 )
 
 # Import ownership management
@@ -59,7 +61,7 @@ exports: (
 
 MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
-BROADCAST_REQUEST_MESSAGE: constant(Bytes[17]) = b'broadcast_request'
+BROADCAST_REQUEST_MESSAGE: constant(Bytes[17]) = b"broadcast_request"
 
 
 ################################################################
@@ -68,28 +70,26 @@ BROADCAST_REQUEST_MESSAGE: constant(Bytes[17]) = b'broadcast_request'
 
 is_initialized: public(bool)
 
-# Broadcast targets
-broadcast_targets: public(HashMap[uint32, address])  # eid => target address
-
-# Struct for cached broadcast info
-struct BroadcastTarget:
-    eid: uint32
-    fee: uint256
-
-
-# Cached broadcast targets
-cached_broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
-
 # Read configuration
 is_read_enabled: public(bool)
 mainnet_eid: public(uint32)
 mainnet_block_view: public(address)
 
 # Block oracle
-block_oracle: public(address)
+block_oracle: public(IBlockOracle)
 
 # Refund address
 default_lz_refund_address: public(address)
+
+# Struct for cached broadcast info
+struct BroadcastTarget:
+    eid: uint32
+    fee: uint256
+
+# Cached broadcast targets
+cached_broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
+
+
 ################################################################
 #                            EVENTS                            #
 ################################################################
@@ -121,12 +121,12 @@ def initialize(
     _gas_limit: uint256,
     _read_channel: uint32,
     # Can optionally initialize with peers
-    _peer_eids: DynArray[uint32, lz.MAX_INIT_PEERS],
-    _peers: DynArray[address, lz.MAX_INIT_PEERS],
+    _peer_eids: DynArray[uint32, lz.MAX_PEERS],
+    _peers: DynArray[address, lz.MAX_PEERS],
     # Also can provide libs (must provide lib types: 1 for lzsend, 2 for lzreceive)
-    _channels: DynArray[uint32, lz.MAX_INIT_PEERS],
-    _libs: DynArray[address, lz.MAX_INIT_PEERS],
-    _lib_types: DynArray[uint16, lz.MAX_INIT_PEERS],
+    _channels: DynArray[uint32, lz.MAX_PEERS],
+    _libs: DynArray[address, lz.MAX_PEERS],
+    _lib_types: DynArray[uint16, lz.MAX_PEERS],
 ):
     """
     @notice Initialize contract with core settings
@@ -151,7 +151,7 @@ def initialize(
     # Set libs if provided
     assert len(_channels) == len(_libs), "Libs-channels length mismatch"
     assert len(_libs) == len(_lib_types), "Libs-types length mismatch"
-    for i: uint256 in range(0, len(_channels), bound=lz.MAX_INIT_PEERS):
+    for i: uint256 in range(0, len(_channels), bound=lz.MAX_PEERS):
         if _lib_types[i] == 1:
             lz._set_send_lib(_channels[i], _libs[i])
         elif _lib_types[i] == 2:
@@ -234,28 +234,6 @@ def set_lz_delegate(_delegate: address):
 
 
 @external
-def set_default_lz_refund_address(_refund_address: address):
-    """
-    @notice Set default refund address for LayerZero operations
-    @param _refund_address New refund address
-    """
-    ownable._check_owner()
-    self.default_lz_refund_address = _refund_address
-
-
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @param _amount Amount to withdraw
-    """
-
-    ownable._check_owner()
-    assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
-
-
-@external
 def set_lz_uln_config(
     _eid: uint32,
     _oapp: address,
@@ -292,49 +270,6 @@ def set_lz_uln_config(
 
 
 @external
-def add_broadcast_target(_eid: uint32, _target: address, _overwrite: bool = False):
-    """
-    @notice Add a chain/contract to broadcast block hashes to
-    @param _eid Chain ID to broadcast to
-    @param _target Target contract address on that chain
-    @param _overwrite if true, will overwrite existing targets and skip asserts
-    """
-    ownable._check_owner()
-    if not _overwrite:
-        assert self.broadcast_targets[_eid] == empty(address), "Already added"
-    self.broadcast_targets[_eid] = _target
-
-
-@external
-def add_multiple_broadcast_targets(
-    _eids: DynArray[uint32, MAX_N_BROADCAST],
-    _targets: DynArray[address, MAX_N_BROADCAST],
-    _overwrite: bool = False
-):
-    """
-    @notice Add multiple broadcast targets
-    @dev batch add is useful for initializing with a list of targets
-    @dev _overwrite: if true, will overwrite existing targets and skip asserts
-    """
-    ownable._check_owner()
-    assert len(_eids) == len(_targets), "Length mismatch"
-    for i: uint256 in range(0, len(_eids), bound=MAX_N_BROADCAST):
-        if not _overwrite:
-            assert self.broadcast_targets[_eids[i]] == empty(address), "One of the targets already added"
-        self.broadcast_targets[_eids[i]] = _targets[i]
-
-
-@external
-def remove_broadcast_target(_eid: uint32):
-    """
-    @notice Remove a chain from broadcasting targets
-    """
-    ownable._check_owner()
-    assert self.broadcast_targets[_eid] != empty(address), "Not a target"
-    self.broadcast_targets[_eid] = empty(address)
-
-
-@external
 def set_read_config(_is_enabled: bool, _mainnet_eid: uint32, _mainnet_view: address):
     """
     @notice Configure read functionality
@@ -355,7 +290,29 @@ def set_block_oracle(_oracle: address):
     @param _oracle Block oracle address
     """
     ownable._check_owner()
-    self.block_oracle = _oracle
+    self.block_oracle = IBlockOracle(_oracle)
+
+
+@external
+def set_default_lz_refund_address(_refund_address: address):
+    """
+    @notice Set default refund address for LayerZero operations
+    @param _refund_address New refund address
+    """
+    ownable._check_owner()
+    self.default_lz_refund_address = _refund_address
+
+
+@external
+def withdraw_eth(_amount: uint256):
+    """
+    @notice Withdraw ETH from contract
+    @param _amount Amount to withdraw
+    """
+
+    ownable._check_owner()
+    assert self.balance >= _amount, "Insufficient balance"
+    send(msg.sender, _amount)
 
 
 ################################################################
@@ -367,8 +324,8 @@ def _commit_block(_block_number: uint256, _block_hash: bytes32):
     """
     @notice Commit block hash to oracle
     """
-    assert self.block_oracle != empty(address), "Oracle not configured"
-    extcall IBlockOracle(self.block_oracle).commit_block(_block_number, _block_hash)
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    extcall self.block_oracle.commit_block(_block_number, _block_hash)
 
 
 @view
@@ -384,15 +341,14 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[lz.LZ_MESSAGE_SIZE_CA
         _block_number, True, method_id=GET_BLOCKHASH_SELECTOR
     )
 
-
     # Prepare read message
     return lz._prepare_read_message_bytes(
-        self.mainnet_eid,
-        self.mainnet_block_view,
-        calldata,
-        False,
-        convert(block.timestamp, uint64),
-        1,  # Default confirmations
+        self.mainnet_eid, # _dst_eid
+        self.mainnet_block_view, # _target
+        calldata, # _calldata
+        False, # _isBlockNum, we use timestamp
+        convert(block.timestamp, uint64), # _blockNumOrTimestamp, we use latest timestamp
+        1, # _confirmations set to 1 because we read 'older' blocks that cant be affected by reorgs
     )
 
 
@@ -414,7 +370,7 @@ def _broadcast_block(
 
     for target: BroadcastTarget in _broadcast_targets:
         # BroadcastTarget is a struct with .eid and .fee
-        target_address: address = self.broadcast_targets[target.eid]
+        target_address: address = lz.LZ_PEERS[target.eid]  # Use LZ_PEERS directly
         if target_address == empty(address):
             continue
 
@@ -430,7 +386,6 @@ def _broadcast_block(
             False,  # _perform_fee_check: No fee check
         )
 
-    # Log broadcast event
     log BlockHashBroadcast(_source_eid, _block_number, _block_hash, _broadcast_targets)
 
 
@@ -535,7 +490,7 @@ def quote_broadcast_fees(
     fees: DynArray[uint256, MAX_N_BROADCAST] = []
 
     for eid: uint32 in _target_eids:
-        target: address = self.broadcast_targets[eid]
+        target: address = lz.LZ_PEERS[eid]  # Use LZ_PEERS directly
         if target == empty(address):
             fees.append(0)
             continue
@@ -585,12 +540,13 @@ def broadcast_latest_block(
     @param _target_eids List of chain IDs to broadcast to
     @param _target_fees List of fees per chain (must match _target_eids length)
     """
-    assert self.block_oracle != empty(address), "Oracle not configured"
+    assert self.is_read_enabled, "Can only broadcast from read-enabled chains"
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
     # Get latest block from oracle
-    block_number: uint256 = staticcall IBlockOracle(self.block_oracle).last_confirmed_block_number()
-    block_hash: bytes32 = staticcall IBlockOracle(self.block_oracle).block_hash(block_number)
+    block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
+    block_hash: bytes32 = staticcall self.block_oracle.block_hash(block_number)
     assert block_hash != empty(bytes32), "No confirmed blocks"
 
     # Prepare broadcast targets
@@ -598,13 +554,17 @@ def broadcast_latest_block(
     for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
 
-    # Perform broadcast
     self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID)
 
 
 @payable
 @external
-def request_remote_read(_remote_eid: uint32, _read_fee: uint256, _broadcast_fee: uint256, _request_gas_limit: uint256 = 0):
+def request_remote_read(
+    _remote_eid: uint32,
+    _read_fee: uint256,
+    _broadcast_fee: uint256,
+    _request_gas_limit: uint256 = 0,
+):
     """
     @notice Request a chain to perform an lzread operation and broadcast the result back to us
     @param _remote_eid Chain ID to request the read from
@@ -623,7 +583,9 @@ def request_remote_read(_remote_eid: uint32, _read_fee: uint256, _broadcast_fee:
     # Send message to target chain
     lz._send_message(
         _remote_eid,  # _dstEid
-        convert(lz.LZ_PEERS[_remote_eid], bytes32),  # _receiver - can only be configured peer (self)
+        convert(
+            lz.LZ_PEERS[_remote_eid], bytes32
+        ),  # _receiver - can only be configured peer (self)
         message,  # _message
         _request_gas_limit,  # _gas_limit for read request
         _read_fee + _broadcast_fee,  # _lz_receive_value: must cover both read and broadcast
@@ -677,7 +639,6 @@ def lzReceive(
             # Perform broadcast and clear cache
             self._broadcast_block(block_number, block_hash, broadcast_targets, _origin.srcEid)
             self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, MAX_N_BROADCAST])
-
     elif slice(_message, 0, 17) == BROADCAST_REQUEST_MESSAGE:  # 17 + 32 bytes
         # Handle broadcast request - decode fee and trigger read
         broadcast_fee: uint256 = abi_decode(slice(_message, 17, 32), (uint256))
