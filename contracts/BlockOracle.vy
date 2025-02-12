@@ -224,10 +224,14 @@ def apply_block(block_number: uint256, block_hash: bytes32):
     self._apply_block(block_number, block_hash)
 
 
+################################################################
+#                         VIEW FUNCTIONS                       #
+################################################################
+
+@view
 @external
 def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
     """
-    @notice Get all committers
-    @return All committers
+    @notice Utility viewer that returns list of all committers
     """
     return self.committers

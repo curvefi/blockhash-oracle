@@ -47,8 +47,6 @@ def print_found_addresses(salt_file: str):
 
     print("\nFound addresses from previous mining:")
     print("-" * 100)
-    print(f"{'Salt':<66} | {'Checksummed Address':<42}")
-    print("-" * 100)
 
     with open(salt_file, "r") as f:
         for line in f:
@@ -57,7 +55,7 @@ def print_found_addresses(salt_file: str):
                     salt, address = line.strip().split(" => ")
                     checksummed = to_checksum_address(address)
                     # print(f"{salt:<66} | {checksummed}")
-                    if checksummed[:10] == "0xfacefeed":
+                    if "facefeed" in checksummed:
                         print(f"Found address: {checksummed}, salt: {salt}")
 
                 except Exception:
@@ -74,8 +72,6 @@ def main(salt_file: str = "scripts/vanity_salt.txt"):
     # contract_path = "contracts/BlockOracle.vy"
     contract_path = "contracts/MainnetBlockView.vy"
     deployer = "0xb101b2b0aa02b7167D238B98dc1B0b0404a760E8"
-
-    # Optional: Prepare constructor args if needed
 
     # Optional: Specify desired address pattern
 
