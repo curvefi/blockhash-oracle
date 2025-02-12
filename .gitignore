@@ -23,4 +23,5 @@ wheels/
 blocks.pklcache
 scripts/vanity_salt.txt
 
-tmp.json # temporary file for contract verification
+# temporary file for contract verification
+tmp.json
