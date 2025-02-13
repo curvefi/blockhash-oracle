@@ -123,10 +123,12 @@ def initialize(
     # Can optionally initialize with peers
     _peer_eids: DynArray[uint32, lz.MAX_PEERS],
     _peers: DynArray[address, lz.MAX_PEERS],
-    # Also can provide libs (must provide lib types: 1 for lzsend, 2 for lzreceive)
-    _channels: DynArray[uint32, lz.MAX_PEERS],
-    _libs: DynArray[address, lz.MAX_PEERS],
-    _lib_types: DynArray[uint16, lz.MAX_PEERS],
+    # Also can provide libs per peer (must provide lib types: 1 for lzsend, 2 for lzreceive)
+    # We limit to 2 * MAX_PEERS because we have send and receive libs for each peer
+    _oapps: DynArray[address, 2 * lz.MAX_PEERS],
+    _channels: DynArray[uint32, 2 * lz.MAX_PEERS],
+    _libs: DynArray[address, 2 * lz.MAX_PEERS],
+    _lib_types: DynArray[uint16, 2 * lz.MAX_PEERS],
 ):
     """
     @notice Initialize contract with core settings
@@ -151,11 +153,11 @@ def initialize(
     # Set libs if provided
     assert len(_channels) == len(_libs), "Libs-channels length mismatch"
     assert len(_libs) == len(_lib_types), "Libs-types length mismatch"
-    for i: uint256 in range(0, len(_channels), bound=lz.MAX_PEERS):
+    for i: uint256 in range(0, len(_channels), bound=2*lz.MAX_PEERS):
         if _lib_types[i] == 1:
-            lz._set_send_lib(_channels[i], _libs[i])
+            lz._set_send_lib(_oapps[i], _channels[i], _libs[i])
         elif _lib_types[i] == 2:
-            lz._set_receive_lib(_channels[i], _libs[i])
+            lz._set_receive_lib(_oapps[i], _channels[i], _libs[i])
         else:
             raise ("Invalid lib type")
 
@@ -199,27 +201,29 @@ def set_lz_read_channel(_new_channel: uint32):
 
 
 @external
-def set_lz_send_lib(_channel: uint32, _lib: address):
+def set_lz_send_lib(_oapp: address, _channel: uint32, _lib: address):
     """
     @notice Set new send library for send requests
+    @param _oapp Peer application address
     @param _channel Send channel ID
     @param _lib New send library address
     """
 
     ownable._check_owner()
-    lz._set_send_lib(_channel, _lib)
+    lz._set_send_lib(_oapp,_channel, _lib)
 
 
 @external
-def set_lz_receive_lib(_channel: uint32, _lib: address):
+def set_lz_receive_lib(_oapp: address, _channel: uint32, _lib: address):
     """
     @notice Set new receive library for receive requests
+    @param _oapp Peer application address
     @param _channel Receive channel ID
     @param _lib New receive library address
     """
 
     ownable._check_owner()
-    lz._set_receive_lib(_channel, _lib)
+    lz._set_receive_lib(_oapp, _channel, _lib)
 
 
 @external
@@ -243,6 +247,7 @@ def set_lz_uln_config(
     _required_dvns: DynArray[address, 10],
     _optional_dvns: DynArray[address, 10],
     _optional_dvn_threshold: uint8,
+    _executor: address = empty(address),
 ):
     """
     @notice Set new ULN configuration for cross-chain messages
@@ -266,6 +271,7 @@ def set_lz_uln_config(
         _required_dvns,
         _optional_dvns,
         _optional_dvn_threshold,
+        _executor,
     )
 
 
@@ -505,7 +511,7 @@ def quote_broadcast_fees(
 @external
 def request_block_hash(
     _target_eids: DynArray[uint32, MAX_N_BROADCAST],
-    _target_fees: DynArray[uint256, MAX_N_BROADCAST],  # Add fees array parameter
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
     _block_number: uint256 = 0,
     _gas_limit: uint256 = 0,
 ):

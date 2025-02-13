@@ -3658,6 +3658,11 @@
                 "canonicalName": "Stakingcabin",
                 "id": "stakingcabin"
             },
+            "0x57eb450b257e6a5d65cdc9a7b95245139975eacf": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
+            },
             "0xfb02364e3f5e97d8327dc6e4326e93828a28657d": {
                 "version": 2,
                 "canonicalName": "Horizen",
@@ -12148,6 +12153,11 @@
                 "version": 2,
                 "canonicalName": "LayerZero Labs",
                 "id": "layerzero-labs"
+            },
+            "0x3a5a74f863ec48c1769c4ee85f6c3d70f5655e2a": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
             },
             "0x04830f6decf08dec9ed6c3fcad215245b78a59e1": {
                 "id": "lz-dead-dvn",
@@ -21000,6 +21010,11 @@
                 "canonicalName": "LZDeadDVN",
                 "deprecated": true
             },
+            "0xdd7b5e1db4aafd5c8ec3b764efb8ed265aa5445b": {
+                "version": 2,
+                "canonicalName": "Nethermind",
+                "id": "nethermind"
+            },
             "0xce8358bc28dd8296ce8caf1cd2b44787abd65887": {
                 "version": 2,
                 "canonicalName": "LayerZero Labs",
@@ -21118,10 +21133,10 @@
                 }
             }
         ],
-        "chainKey": "ton-mainnet-custom",
+        "chainKey": "ton",
         "chainDetails": {
             "chainType": "ton",
-            "chainKey": "ton-mainnet-custom",
+            "chainKey": "ton",
             "chainLayer": "L1",
             "nativeCurrency": {
                 "symbol": "TON",
@@ -23537,7 +23552,7 @@
             "chainLayer": "L2",
             "nativeCurrency": {
                 "symbol": "IP",
-                "cmcId": 3890,
+                "cmcId": 35626,
                 "decimals": 18
             }
         },
@@ -23563,7 +23578,12 @@
                 "canonicalName": "LZDeadDVN",
                 "deprecated": true
             }
-        }
+        },
+        "blockExplorers": [
+            {
+                "url": "https://storyscan.xyz"
+            }
+        ]
     },
     "story-testnet": {
         "deployments": [
