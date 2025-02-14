@@ -31,7 +31,7 @@ interface IBlockOracle:
 ################################################################
 
 # Import LayerZero module for cross-chain messaging
-import LayerZeroV2 as lz
+import contracts.modules.LayerZeroV2 as lz
 initializes: lz
 exports: (
     lz.LZ_ENDPOINT,

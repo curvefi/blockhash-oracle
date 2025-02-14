@@ -33,6 +33,11 @@ exports: (
     ownable.renounce_ownership,
 )
 
+# Import RLP Block Header Decoder
+import contracts.modules.BlockHeaderRLPDecoder as bh_rlp
+initializes: bh_rlp
+
+
 ################################################################
 #                            EVENTS                            #
 ################################################################
@@ -66,6 +71,8 @@ MAX_COMMITTERS: constant(uint256) = 32
 block_hash: public(HashMap[uint256, bytes32])  # block_number => hash
 last_confirmed_block_number: public(uint256)
 
+block_header: public(HashMap[uint256, bh_rlp.BlockHeader]) # block_number => header
+
 committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
 commitment_count: public(HashMap[uint256, HashMap[bytes32, uint256]])  # block_number => hash => count
@@ -83,8 +90,13 @@ def __init__(_owner: address):
     @notice Initialize the contract with the owner
     @param _owner The owner of the contract
     """
+
+    # Initialize ownable
     ownable.__init__()
     ownable._transfer_ownership(_owner)
+
+    # Initialize RLP decoder
+    bh_rlp.__init__()
 
 
 ################################################################
@@ -224,6 +236,23 @@ def apply_block(block_number: uint256, block_hash: bytes32):
     self._apply_block(block_number, block_hash)
 
 
+@external
+def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
+    """
+    @notice Submit a block header. If it's correct and blockhash is applied, store it.
+    @param encoded_header The block header to submit
+    """
+    # Decode whatever is submitted
+    decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(encoded_header)
+
+    # Validate against stored blockhash
+    assert self.block_hash[decoded_header.block_number] != empty(bytes32), "Blockhash not applied"
+    assert keccak256(encoded_header) == self.block_hash[decoded_header.block_number], "Blockhash does not match"
+
+    # Store decoded header
+    self.block_header[decoded_header.block_number] = decoded_header
+
+
 ################################################################
 #                         VIEW FUNCTIONS                       #
 ################################################################
@@ -235,3 +264,21 @@ def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
     @notice Utility viewer that returns list of all committers
     """
     return self.committers
+
+
+@view
+@external
+def get_block_hash(block_number: uint256) -> bytes32:
+    """
+    @notice Get a block hash
+    """
+    return self.block_hash[block_number]
+
+
+@view
+@external
+def get_state_root(block_number: uint256) -> bytes32:
+    """
+    @notice Get a state root
+    """
+    return self.block_header[block_number].state_root
