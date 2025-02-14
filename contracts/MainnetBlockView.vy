@@ -18,7 +18,7 @@ def __init__():
     pass
 
 
-@pure
+@view
 @external
 def get_blockhash(
     _block_number: uint256 = block.number - 65, _avoid_failure: bool = False
