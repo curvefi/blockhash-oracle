@@ -32,13 +32,6 @@ struct BlockHeader:
 
 
 ################################################################
-#                           STORAGE                            #
-################################################################
-
-block_header: public(HashMap[uint256, BlockHeader])
-
-
-################################################################
 #                         CONSTRUCTOR                          #
 ################################################################
 
@@ -178,6 +171,7 @@ def _read_rlp_number(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (uint25
     value: uint256 = convert(
         abi_decode(abi_encode(slice(encoded, pos + 1, length)), (Bytes[32])), uint256
     )
+    # abi_decode(abi_encode(bytesA), bytesB) is needed to unsafe cast bytesA to bytesB
     return value, pos + 1 + length
 
 

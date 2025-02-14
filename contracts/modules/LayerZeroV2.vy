@@ -36,6 +36,7 @@ interface ILayerZeroEndpointV2:
     def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 1]): nonpayable
     def eid() -> uint32: view
 
+
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
@@ -268,7 +269,13 @@ def _set_uln_config(
     """
 
     config_param: SetConfigParam = self._prepare_uln_config(
-        _eid, _config_type, _confirmations, _required_dvns, _optional_dvns, _optional_dvn_threshold, _executor
+        _eid,
+        _config_type,
+        _confirmations,
+        _required_dvns,
+        _optional_dvns,
+        _optional_dvn_threshold,
+        _executor,
     )
 
     # Call endpoint to set config
@@ -563,9 +570,7 @@ def _send_message(
         fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall self.LZ_ENDPOINT.send(
-        params, _refund_address, value=message_value
-    )
+    extcall self.LZ_ENDPOINT.send(params, _refund_address, value=message_value)
 
 
 @payable

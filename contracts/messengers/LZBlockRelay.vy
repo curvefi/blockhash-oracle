@@ -1,11 +1,17 @@
 # pragma version ~=0.4
 
 """
-@title Example LayerZero Messenger
+@title LayerZero Block Relay
 
-@notice Example implementation of LZ Base module for simple messaging between
-chains. Allows sending and receiving string messages across chains using LayerZero
-protocol. Includes ownership control for secure peer management and configuration.
+@notice Layer Zero messenger for block hashes.
+This contract should be deployed on multiple chains along with BlockOracle and MainnetBlockView.
+
+Main functionality includes requesting lzRead of recent ethereum mainnet blockhashes from MainnetBlockView.
+Upon receiving LZ message in lzReceive, the blockhash is committed to the BlockOracle, and if it was a read request,
+the contract will attempt to broadcast the blockhash to other chains via lzSend.
+
+If chain is read-enabled, it will be able to read the blockhash from MainnetBlockView and broadcast it to other chains.
+If chain is not read-enabled, it will only be able to receive blockhashes from other chains.
 
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
 
@@ -153,7 +159,7 @@ def initialize(
     # Set libs if provided
     assert len(_channels) == len(_libs), "Libs-channels length mismatch"
     assert len(_libs) == len(_lib_types), "Libs-types length mismatch"
-    for i: uint256 in range(0, len(_channels), bound=2*lz.MAX_PEERS):
+    for i: uint256 in range(0, len(_channels), bound=2 * lz.MAX_PEERS):
         if _lib_types[i] == 1:
             lz._set_send_lib(_oapps[i], _channels[i], _libs[i])
         elif _lib_types[i] == 2:
@@ -210,7 +216,7 @@ def set_lz_send_lib(_oapp: address, _channel: uint32, _lib: address):
     """
 
     ownable._check_owner()
-    lz._set_send_lib(_oapp,_channel, _lib)
+    lz._set_send_lib(_oapp, _channel, _lib)
 
 
 @external
@@ -349,12 +355,12 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[lz.LZ_MESSAGE_SIZE_CA
 
     # Prepare read message
     return lz._prepare_read_message_bytes(
-        self.mainnet_eid, # _dst_eid
-        self.mainnet_block_view, # _target
-        calldata, # _calldata
-        False, # _isBlockNum, we use timestamp
-        convert(block.timestamp, uint64), # _blockNumOrTimestamp, we use latest timestamp
-        1, # _confirmations set to 1 because we read 'older' blocks that cant be affected by reorgs
+        self.mainnet_eid,  # _dst_eid
+        self.mainnet_block_view,  # _target
+        calldata,  # _calldata
+        False,  # _isBlockNum, we use timestamp
+        convert(block.timestamp, uint64),  # _blockNumOrTimestamp, we use latest timestamp
+        1,  # _confirmations set to 1 because we read 'older' blocks that cant be affected by reorgs
     )
 
 

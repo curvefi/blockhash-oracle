@@ -47,15 +47,25 @@ event CommitBlock:
     block_number: indexed(uint256)
     block_hash: bytes32
 
+
 event ApplyBlock:
     block_number: indexed(uint256)
     block_hash: bytes32
 
+
+event SubmitBlockHeader:
+    committer: indexed(address)
+    block_number: indexed(uint256)
+    block_hash: bytes32
+
+
 event AddCommitter:
     committer: indexed(address)
 
+
 event RemoveCommitter:
     committer: indexed(address)
+
 
 ################################################################
 #                            CONSTANTS                          #
@@ -71,12 +81,16 @@ MAX_COMMITTERS: constant(uint256) = 32
 block_hash: public(HashMap[uint256, bytes32])  # block_number => hash
 last_confirmed_block_number: public(uint256)
 
-block_header: public(HashMap[uint256, bh_rlp.BlockHeader]) # block_number => header
+block_header: public(HashMap[uint256, bh_rlp.BlockHeader])  # block_number => header
 
 committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
-commitment_count: public(HashMap[uint256, HashMap[bytes32, uint256]])  # block_number => hash => count
-committer_votes: public(HashMap[address, HashMap[uint256, bytes32]])  # committer => block_number => committed_hash
+commitment_count: public(
+    HashMap[uint256, HashMap[bytes32, uint256]]
+)  # block_number => hash => count
+committer_votes: public(
+    HashMap[address, HashMap[uint256, bytes32]]
+)  # committer => block_number => committed_hash
 threshold: public(uint256)
 
 
@@ -151,7 +165,9 @@ def set_threshold(_new_threshold: uint256):
     """
 
     ownable._check_owner()
-    assert _new_threshold <= len(self.committers), "Threshold cannot be greater than number of committers"
+    assert _new_threshold <= len(
+        self.committers
+    ), "Threshold cannot be greater than number of committers"
     self.threshold = _new_threshold
 
 
@@ -232,7 +248,9 @@ def apply_block(block_number: uint256, block_hash: bytes32):
     """
 
     assert self.block_hash[block_number] == empty(bytes32), "Already applied"
-    assert self.commitment_count[block_number][block_hash] >= self.threshold, "Insufficient commitments"
+    assert (
+        self.commitment_count[block_number][block_hash] >= self.threshold
+    ), "Insufficient commitments"
     self._apply_block(block_number, block_hash)
 
 
@@ -247,10 +265,13 @@ def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
 
     # Validate against stored blockhash
     assert self.block_hash[decoded_header.block_number] != empty(bytes32), "Blockhash not applied"
-    assert keccak256(encoded_header) == self.block_hash[decoded_header.block_number], "Blockhash does not match"
+    assert (
+        decoded_header.block_hash == self.block_hash[decoded_header.block_number]
+    ), "Blockhash does not match"
 
     # Store decoded header
     self.block_header[decoded_header.block_number] = decoded_header
+    log SubmitBlockHeader(msg.sender, decoded_header.block_number, decoded_header.block_hash)
 
 
 ################################################################
@@ -269,16 +290,10 @@ def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
 @view
 @external
 def get_block_hash(block_number: uint256) -> bytes32:
-    """
-    @notice Get a block hash
-    """
     return self.block_hash[block_number]
 
 
 @view
 @external
 def get_state_root(block_number: uint256) -> bytes32:
-    """
-    @notice Get a state root
-    """
     return self.block_header[block_number].state_root
