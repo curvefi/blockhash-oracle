@@ -37,7 +37,8 @@ interface IBlockOracle:
 ################################################################
 
 # Import LayerZero module for cross-chain messaging
-import contracts.modules.LayerZeroV2 as lz
+from ..modules import LayerZeroV2 as lz
+
 initializes: lz
 exports: (
     lz.LZ_ENDPOINT,
@@ -91,6 +92,7 @@ default_lz_refund_address: public(address)
 struct BroadcastTarget:
     eid: uint32
     fee: uint256
+
 
 # Cached broadcast targets
 cached_broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
@@ -370,6 +372,7 @@ def _broadcast_block(
     _block_hash: bytes32,
     _broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST],
     _source_eid: uint32,
+    _refund_address: address = empty(address),
 ):
     """
     @notice Internal function to broadcast block hash to multiple chains
@@ -394,7 +397,7 @@ def _broadcast_block(
             0,  # _lz_receive_value: No value to attach to receive call
             0,  # _data_size: Zero data size (not a read)
             target.fee,  # _request_msg_value: Use cached fee as send message value
-            self,  # _refund_address: shouldn't refund executor
+            _refund_address,  # _refund_address: shouldn't refund executor
             False,  # _perform_fee_check: No fee check
         )
 
@@ -566,7 +569,7 @@ def broadcast_latest_block(
     for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
 
-    self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID)
+    self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID, msg.sender)
 
 
 @payable
@@ -649,7 +652,13 @@ def lzReceive(
         ] = self.cached_broadcast_targets
         if len(broadcast_targets) > 0:
             # Perform broadcast and clear cache
-            self._broadcast_block(block_number, block_hash, broadcast_targets, _origin.srcEid)
+            self._broadcast_block(
+                block_number,
+                block_hash,
+                broadcast_targets,
+                _origin.srcEid,
+                self.default_lz_refund_address,
+            )
             self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, MAX_N_BROADCAST])
     elif slice(_message, 0, 17) == BROADCAST_REQUEST_MESSAGE:  # 17 + 32 bytes
         # Handle broadcast request - decode fee and trigger read
