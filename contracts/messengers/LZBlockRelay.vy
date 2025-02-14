@@ -673,7 +673,7 @@ def lzReceive(
             0,  # Latest block
             2 * lz.default_gas_limit,  # Default gas limit x2 (read + broadcast)
             msg.value,  # covers read and broadcast
-            self,  # Keep refunds in contract [not set at current deploy, TODO set default_lz_refund_address]
+            self.default_lz_refund_address,  #fee refunds destination
         )
 
     else:
