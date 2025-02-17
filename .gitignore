@@ -20,7 +20,7 @@ wheels/
 
 *.DS_Store
 
-blocks.pklcache
+block_cache.pkl
 scripts/vanity_salt.txt
 
 # temporary files for contract verification
