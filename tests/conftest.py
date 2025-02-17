@@ -70,7 +70,7 @@ def block_number(request):
 
 @pytest.fixture(scope="session")
 def blocks_cache_file():
-    return "blocks.pklcache"
+    return "block_cache.pkl"
 
 
 @pytest.fixture(scope="session")
@@ -85,7 +85,7 @@ def n_blocks_data(eth_web3_client, block_number, request, blocks_cache_file):
     """Fetch a real block from mainnet"""
     n_blocks = request.param
     res = []
-    should_save = False
+    should_save = True
     # Check if cache exists
     if os.path.exists(blocks_cache_file):
         with open(blocks_cache_file, "rb") as f:
@@ -95,7 +95,7 @@ def n_blocks_data(eth_web3_client, block_number, request, blocks_cache_file):
         cache_dict = {}
     if block_number == "latest":
         block_number = eth_web3_client.eth.block_number
-    for i in range(block_number, block_number - n_blocks, -1):
+    for i in range(block_number, block_number + n_blocks):
         if i in cache_dict:
             block = cache_dict[i]
         else:

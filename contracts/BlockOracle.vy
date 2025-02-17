@@ -80,9 +80,10 @@ MAX_COMMITTERS: constant(uint256) = 32
 ################################################################
 
 block_hash: public(HashMap[uint256, bytes32])  # block_number => hash
-last_confirmed_block_number: public(uint256)
+last_confirmed_block_number: public(uint256) # number of the last confirmed block hash
 
 block_header: public(HashMap[uint256, bh_rlp.BlockHeader])  # block_number => header
+last_confirmed_header: public(bh_rlp.BlockHeader) # last confirmed header
 
 committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
@@ -261,6 +262,7 @@ def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
     @notice Submit a block header. If it's correct and blockhash is applied, store it.
     @param encoded_header The block header to submit
     """
+    current_header_block_number: uint256 = self.last_confirmed_header.block_number
     # Decode whatever is submitted
     decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(encoded_header)
 
@@ -273,6 +275,9 @@ def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
     # Store decoded header
     self.block_header[decoded_header.block_number] = decoded_header
     log SubmitBlockHeader(msg.sender, decoded_header.block_number, decoded_header.block_hash)
+
+    if decoded_header.block_number > current_header_block_number:
+        self.last_confirmed_header = decoded_header
 
 
 ################################################################
