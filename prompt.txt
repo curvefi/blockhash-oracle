@@ -1,0 +1,159 @@
+Create comprehensive documentation for a decentralized Ethereum block hash oracle system with the following architecture and components:
+
+SYSTEM OVERVIEW:
+The system provides Ethereum mainnet block hashes and state roots across multiple chains through a decentralized oracle network. While controlled by Curve DAO for security, it's designed for permissionless usage where anyone can trigger cross-chain block propagation using LayerZero relayers.
+
+KEY COMPONENTS:
+
+1. MainnetBlockView (Ethereum Mainnet)
+- Deployed at: [mainnet_address]
+- Simple view contract for recent blocks (>64, <256 blocks old)
+- Returns (block_number, block_hash)
+- Defaults to block.number-65 (2 beacon chain epochs ago)
+- No state changes, pure view functionality
+- Used as source of truth for the entire system
+
+2. BlockOracle (Hub Chain - e.g., Arbitrum)
+- Deployed at: [arbitrum_address]
+- Core consensus mechanism
+- Features:
+  * Multi-committer threshold system
+  * Full block header validation and storage
+  * Permissionless header submission
+  * Tracks latest confirmed header
+  * Immutable storage after confirmation
+- Consensus Process:
+  ```
+  [Committers] --submit--> [Threshold Check] --confirm--> [Immutable Storage]
+                                 |
+                                 v
+                         [Header Validation]
+  ```
+
+3. LayerZero Integration
+- LZBlockRelay contracts on multiple chains
+- Deployments:
+  * Base: [base_address]
+  * Optimism: [optimism_address]
+  * Polygon: [polygon_address]
+  * Gnosis: [gnosis_address]
+  * BSC: [bsc_address]
+  * Mantle: [mantle_address]
+  * Fraxtal: [fraxtal_address]
+
+CROSS-CHAIN FLOW:
+
+```
+[Ethereum Mainnet]     [Hub Chain (Arbitrum)]     [Destination Chains]
+MainnetBlockView  <--   BlockOracle       -->     LZBlockRelay
+     |                      ^                           ^
+     |                      |                           |
+     +------- LZRead ------+                           |
+                           |                           |
+                           +-------- LZSend -----------+
+```
+
+PERMISSIONLESS OPERATIONS:
+
+1. request_lzread:
+```
+User/Relayer --calls--> BlockOracle.request_lzread()
+                              |
+                              v
+LayerZero --fetches--> MainnetBlockView
+                              |
+                              v
+BlockOracle --receives--> Latest Block Data
+```
+
+2. broadcast:
+```
+User/Relayer --calls--> BlockOracle.broadcast()
+                              |
+                              v
+LayerZero --sends to--> All Configured Chains
+                              |
+                              v
+LZBlockRelay --stores--> Block Data
+```
+
+BLOCK HEADER COMMITMENT:
+
+1. Committer System:
+- Controlled by Curve DAO
+- Multiple trusted committers
+- Configurable threshold (N-of-M)
+- Committers can update votes before confirmation
+
+2. Header Validation:
+```
+[RLP Header] --decode--> [Validate Hash] --check--> [Compare with Committed]
+                              |                            |
+                              v                            v
+                    [Extract State Root]          [Store if Match]
+```
+
+3. Permissionless Usage:
+- Anyone can submit block headers
+- Anyone can trigger cross-chain updates
+- Anyone can read block data
+- Only committers can validate new blocks
+
+SECURITY FEATURES:
+
+1. Multi-layer validation:
+```
+[Committer Consensus] --> [RLP Validation] --> [Hash Verification]
+```
+
+2. Immutability guarantees:
+- Confirmed blocks cannot be changed
+- Headers must match confirmed hashes
+- State roots are verified through headers
+
+CROSS-CHAIN MESSAGING:
+
+1. LZRead Operation:
+- Permissionless triggering
+- Automatic fee handling
+- Configurable gas limits
+- Retries on failure
+
+2. Broadcast Operation:
+- Fan-out to all configured chains
+- Atomic updates
+- Gas optimization through batching
+- Failure handling per chain
+
+TECHNICAL SPECIFICATIONS:
+
+1. Block Header Format:
+- Full RLP encoding
+- Includes:
+  * Block hash
+  * Parent hash
+  * State root
+  * Block number
+  * Timestamp
+
+2. LayerZero Configuration:
+- Endpoint contracts per chain
+- Gas estimation for cross-chain calls
+- Retry logic
+- Fee handling
+
+USE CASES:
+
+1. State Verification:
+- Prove Ethereum state on sidechains
+- Verify transaction inclusion
+- Cross-chain applications requiring mainnet state
+
+2. Cross-chain Applications:
+- Bridge security
+- State synchronization
+- Proof systems
+
+This system provides a crucial public good for the Ethereum ecosystem, enabling secure and efficient access to mainnet block data across multiple chains while maintaining decentralization through Curve DAO governance and permissionless operation through LayerZero infrastructure.
+
+Generate documentation that emphasizes these aspects while maintaining technical accuracy and providing clear usage instructions for both users and developers.
