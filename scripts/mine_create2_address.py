@@ -31,7 +31,7 @@ cargo build --release
 ./target/release/createxcrunch create2 \\
     --caller {deployer} \\
     --code-hash {code_hash} \\
-    --output out{timestamp}.txt"""
+    --output {pattern[0:10]}.txt"""
 
     # Add pattern if specified
     if pattern:
@@ -55,8 +55,9 @@ def print_found_addresses(salt_file: str):
                     salt, address = line.strip().split(" => ")
                     checksummed = to_checksum_address(address)
                     # print(f"{salt:<66} | {checksummed}")
-                    if "facefeed" in checksummed:
-                        print(f"Found address: {checksummed}, salt: {salt}")
+                    for pattern in ["facefeed", "FACEFEED", "b10cface", "B10CFACE", "FaceFeed"]:
+                        if pattern in checksummed:
+                            print(f"Found address: {checksummed}, salt: {salt}")
 
                 except Exception:
                     pass

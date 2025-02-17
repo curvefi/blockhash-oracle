@@ -1,4 +1,6 @@
 # pragma version ~=0.4
+# pragma optimize gas
+# pragma evm-version cancun
 
 """
 @title LayerZero Block Relay
