@@ -13,11 +13,11 @@ The Ethereum Mainnet Block Oracle System provides decentralized, permissionless 
 1. **Block Data Request:**
    Users or relayers trigger a block data request via `request_block_hash`, which initiates a LayerZero read from MainnetBlockView.
 
-2. **Commitment & Validation:**
-   Trusted committers submit block headers to the BlockOracle. Once a configurable threshold is reached, the block hash is confirmed and stored permanently.
+2. **Broadcasting:**
+   Received block data is sent using `broadcast_latest_block` across chains through LayerZero’s messaging system.
 
-3. **Broadcasting:**
-   Confirmed block data is sent using `broadcast_latest_block` across chains through LayerZero’s messaging system.
+3. **Commitment & Validation:**
+   LZ Relayers commit block headers to the BlockOracle. Once a configurable threshold (currently just 1) is reached, the block hash is confirmed and stored permanently.
 
 4. **Block Header Submission:**
    RLP encoded block headers can be submitted by anyone to the BlockOracle using `submit_block_header`.
@@ -30,11 +30,12 @@ The Ethereum Mainnet Block Oracle System provides decentralized, permissionless 
 
 ## Deployments & Configuration
 
-Deployments are managed as follows:
+MainnetBlockView is deployed on Ethereum mainnet: [0xB10CFACE40490D798770FEdd104e0a013eD308a6](https://etherscan.io/address/0xB10CFACE40490D798770FEdd104e0a013eD308a6)
+
+Oracles and LZ Relayers are deployed across many chains where Curve Finance is live:
 
 | Chain     | Oracle Address | Block Relay Address |
 |-----------|----------------|---------------------|
-| Ethereum  | [0xB10CFACE40490D798770FEdd104e0a013eD308a6](https://etherscan.io/address/0xB10CFACE40490D798770FEdd104e0a013eD308a6) | N/A (Main view; no block relay) |
 | Arbitrum  | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://arbiscan.io/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://arbiscan.io/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
 | Polygon   | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://polygonscan.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://polygonscan.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
 | BSC       | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://bscscan.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://bscscan.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
@@ -45,7 +46,7 @@ Deployments are managed as follows:
 | Gnosis    | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://gnosisscan.io/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://gnosisscan.io/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
 | Sonic     | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://sonicscan.org/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://sonicscan.org/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
 | Ink       | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://explorer.inkonchain.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://explorer.inkonchain.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| MP1       | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://maizenet-explorer.usecorn.com//address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://maizenet-explorer.usecorn.com//address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
+| Corn      | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://maizenet-explorer.usecorn.com//address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://maizenet-explorer.usecorn.com//address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
 
 ## Usage Instructions
 
