@@ -1,100 +1,135 @@
-from cryptography.fernet import Fernet
+from eth_account import Account
 import keyring
-import base64
+import base58
+import json
 from getpass import getpass
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-import os
+import sys
+import time
+from cryptography.fernet import Fernet
 
 KEYCHAIN_SERVICE = "web3_credentials"
 KEYCHAIN_USERNAME = "deployer"
-SALT_LENGTH = 16  # for PBKDF2
-PBKDF2HMAC_ITERATIONS = 5_000_000  # ~2s on m2pro
+DEFAULT_SCRYPT_ITERATIONS = 2**21  # m2pro: 2**20 is ~2s, 2**21 is ~4s etc
 
 
-def generate_and_store_key():
-    """Generate encryption key and store it in keychain"""
-    key = Fernet.generate_key()
-    keyring.set_password(KEYCHAIN_SERVICE, f"{KEYCHAIN_USERNAME}_key", key.decode())
-    return key
-
-
-def get_encryption_key():
-    """Retrieve encryption key from keychain"""
+def get_keyring_key() -> bytes:
+    """
+    Get or generate Fernet encryption key from keyring.
+    This key is used as an additional encryption layer.
+    """
     key = keyring.get_password(KEYCHAIN_SERVICE, f"{KEYCHAIN_USERNAME}_key")
     if not key:
-        key = generate_and_store_key()
-    return key.encode() if isinstance(key, str) else key
+        # Generate a new Fernet key and store it in keyring as is
+        key = Fernet.generate_key().decode()
+        keyring.set_password(KEYCHAIN_SERVICE, f"{KEYCHAIN_USERNAME}_key", key)
+    return key.encode()  # Return bytes for Fernet
 
 
-def derive_key_from_password(password: str, salt: bytes = None) -> tuple[bytes, bytes]:
+def get_private_key() -> bytes:
     """
-    Derive a key from password using PBKDF2
-    Returns (key, salt) tuple
+    Prompts for your secret: either a private key in hex or a mnemonic phrase.
+    Returns the private key as bytes.
+    If a mnemonic is provided (detected by spaces), derive the private key using the default path.
     """
-    if salt is None:
-        salt = os.urandom(SALT_LENGTH)
+    secret = getpass("Enter your secret (private key in hex OR mnemonic phrase): ").strip()
+    # If the input has a space, assume it's a mnemonic
+    if " " in secret:
+        try:
+            Account.enable_unaudited_hdwallet_features()
+            account = Account.from_mnemonic(secret)
+            print("Derived private key from mnemonic.")
+            return account.key
+        except Exception as e:
+            print("Error deriving private key from mnemonic:", e)
+            sys.exit(1)
+    else:
+        # Assume it's a hexadecimal private key string
+        if secret.startswith("0x"):
+            secret = secret[2:]
+        try:
+            return bytes.fromhex(secret)
+        except Exception as e:
+            print("Error parsing private key in hex:", e)
+            sys.exit(1)
 
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=PBKDF2HMAC_ITERATIONS,
-    )
-    key = base64.b64encode(kdf.derive(password.encode()))
-    return key, salt
 
-
-def encrypt_private_key(private_key: str, password: str) -> str:
+def encrypt_private_key(
+    private_key: bytes, password: str, iterations: int = DEFAULT_SCRYPT_ITERATIONS
+) -> str:
     """
-    Encrypt private key using both keychain key and password
+    Encrypt private key using both keyring and eth_account's encryption:
+    1. First layer: eth_account's scrypt encryption
+    2. Second layer: Fernet encryption using keyring key
     Returns the encrypted key that can be stored in .env
     """
-    # First layer: password-based encryption
-    password_key, salt = derive_key_from_password(password)
-    f1 = Fernet(password_key)
-    first_layer = f1.encrypt(private_key.encode())
+    # First layer: eth_account's encryption
+    print(f"\nEncrypting with {iterations} scrypt iterations...")
+    start_time = time.time()
 
-    # Second layer: keychain-based encryption
-    keychain_key = get_encryption_key()
-    f2 = Fernet(keychain_key)
-    second_layer = f2.encrypt(first_layer)
+    encrypted_data = Account.encrypt(private_key, password, kdf="scrypt", iterations=iterations)
 
-    # Combine salt with encrypted data
-    combined = salt + second_layer
-    return base64.b64encode(combined).decode()
+    # Convert to string for Fernet encryption
+    encrypted_str = json.dumps(encrypted_data, separators=(",", ":"))
+
+    # Second layer: keyring-based encryption
+    keyring_key = get_keyring_key()
+    f = Fernet(keyring_key)
+    final_encrypted = f.encrypt(encrypted_str.encode())
+
+    encryption_time = time.time() - start_time
+    print(f"Encryption took {encryption_time:.2f} seconds")
+
+    # Encode as base58 for storage
+    return base58.b58encode(final_encrypted).decode()
 
 
-def decrypt_private_key(encrypted_key: str, password: str) -> str:
+def decrypt_private_key(encrypted_combined: str, password: str) -> bytes:
     """
-    Decrypt private key using both keychain key and password
+    Decrypt private key using both keyring and password:
+    1. First layer: Fernet decryption using keyring key
+    2. Second layer: eth_account's scrypt decryption
     """
-    # Decode the combined data
-    encrypted_data = base64.b64decode(encrypted_key.encode())
-    salt = encrypted_data[:SALT_LENGTH]
-    encrypted_payload = encrypted_data[SALT_LENGTH:]
+    try:
+        # Decode from base58
+        encrypted_data = base58.b58decode(encrypted_combined)
 
-    # First layer: keychain-based decryption
-    keychain_key = get_encryption_key()
-    f2 = Fernet(keychain_key)
-    first_layer = f2.decrypt(encrypted_payload)
+        # First layer: keyring-based decryption
+        keyring_key = get_keyring_key()
+        f = Fernet(keyring_key)
+        decrypted_str = f.decrypt(encrypted_data)
 
-    # Second layer: password-based decryption
-    password_key, _ = derive_key_from_password(password, salt)
-    f1 = Fernet(password_key)
-    decrypted_key = f1.decrypt(first_layer)
+        # Parse the eth_account encrypted data
+        encrypted_key = json.loads(decrypted_str)
 
-    return decrypted_key.decode()
+        # Extract and display KDF parameters
+        kdf_params = encrypted_key.get("crypto", {}).get("kdfparams", {})
+        iterations = kdf_params.get("n", "unknown")
+        print(f"\nDetected {iterations} scrypt iterations in the encrypted key")
+
+        print("\nDecrypting...")
+        start_time = time.time()
+
+        # Second layer: eth_account's decryption
+        private_key = Account.decrypt(encrypted_key, password)
+        decryption_time = time.time() - start_time
+        print(f"Decryption took {decryption_time:.2f} seconds")
+
+        return private_key
+
+    except Exception as e:
+        print("Error decrypting the key:", e)
+        sys.exit(1)
 
 
-def setup_encrypted_key():
+def setup_encrypted_key(iterations: int = DEFAULT_SCRYPT_ITERATIONS) -> str:
     """
     Interactive function to set up encrypted private key
     Returns the encrypted key to be stored in .env
     """
-    print("Enter your private key (it will not be displayed):")
-    private_key = getpass()
-    print("\nEnter a strong password for additional encryption:")
+    private_key = get_private_key()
+    acc_pre = Account.from_key(private_key)
+    print(f"\nAccount address: {acc_pre.address}")
+    print("\nEnter a strong password for encryption:")
     password = getpass()
     print("Confirm password:")
     password_confirm = getpass()
@@ -102,57 +137,70 @@ def setup_encrypted_key():
     if password != password_confirm:
         raise ValueError("Passwords do not match!")
 
-    return encrypt_private_key(private_key, password)
+    encrypted = encrypt_private_key(private_key, password, iterations)
+
+    # Verify decryption
+    print("\nVerifying decryption - enter your password:")
+    verify_password = getpass()
+    try:
+        decrypted_key = decrypt_private_key(encrypted, verify_password)
+        account = Account.from_key(decrypted_key)
+        print(f"Decrypted account address: {account.address}")
+        assert account.address == acc_pre.address
+        print("\nDecryption successful! Your key is secure.")
+    except Exception as e:
+        print("\nDecryption verification failed. Please ensure you remember your password!")
+        print(e)
+        sys.exit(1)
+
+    return encrypted
 
 
 def get_web3_account(encrypted_key: str, password: str):
     """
     Get Web3 account from encrypted private key
     """
-    from eth_account import Account
-
     private_key = decrypt_private_key(encrypted_key, password)
     return Account.from_key(private_key)
 
 
-def test_pbkdf2_time(iterations):
-    import time
+def benchmark_scrypt(iterations_list=None):
+    """
+    Benchmark scrypt encryption/decryption times with different iteration counts
+    """
+    if iterations_list is None:
+        iterations_list = [n for n in range(14, 30)]
 
-    salt = os.urandom(16)
-    start = time.time()
+    # Generate a test private key
+    test_key = Account.create().key
+    test_password = "benchmark_password"
 
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=iterations,
-    )
-    kdf.derive(b"test password")
+    print("\nBenchmarking scrypt encryption/decryption times:")
+    print("Iterations | Encryption | Decryption | Total")
+    print("-" * 45)
 
-    duration = time.time() - start
-    print(f"Iterations: {iterations:,}, Time: {duration:.2f}s")
-    return duration
+    for n in iterations_list:
+        # Time encryption
+        start_time = time.time()
+        encrypted = Account.encrypt(test_key, test_password, kdf="scrypt", iterations=2**n)
+        encrypt_time = time.time() - start_time
+
+        # Time decryption
+        start_time = time.time()
+        Account.decrypt(encrypted, test_password)
+        decrypt_time = time.time() - start_time
+
+        total_time = encrypt_time + decrypt_time
+        print(f"{n:10,d} | {encrypt_time:9.2f}s | {decrypt_time:9.2f}s | {total_time:5.2f}s")
 
 
 if __name__ == "__main__":
-    ## Some preliminary benchmark tests
-    # for i in [100_000, 480_000, 1_000_000, 2_000_000, 5_000_000]:
-    #     test_pbkdf2_time(i)
-
-    # If run directly, help user set up encrypted key
-    try:
-        encrypted = setup_encrypted_key()
-        print("\nAdd this to your .env file as ENCRYPTED_PRIVATE_KEY:")
-        print(encrypted)
-
-        # Verify decryption
-        print("\nVerifying decryption - enter your password:")
-        verify_password = getpass()
+    if len(sys.argv) > 1 and sys.argv[1] == "benchmark":
+        benchmark_scrypt()
+    else:
         try:
-            decrypted = decrypt_private_key(encrypted, verify_password)
-            print("\nDecryption successful! Your key is secure.")
+            encrypted = setup_encrypted_key()
+            print("\nAdd this to your .env file as ENCRYPTED_PRIVATE_KEY:")
+            print(encrypted)
         except Exception as e:
-            print("\nDecryption failed. Please ensure you remember your password!")
-            print(e)
-    except Exception as e:
-        print(f"Error: {e}")
+            print(f"Error: {e}")

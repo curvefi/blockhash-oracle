@@ -29,7 +29,8 @@ dev-dependencies = [
     "python-dotenv>=1.0.1",
     "natrix",
     "cryptography",
-    "keyring"
+    "keyring",
+    "base58"
 ]
 
 [tool.ruff]
