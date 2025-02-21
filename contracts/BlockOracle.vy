@@ -36,7 +36,6 @@ exports: (
 )
 
 # Import RLP Block Header Decoder
-# import contracts.modules.BlockHeaderRLPDecoder as bh_rlp
 from modules import BlockHeaderRLPDecoder as bh_rlp
 initializes: bh_rlp
 
