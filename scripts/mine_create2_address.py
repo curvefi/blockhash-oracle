@@ -2,7 +2,6 @@ import boa
 from vyper.utils import keccak256
 from eth_utils import to_checksum_address
 import os
-import datetime
 
 
 def get_contract_bytecode(contract_path: str, args: bytes = None) -> bytes:
@@ -20,7 +19,7 @@ def prepare_mining_command(
     # Get bytecode and compute hash
     bytecode = get_contract_bytecode(contract_path, init_args)
     code_hash = keccak256(bytecode).hex()
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     # Build command
     cmd = f"""# Clone and build the miner:
 git clone https://github.com/HrikB/createXcrunch.git
@@ -54,7 +53,7 @@ def print_found_addresses(salt_file: str):
                 try:
                     salt, address = line.strip().split(" => ")
                     checksummed = to_checksum_address(address)
-                    # print(f"{salt:<66} | {checksummed}")
+                    print(f"{salt} | {checksummed}")
                     for pattern in ["facefeed", "FACEFEED", "b10cface", "B10CFACE", "FaceFeed"]:
                         if pattern in checksummed:
                             print(f"Found address: {checksummed}, salt: {salt}")
@@ -84,9 +83,9 @@ def main(salt_file: str = "scripts/vanity_salt.txt"):
     pattern = "b10cfaceXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
 
-    contract_path = "contracts/messengers/LZBlockRelay.vy"
-    pattern = "facefeedXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
+    # contract_path = "contracts/messengers/LZBlockRelay.vy"
+    # pattern = "facefeedXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
 
     # Generate command
     command = prepare_mining_command(

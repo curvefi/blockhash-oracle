@@ -63,8 +63,6 @@ You can find example use scripts in `scripts/` notebook files.
 - **Expanded Committer Network:** Onboard additional trusted committers to further decentralize the consensus process.
 - **Fee Optimization:** Enhance fee management for improved efficiency in cross-chain messaging.
 
-## Contact & Support
 
-For additional information or support, please contact the Curve DAO team at **security@curve.fi**.
-
+##
 © Curve.Fi, 2025. All rights reserved.

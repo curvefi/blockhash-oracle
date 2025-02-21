@@ -556,6 +556,9 @@ def broadcast_latest_block(
     @notice Broadcast latest confirmed block hash to specified chains
     @param _target_eids List of chain IDs to broadcast to
     @param _target_fees List of fees per chain (must match _target_eids length)
+    @dev TODO must think of ways to prevent distribution of malicious block hashes
+    If single chain oracle has wrong hash (compromised sequencer/committer) it can be used to broadcast malicious block hashes everywhere.
+    Either rm this function completely or cache lz received hashes and only transmit them (+hashmap & assert)
     """
     assert self.is_read_enabled, "Can only broadcast from read-enabled chains"
     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
