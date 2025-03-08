@@ -1,6 +1,5 @@
 # pragma version ~=0.4
 # pragma optimize gas
-# pragma evm-version cancun
 
 """
 @title Block Oracle
@@ -37,6 +36,7 @@ exports: (
 
 # Import RLP Block Header Decoder
 from modules import BlockHeaderRLPDecoder as bh_rlp
+
 initializes: bh_rlp
 
 
@@ -81,10 +81,10 @@ MAX_COMMITTERS: constant(uint256) = 32
 ################################################################
 
 block_hash: public(HashMap[uint256, bytes32])  # block_number => hash
-last_confirmed_block_number: public(uint256) # number of the last confirmed block hash
+last_confirmed_block_number: public(uint256)  # number of the last confirmed block hash
 
 block_header: public(HashMap[uint256, bh_rlp.BlockHeader])  # block_number => header
-last_confirmed_header: public(bh_rlp.BlockHeader) # last confirmed header
+last_confirmed_header: public(bh_rlp.BlockHeader)  # last confirmed header
 
 committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
@@ -222,6 +222,7 @@ def commit_block(block_number: uint256, block_hash: bytes32, apply: bool = True)
 
     assert self.is_committer[msg.sender], "Not authorized"
     assert self.block_hash[block_number] == empty(bytes32), "Already applied"
+    assert block_hash != empty(bytes32), "Invalid block hash"
 
     previous_commitment: bytes32 = self.committer_votes[msg.sender][block_number]
 
@@ -268,10 +269,12 @@ def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
     decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(encoded_header)
 
     # Validate against stored blockhash
-    assert self.block_hash[decoded_header.block_number] != empty(bytes32), "Blockhash not applied"
-    assert (
-        decoded_header.block_hash == self.block_hash[decoded_header.block_number]
-    ), "Blockhash does not match"
+    block_hash: bytes32 = self.block_hash[decoded_header.block_number]
+    assert block_hash != empty(bytes32), "Blockhash not applied"
+    assert (decoded_header.block_hash == block_hash), "Blockhash does not match"
+    assert self.block_header[decoded_header.block_number] == empty(
+        bh_rlp.BlockHeader
+    ), "Header already submitted"
 
     # Store decoded header
     self.block_header[decoded_header.block_number] = decoded_header
