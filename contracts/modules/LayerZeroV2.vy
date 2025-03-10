@@ -339,8 +339,8 @@ def _prepare_uln_config(
     _eid: uint32,
     _config_type: uint32,
     _confirmations: uint64,
-    _required_dvns: DynArray[address, 10],
-    _optional_dvns: DynArray[address, 10],
+    _required_dvns: DynArray[address, MAX_DVNS],
+    _optional_dvns: DynArray[address, MAX_DVNS],
     _optional_dvn_threshold: uint8,
     _executor: address = empty(address),
 ) -> SetConfigParam:
