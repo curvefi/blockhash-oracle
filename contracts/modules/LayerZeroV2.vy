@@ -53,7 +53,7 @@ OPTIONS_HEADER: constant(bytes3) = 0x000301  # concat(TYPE_3, WORKER_ID)
 OPTION_TYPE_LZRECEIVE: constant(bytes1) = 0x01
 OPTION_TYPE_NATIVE_DROP: constant(bytes1) = 0x02
 OPTION_TYPE_LZREAD: constant(bytes1) = 0x05
-READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1600
+READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1602, 1600 channels reserved for read
 
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
@@ -280,7 +280,7 @@ def _set_uln_config(
     # Call endpoint to set config
     extcall self.LZ_ENDPOINT.setConfig(self, _lib, [config_param])
 
-    if _executor != empty(address) and _eid < READ_CHANNEL_THRESHOLD:
+    if _executor != empty(address) and _eid <= READ_CHANNEL_THRESHOLD:
         # Set executor for ULN config
         executor_config: ULNExecutorConfig = ULNExecutorConfig(
             max_message_size=1024,
