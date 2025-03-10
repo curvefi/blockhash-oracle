@@ -254,7 +254,6 @@ def _set_receive_lib(_eid: uint32, _lib: address):
 @internal
 def _set_uln_config(
     _eid: uint32,
-    _oapp: address,
     _lib: address,
     _config_type: uint32,
     _confirmations: uint64,
@@ -279,7 +278,7 @@ def _set_uln_config(
     )
 
     # Call endpoint to set config
-    extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param])
+    extcall self.LZ_ENDPOINT.setConfig(self, _lib, [config_param])
 
     if _executor != empty(address) and _eid < READ_CHANNEL_THRESHOLD:
         # Set executor for ULN config
@@ -292,7 +291,7 @@ def _set_uln_config(
             configType=1,  # 1 = ULN executor config
             config=abi_encode(executor_config),
         )
-        extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param_executor])
+        extcall self.LZ_ENDPOINT.setConfig(self, _lib, [config_param_executor])
 
 
 ################################################################

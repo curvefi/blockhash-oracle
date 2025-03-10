@@ -134,7 +134,6 @@ def initialize(
     _peers: DynArray[address, lz.MAX_PEERS],
     # Also can provide libs per peer (must provide lib types: 1 for lzsend, 2 for lzreceive)
     # We limit to 2 * MAX_PEERS because we have send and receive libs for each peer
-    _oapps: DynArray[address, 2 * lz.MAX_PEERS],
     _channels: DynArray[uint32, 2 * lz.MAX_PEERS],
     _libs: DynArray[address, 2 * lz.MAX_PEERS],
     _lib_types: DynArray[uint16, 2 * lz.MAX_PEERS],
@@ -258,7 +257,6 @@ def set_lz_uln_config(
     """
     @notice Set new ULN configuration for cross-chain messages
     @param _eid Endpoint ID
-    @param _oapp Originating application address
     @param _lib Library address
     @param _config_type Configuration type
     @param _confirmations Number of confirmations required
