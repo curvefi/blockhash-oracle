@@ -69,7 +69,7 @@ event RemoveCommitter:
     committer: indexed(address)
 
 
-event SetThreshold
+event SetThreshold:
     new_threshold: indexed(uint256)
 
 
@@ -137,7 +137,7 @@ def add_committer(_committer: address, _bump_threshold: bool = False):
         assert len(self.committers) < MAX_COMMITTERS, "Max committers reached"
         self.is_committer[_committer] = True
         self.committers.append(_committer)
-        log AddCommitter(_committer)
+        log  AddCommitter(committer=_committer)
 
         if _bump_threshold:
             self.threshold += 1
@@ -161,7 +161,7 @@ def remove_committer(_committer: address):
                 new_committers.append(committer)
         self.committers = new_committers
 
-        log RemoveCommitter(_committer)
+        log  RemoveCommitter(committer=_committer)
 
 
 @external
@@ -177,7 +177,7 @@ def set_threshold(_new_threshold: uint256):
     ), "Threshold cannot be greater than number of committers"
     self.threshold = _new_threshold
 
-    log SetThreshold(_new_threshold)
+    log  SetThreshold(new_threshold=_new_threshold)
 
 
 @external
@@ -209,7 +209,7 @@ def _apply_block(block_number: uint256, block_hash: bytes32):
     self.block_hash[block_number] = block_hash
     if self.last_confirmed_block_number < block_number:
         self.last_confirmed_block_number = block_number
-    log ApplyBlock(block_number, block_hash)
+    log  ApplyBlock(block_number=block_number, block_hash=block_hash)
 
 
 ################################################################
@@ -238,7 +238,7 @@ def commit_block(block_number: uint256, block_hash: bytes32, apply: bool = True)
 
     self.committer_votes[msg.sender][block_number] = block_hash
     self.commitment_count[block_number][block_hash] += 1
-    log CommitBlock(msg.sender, block_number, block_hash)
+    log  CommitBlock(committer=msg.sender, block_number=block_number, block_hash=block_hash)
 
     # Optional attempt to apply block
     if apply and self.commitment_count[block_number][block_hash] >= self.threshold:
@@ -284,7 +284,11 @@ def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
 
     # Store decoded header
     self.block_header[decoded_header.block_number] = decoded_header
-    log SubmitBlockHeader(msg.sender, decoded_header.block_number, decoded_header.block_hash)
+    log  SubmitBlockHeader(
+        committer=msg.sender,
+        block_number=decoded_header.block_number,
+        block_hash=decoded_header.block_hash,
+    )
 
     if decoded_header.block_number > current_header_block_number:
         self.last_confirmed_header = decoded_header
