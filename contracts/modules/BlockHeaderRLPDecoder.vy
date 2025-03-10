@@ -86,8 +86,11 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
     tmp_int: uint256 = 0
     tmp_bytes: bytes32 = empty(bytes32)
 
-    # 1. Parse RLP list header
-    current_pos: uint256 = self._read_rlp_list_header(encoded_header)
+    # Current position in the encoded header
+    current_pos: uint256 = 0
+
+    # 1. Skip RLP list length
+    current_pos = self._skip_rlp_list(encoded_header, current_pos)
 
     # 2. Extract hashes
     parent_hash: bytes32 = empty(bytes32)
@@ -139,16 +142,14 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
 
 @pure
 @internal
-def _read_rlp_list_header(encoded: Bytes[BLOCK_HEADER_SIZE]) -> uint256:
+def _skip_rlp_list(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
     """@dev Returns position after list header"""
     first_byte: uint256 = convert(slice(encoded, 0, 1), uint256)
     assert first_byte >= RLP_LIST_SHORT_START, "Not a list"
-
-    if first_byte < RLP_LIST_LONG_START:
-        return 1
+    if first_byte <= RLP_LIST_LONG_START:
+        return pos + 1
     else:
-        len_of_len: uint256 = first_byte - RLP_LIST_LONG_START
-        return 1 + len_of_len
+        return pos + 1 + (first_byte - RLP_LIST_LONG_START)
 
 
 @pure
@@ -167,6 +168,9 @@ def _read_rlp_number(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (uint25
     if prefix < RLP_SHORT_START:
         return prefix, pos + 1
 
+    # Sanity check: ensure this is a short string (not a long string or list)
+    assert prefix <= RLP_LONG_START, "Invalid RLP number encoding"
+
     length: uint256 = prefix - RLP_SHORT_START
     value: uint256 = convert(
         abi_decode(abi_encode(slice(encoded, pos + 1, length)), (Bytes[32])), uint256
@@ -182,9 +186,12 @@ def _skip_rlp_string(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256
     prefix: uint256 = convert(slice(encoded, pos, 1), uint256)
     if prefix < RLP_SHORT_START:
         return pos + 1
-    elif prefix < RLP_LONG_START:
+    elif prefix <= RLP_LONG_START:
         return pos + 1 + (prefix - RLP_SHORT_START)
     else:
+        # Sanity check: ensure this is a string, not a list
+        assert prefix < RLP_LIST_SHORT_START, "Expected string, found list prefix"
+
         len_of_len: uint256 = prefix - RLP_LONG_START
         data_length: uint256 = convert(
             abi_decode(abi_encode(slice(encoded, pos + 1, len_of_len)), (Bytes[32])), uint256
