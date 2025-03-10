@@ -237,17 +237,17 @@ def _set_delegate(_delegate: address):
 
 
 @internal
-def _set_send_lib(_oapp: address, _eid: uint32, _lib: address):
+def _set_send_lib(_eid: uint32, _lib: address):
     """@notice Set new send library for send requests"""
 
-    extcall self.LZ_ENDPOINT.setSendLibrary(_oapp, _eid, _lib)
+    extcall self.LZ_ENDPOINT.setSendLibrary(self, _eid, _lib)
 
 
 @internal
-def _set_receive_lib(_oapp: address, _eid: uint32, _lib: address):
+def _set_receive_lib(_eid: uint32, _lib: address):
     """@notice Set new receive library for receive requests"""
 
-    extcall self.LZ_ENDPOINT.setReceiveLibrary(_oapp, _eid, _lib, 0)
+    extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, 0)
     # 0 is for grace period, not used in this contract
 
 

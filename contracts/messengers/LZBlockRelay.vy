@@ -1,6 +1,5 @@
 # pragma version ~=0.4
 # pragma optimize gas
-# pragma evm-version cancun
 
 """
 @title LayerZero Block Relay
@@ -165,9 +164,9 @@ def initialize(
     assert len(_libs) == len(_lib_types), "Libs-types length mismatch"
     for i: uint256 in range(0, len(_channels), bound=2 * lz.MAX_PEERS):
         if _lib_types[i] == 1:
-            lz._set_send_lib(_oapps[i], _channels[i], _libs[i])
+            lz._set_send_lib(_channels[i], _libs[i])
         elif _lib_types[i] == 2:
-            lz._set_receive_lib(_oapps[i], _channels[i], _libs[i])
+            lz._set_receive_lib(_channels[i], _libs[i])
         else:
             raise ("Invalid lib type")
 
@@ -211,29 +210,27 @@ def set_lz_read_channel(_new_channel: uint32):
 
 
 @external
-def set_lz_send_lib(_oapp: address, _channel: uint32, _lib: address):
+def set_lz_send_lib(_channel: uint32, _lib: address):
     """
     @notice Set new send library for send requests
-    @param _oapp Peer application address
     @param _channel Send channel ID
     @param _lib New send library address
     """
 
     ownable._check_owner()
-    lz._set_send_lib(_oapp, _channel, _lib)
+    lz._set_send_lib(_channel, _lib)
 
 
 @external
-def set_lz_receive_lib(_oapp: address, _channel: uint32, _lib: address):
+def set_lz_receive_lib(_channel: uint32, _lib: address):
     """
     @notice Set new receive library for receive requests
-    @param _oapp Peer application address
     @param _channel Receive channel ID
     @param _lib New receive library address
     """
 
     ownable._check_owner()
-    lz._set_receive_lib(_oapp, _channel, _lib)
+    lz._set_receive_lib(_channel, _lib)
 
 
 @external
