@@ -69,6 +69,10 @@ event RemoveCommitter:
     committer: indexed(address)
 
 
+event SetThreshold
+    new_threshold: indexed(uint256)
+
+
 ################################################################
 #                            CONSTANTS                          #
 ################################################################
@@ -172,6 +176,8 @@ def set_threshold(_new_threshold: uint256):
         self.committers
     ), "Threshold cannot be greater than number of committers"
     self.threshold = _new_threshold
+
+    log SetThreshold(_new_threshold)
 
 
 @external
