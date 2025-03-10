@@ -247,7 +247,6 @@ def set_lz_delegate(_delegate: address):
 @external
 def set_lz_uln_config(
     _eid: uint32,
-    _oapp: address,
     _lib: address,
     _config_type: uint32,
     _confirmations: uint64,
@@ -271,7 +270,6 @@ def set_lz_uln_config(
     ownable._check_owner()
     lz._set_uln_config(
         _eid,
-        _oapp,
         _lib,
         _config_type,
         _confirmations,
