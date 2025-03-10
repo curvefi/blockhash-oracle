@@ -308,9 +308,9 @@ def _prepare_options(_gas: uint256, _value: uint256, _data_size: uint32) -> Byte
     @param _value Optional native value
     @param _data_size If nonzero, indicates a read request; otherwise regular message
     """
-    gas_bytes: Bytes[16] = concat(convert(convert(_gas, uint128), bytes16), b"")  # gas
-    value_bytes: Bytes[16] = concat(convert(convert(_value, uint128), bytes16), b"")  # value
-    data_size_bytes: Bytes[4] = concat(convert(_data_size, bytes4), b"")  # data size
+    gas_bytes: bytes16 = convert(convert(_gas, uint128), bytes16)  # gas
+    value_bytes: bytes16 = convert(convert(_value, uint128), bytes16)  # value
+    data_size_bytes: bytes4 = convert(_data_size, bytes4)  # data size
 
     full_option: Bytes[36] = empty(Bytes[36])
     if _data_size > 0 and _value > 0:
@@ -324,7 +324,7 @@ def _prepare_options(_gas: uint256, _value: uint256, _data_size: uint32) -> Byte
         full_option = concat(gas_bytes, value_bytes)
     else:
         # regular message without value
-        full_option = gas_bytes
+        full_option = concat(gas_bytes, b"") # bytes -> Bytes
 
     return concat(
         OPTIONS_HEADER,
