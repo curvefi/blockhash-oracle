@@ -1,4 +1,4 @@
-# pragma version ~=0.4
+# pragma version 0.4.1
 # pragma optimize gas
 
 """

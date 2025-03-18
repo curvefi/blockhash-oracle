@@ -1,4 +1,4 @@
-# pragma version ~=0.4
+# pragma version 0.4.1
 # pragma optimize gas
 
 """
@@ -69,7 +69,6 @@ exports: (
 
 MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
-BROADCAST_REQUEST_MESSAGE: constant(Bytes[17]) = b"broadcast_request"
 
 
 ################################################################
@@ -94,10 +93,11 @@ struct BroadcastTarget:
     eid: uint32
     fee: uint256
 
+# Broadcast targets
+broadcast_targets: HashMap[bytes32, DynArray[BroadcastTarget, MAX_N_BROADCAST]] # guid -> targets
 
-# Cached broadcast targets
-cached_broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
-
+# lzRead received blocks
+received_blocks: HashMap[uint256, bytes32] # block_number -> block_hash
 
 ################################################################
 #                            EVENTS                            #
@@ -132,8 +132,8 @@ def initialize(
     # Can optionally initialize with peers
     _peer_eids: DynArray[uint32, lz.MAX_PEERS],
     _peers: DynArray[address, lz.MAX_PEERS],
-    # Also can provide libs per peer (must provide lib types: 1 for lzsend, 2 for lzreceive)
-    # We limit to 2 * MAX_PEERS because we have send and receive libs for each peer
+    # Also can provide libs (must provide lib types: 1 for lzsend, 2 for lzreceive)
+    # We limit to 2 * MAX_PEERS because we have send and receive libs for each channel
     _channels: DynArray[uint32, 2 * lz.MAX_PEERS],
     _libs: DynArray[address, 2 * lz.MAX_PEERS],
     _lib_types: DynArray[uint16, 2 * lz.MAX_PEERS],
@@ -384,7 +384,7 @@ def _broadcast_block(
         if target_address == empty(address):
             continue
 
-        lz._send_message(
+        receipt: lz.MessagingReceipt = lz._send_message(
             target.eid,  # _dstEid
             convert(target_address, bytes32),  # _receiver
             message,  # _message
@@ -426,12 +426,11 @@ def _request_block_hash(
     for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
         cached_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
-    self.cached_broadcast_targets = cached_targets
 
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = self._prepare_read_request(_block_number)
 
     # Send to read channel with enough value to cover broadcasts
-    lz._send_message(
+    receipt: lz.MessagingReceipt = lz._send_message(
         lz.LZ_READ_CHANNEL,  # _dstEid
         convert(self, bytes32),  # _receiver
         message,  # _message
@@ -442,6 +441,8 @@ def _request_block_hash(
         _refund_address,  # _refund_address: Refund unspent fees to specified address
         False,  # _perform_fee_check: No fee check
     )
+
+    self.broadcast_targets[receipt.guid] = cached_targets
 
 
 ################################################################
@@ -554,10 +555,9 @@ def broadcast_latest_block(
     @notice Broadcast latest confirmed block hash to specified chains
     @param _target_eids List of chain IDs to broadcast to
     @param _target_fees List of fees per chain (must match _target_eids length)
-    @dev TODO must think of ways to prevent distribution of malicious block hashes
-    If single chain oracle has wrong hash (compromised sequencer/committer) it can be used to broadcast malicious block hashes everywhere.
-    Either rm this function completely or cache lz received hashes and only transmit them (+hashmap & assert)
+    @dev Only broadcast what was received via lzRead to prevent potentially malicious hashes from other sources
     """
+
     assert self.is_read_enabled, "Can only broadcast from read-enabled chains"
     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
@@ -567,51 +567,15 @@ def broadcast_latest_block(
     block_hash: bytes32 = staticcall self.block_oracle.block_hash(block_number)
     assert block_hash != empty(bytes32), "No confirmed blocks"
 
+    # Only broadcast if this block was received via lzRead
+    assert self.received_blocks[block_number] == block_hash
+
     # Prepare broadcast targets
     broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
 
     self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID, msg.sender)
-
-
-@payable
-@external
-def request_remote_read(
-    _remote_eid: uint32,
-    _read_fee: uint256,
-    _broadcast_fee: uint256,
-    _request_gas_limit: uint256 = 0,
-):
-    """
-    @notice Request a chain to perform an lzread operation and broadcast the result back to us
-    @param _remote_eid Chain ID to request the read from
-    @param _read_fee Fee to cover the lzread operation on target chain
-    @param _broadcast_fee Fee to cover broadcasting the result back to us
-    @dev msg.value must cover both:
-         - fee to send request to target chain
-         - _read_fee + _broadcast_fee which will be used by target chain
-    """
-    # Prepare broadcast request message (magic bytes + fee)
-    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = concat(
-        BROADCAST_REQUEST_MESSAGE,  # 17 bytes
-        convert(_broadcast_fee, bytes32),  # 32 bytes
-    )
-
-    # Send message to target chain
-    lz._send_message(
-        _remote_eid,  # _dstEid
-        convert(
-            lz.LZ_PEERS[_remote_eid], bytes32
-        ),  # _receiver - can only be configured peer (self)
-        message,  # _message
-        _request_gas_limit,  # _gas_limit for read request
-        _read_fee + _broadcast_fee,  # _lz_receive_value: must cover both read and broadcast
-        0,  # _data_size: Zero data size (not a read)
-        msg.value,  # _request_msg_value: Use full msg.value
-        msg.sender,  # _refund_address: Refund to sender
-        True,  # _perform_fee_check: Check fees
-    )
 
 
 @payable
@@ -627,11 +591,7 @@ def lzReceive(
     @notice Handle messages: read responses, broadcast requests, and regular messages
     @dev Three types of messages:
          1. Read responses (from read channel)
-         2. Broadcast requests (magic bytes + fee)
-         3. Regular messages (block hash broadcasts)
-    @dev Broadcast request format:
-         - First 17 bytes: BROADCAST_REQUEST_MESSAGE
-         - Next 32 bytes: uint256 fee for return broadcast
+         2. Regular messages (block hash broadcasts)
     """
     # Verify message source
     assert lz._lz_receive(_origin, _guid, _message, _executor, _extraData)
@@ -639,7 +599,6 @@ def lzReceive(
     if lz._is_read_response(_origin):
         # Only handle read response if read is enabled
         assert self.is_read_enabled, "Read not enabled"
-
         # Decode block hash and number from response
         block_number: uint256 = 0
         block_hash: bytes32 = empty(bytes32)
@@ -647,14 +606,23 @@ def lzReceive(
         if block_hash == empty(bytes32):
             return True  # Invalid response
 
+        # Cache received block hash
+        self.received_blocks[block_number] = block_hash
+
+        # Commit block hash to oracle
         self._commit_block(block_number, block_hash)
 
-        # Get cached targets and broadcast if we have any
-        broadcast_targets: DynArray[
-            BroadcastTarget, MAX_N_BROADCAST
-        ] = self.cached_broadcast_targets
+        broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.broadcast_targets[_guid]
+
         if len(broadcast_targets) > 0:
-            # Perform broadcast and clear cache
+
+            # Verify that attached value covers requested broadcast fees
+            total_fee: uint256 = 0
+            for target: BroadcastTarget in broadcast_targets:
+                total_fee += target.fee
+            assert msg.value >= total_fee, "Insufficient msg.value"
+
+            # Perform broadcast
             self._broadcast_block(
                 block_number,
                 block_hash,
@@ -662,23 +630,6 @@ def lzReceive(
                 _origin.srcEid,
                 self.default_lz_refund_address,
             )
-            self.cached_broadcast_targets = empty(DynArray[BroadcastTarget, MAX_N_BROADCAST])
-    elif slice(_message, 0, 17) == BROADCAST_REQUEST_MESSAGE:  # 17 + 32 bytes
-        # Handle broadcast request - decode fee and trigger read
-        broadcast_fee: uint256 = abi_decode(slice(_message, 17, 32), (uint256))
-
-        # msg.value must cover both read and broadcast
-        assert broadcast_fee <= msg.value, "Insufficient message value"
-
-        self._request_block_hash(
-            [_origin.srcEid],  # Single target - the requesting chain
-            [broadcast_fee],  # Use the decoded fee for broadcast
-            0,  # Latest block
-            2 * lz.default_gas_limit,  # Default gas limit x2 (read + broadcast)
-            msg.value,  # covers read and broadcast
-            self.default_lz_refund_address,  # fee refunds destination
-        )
-
     else:
         # Regular message - decode and commit block hash
         block_number: uint256 = 0

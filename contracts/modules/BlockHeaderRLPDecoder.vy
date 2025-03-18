@@ -176,7 +176,7 @@ def _skip_rlp_string(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256
 @internal
 def _read_hash32(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (bytes32, uint256):
     """@dev Read 32-byte hash field, returns (hash, next_pos)"""
-    assert convert(slice(encoded, pos, 1), uint256) == 160  # 0xa0
+    assert convert(slice(encoded, pos, 1), uint256) == 160  # RLP_SHORT_START + 32
     return extract32(encoded, pos + 1), pos + 33
 
 

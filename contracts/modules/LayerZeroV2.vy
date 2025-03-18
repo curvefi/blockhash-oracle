@@ -51,7 +51,7 @@ OPTIONS_HEADER: constant(bytes3) = 0x000301  # concat(TYPE_3, WORKER_ID)
 OPTION_TYPE_LZRECEIVE: constant(bytes1) = 0x01
 OPTION_TYPE_NATIVE_DROP: constant(bytes1) = 0x02
 OPTION_TYPE_LZREAD: constant(bytes1) = 0x05
-READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1602, 1600 channels reserved for read
+READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
 
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
@@ -248,10 +248,10 @@ def _set_send_lib(_eid: uint32, _lib: address):
 
 
 @internal
-def _set_receive_lib(_eid: uint32, _lib: address):
+def _set_receive_lib(_eid: uint32, _lib: address, _grace_period: uint256 = 0):
     """@notice Set new receive library for receive requests"""
 
-    extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, 0)
+    extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, _grace_period)
     # 0 is for grace period, not used in this contract
 
 
