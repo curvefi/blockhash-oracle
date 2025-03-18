@@ -25,9 +25,7 @@ functionality for lzSend messages and lzRead.
 
 interface ILayerZeroEndpointV2:
     def quote(_params: MessagingParams, _sender: address) -> MessagingFee: view
-    def send(_params: MessagingParams, _refundAddress: address) -> (
-        bytes32, uint64, uint256, uint256
-    ): payable
+    def send(_params: MessagingParams, _refundAddress: address) -> MessagingReceipt: payable
     def setDelegate(_delegate: address): nonpayable
     def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
     def setReceiveLibrary(
@@ -94,6 +92,12 @@ struct MessagingParams:
     message: Bytes[LZ_MESSAGE_SIZE_CAP]
     options: Bytes[LZ_OPTION_SIZE]
     payInLzToken: bool
+
+
+struct MessagingReceipt:
+    guid: bytes32
+    nonce: uint64
+    fee: MessagingFee
 
 
 struct MessagingFee:
@@ -540,7 +544,7 @@ def _send_message(
     _request_msg_value: uint256 = 0,
     _refund_address: address = msg.sender,
     _perform_fee_check: bool = False,
-):
+) -> MessagingReceipt:
     """@notice Send message using prepared parameters
     @dev This function is used to send both regular messages and read requests
     @param _dstEid Destination chain ID
@@ -569,7 +573,7 @@ def _send_message(
         fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall self.LZ_ENDPOINT.send(params, _refund_address, value=message_value)
+    return extcall self.LZ_ENDPOINT.send(params, _refund_address, value=message_value)
 
 
 @payable

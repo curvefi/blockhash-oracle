@@ -154,6 +154,26 @@ def _skip_rlp_list(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
 
 @pure
 @internal
+def _skip_rlp_string(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
+    """@dev Skip RLP string field, returns next_pos"""
+    prefix: uint256 = convert(slice(encoded, pos, 1), uint256)
+    if prefix < RLP_SHORT_START:
+        return pos + 1
+    elif prefix <= RLP_LONG_START:
+        return pos + 1 + (prefix - RLP_SHORT_START)
+    else:
+        # Sanity check: ensure this is a string, not a list
+        assert prefix < RLP_LIST_SHORT_START, "Expected string, found list prefix"
+
+        len_of_len: uint256 = prefix - RLP_LONG_START
+        data_length: uint256 = convert(
+            abi_decode(abi_encode(slice(encoded, pos + 1, len_of_len)), (Bytes[32])), uint256
+        )
+        return pos + 1 + len_of_len + data_length
+
+
+@pure
+@internal
 def _read_hash32(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (bytes32, uint256):
     """@dev Read 32-byte hash field, returns (hash, next_pos)"""
     assert convert(slice(encoded, pos, 1), uint256) == 160  # 0xa0
@@ -177,23 +197,3 @@ def _read_rlp_number(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (uint25
     )
     # abi_decode(abi_encode(bytesA), bytesB) is needed to unsafe cast bytesA to bytesB
     return value, pos + 1 + length
-
-
-@pure
-@internal
-def _skip_rlp_string(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
-    """@dev Skip RLP string field, returns next_pos"""
-    prefix: uint256 = convert(slice(encoded, pos, 1), uint256)
-    if prefix < RLP_SHORT_START:
-        return pos + 1
-    elif prefix <= RLP_LONG_START:
-        return pos + 1 + (prefix - RLP_SHORT_START)
-    else:
-        # Sanity check: ensure this is a string, not a list
-        assert prefix < RLP_LIST_SHORT_START, "Expected string, found list prefix"
-
-        len_of_len: uint256 = prefix - RLP_LONG_START
-        data_length: uint256 = convert(
-            abi_decode(abi_encode(slice(encoded, pos + 1, len_of_len)), (Bytes[32])), uint256
-        )
-        return pos + 1 + len_of_len + data_length

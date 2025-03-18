@@ -278,8 +278,8 @@ def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
     block_hash: bytes32 = self.block_hash[decoded_header.block_number]
     assert block_hash != empty(bytes32), "Blockhash not applied"
     assert (decoded_header.block_hash == block_hash), "Blockhash does not match"
-    assert self.block_header[decoded_header.block_number] == empty(
-        bh_rlp.BlockHeader
+    assert self.block_header[decoded_header.block_number].block_hash == empty(
+        bytes32
     ), "Header already submitted"
 
     # Store decoded header

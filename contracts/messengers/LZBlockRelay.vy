@@ -396,7 +396,12 @@ def _broadcast_block(
             False,  # _perform_fee_check: No fee check
         )
 
-    log BlockHashBroadcast(_source_eid, _block_number, _block_hash, _broadcast_targets)
+    log BlockHashBroadcast(
+        source_eid=_source_eid,
+        block_number=_block_number,
+        block_hash=_block_hash,
+        targets=_broadcast_targets,
+    )
 
 
 @internal
@@ -671,7 +676,7 @@ def lzReceive(
             0,  # Latest block
             2 * lz.default_gas_limit,  # Default gas limit x2 (read + broadcast)
             msg.value,  # covers read and broadcast
-            self.default_lz_refund_address,  #fee refunds destination
+            self.default_lz_refund_address,  # fee refunds destination
         )
 
     else:
