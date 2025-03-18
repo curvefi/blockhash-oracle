@@ -252,7 +252,6 @@ def _set_receive_lib(_eid: uint32, _lib: address, _grace_period: uint256 = 0):
     """@notice Set new receive library for receive requests"""
 
     extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, _grace_period)
-    # 0 is for grace period, not used in this contract
 
 
 @internal
@@ -589,12 +588,10 @@ def _lz_receive(
     @notice Base security checks for received messages
     @dev Must be called by importing contract's lzReceive
     """
-
+    peer: address = self.LZ_PEERS[_origin.srcEid]
     assert msg.sender == self.LZ_ENDPOINT.address, "Not LZ endpoint"
-    assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
-    assert (
-        convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid]
-    ), "Invalid LZ message source!"
+    assert peer != empty(address), "LZ Peer not set"
+    assert convert(_origin.sender, address) == peer, "Invalid LZ message source!"
     return True
 
 

@@ -78,7 +78,7 @@ GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bo
 is_initialized: public(bool)
 
 # Read configuration
-is_read_enabled: public(bool)
+read_enabled: public(bool)
 mainnet_eid: public(uint32)
 mainnet_block_view: public(address)
 
@@ -93,11 +93,12 @@ struct BroadcastTarget:
     eid: uint32
     fee: uint256
 
+
 # Broadcast targets
-broadcast_targets: HashMap[bytes32, DynArray[BroadcastTarget, MAX_N_BROADCAST]] # guid -> targets
+broadcast_targets: HashMap[bytes32, DynArray[BroadcastTarget, MAX_N_BROADCAST]]  # guid -> targets
 
 # lzRead received blocks
-received_blocks: HashMap[uint256, bytes32] # block_number -> block_hash
+received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 
 ################################################################
 #                            EVENTS                            #
@@ -287,7 +288,10 @@ def set_read_config(_is_enabled: bool, _mainnet_eid: uint32, _mainnet_view: addr
     @param _mainnet_view MainnetBlockView contract address
     """
     ownable._check_owner()
-    self.is_read_enabled = _is_enabled
+    assert (_is_enabled and _mainnet_eid != 0 and _mainnet_view != empty(address)) or (
+        not _is_enabled and _mainnet_eid == 0 and _mainnet_view == empty(address)
+    ), "Invalid config"
+    self.read_enabled = _is_enabled
     self.mainnet_eid = _mainnet_eid
     self.mainnet_block_view = _mainnet_view
 
@@ -416,7 +420,7 @@ def _request_block_hash(
     """
     @notice Internal function to request block hash from mainnet and broadcast to specified targets
     """
-    assert self.is_read_enabled, "Read not enabled - call set_read_config"
+    assert self.read_enabled, "Read not enabled - call set_read_config"
     assert self.mainnet_block_view != empty(address), "Mainnet view not set - call set_read_config"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
@@ -473,14 +477,14 @@ def quote_read_fee(
     @param _gas_limit Optional gas limit override
     @return Fee in native tokens required for the read operation
     """
-    assert self.is_read_enabled, "Read not enabled - call set_read_config"
+    assert self.read_enabled, "Read not enabled - call set_read_config"
     assert self.mainnet_block_view != empty(address), "Mainnet view not set - call set_read_config"
 
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = self._prepare_read_request(_block_number)
 
     return lz._quote_lz_fee(
         lz.LZ_READ_CHANNEL,
-        empty(address),
+        self,
         message,
         _gas_limit,
         _value,
@@ -558,7 +562,7 @@ def broadcast_latest_block(
     @dev Only broadcast what was received via lzRead to prevent potentially malicious hashes from other sources
     """
 
-    assert self.is_read_enabled, "Can only broadcast from read-enabled chains"
+    assert self.read_enabled, "Can only broadcast from read-enabled chains"
     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
@@ -598,7 +602,7 @@ def lzReceive(
 
     if lz._is_read_response(_origin):
         # Only handle read response if read is enabled
-        assert self.is_read_enabled, "Read not enabled"
+        assert self.read_enabled, "Read not enabled"
         # Decode block hash and number from response
         block_number: uint256 = 0
         block_hash: bytes32 = empty(bytes32)
@@ -606,13 +610,16 @@ def lzReceive(
         if block_hash == empty(bytes32):
             return True  # Invalid response
 
+
         # Cache received block hash
         self.received_blocks[block_number] = block_hash
 
         # Commit block hash to oracle
         self._commit_block(block_number, block_hash)
 
-        broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.broadcast_targets[_guid]
+        broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.broadcast_targets[
+            _guid
+        ]
 
         if len(broadcast_targets) > 0:
 
