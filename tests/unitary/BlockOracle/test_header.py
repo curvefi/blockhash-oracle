@@ -57,8 +57,9 @@ def test_submit_header_multiple_times(block_oracle, encoded_block_header, block_
     # Submit header first time
     block_oracle.submit_block_header(encoded_block_header)
 
-    # Submit again - should work but just overwrite same data
-    block_oracle.submit_block_header(encoded_block_header)
+    # Submit again - should not work
+    with boa.reverts("Header already submitted"):
+        block_oracle.submit_block_header(encoded_block_header)
 
     # Verify data is still correct
     header = block_oracle.block_header(block_data["number"])

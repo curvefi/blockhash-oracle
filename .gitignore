@@ -22,6 +22,7 @@ wheels/
 
 block_cache.pkl
 scripts/vanity_salt.txt
+scripts/lz_deployments.json
 
 # temporary files for contract verification
 tmp.json

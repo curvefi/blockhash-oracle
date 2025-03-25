@@ -68,7 +68,7 @@ def forked_env(rpc_url):
         if BOA_CACHE:
             boa.fork(url=rpc_url, block_identifier=block_to_fork)
         else:
-            boa.fork(url=rpc_url, block_identifier=block_to_fork, cache_file=None)
+            boa.fork(url=rpc_url, block_identifier=block_to_fork, cache_dir=None)
         boa.env.enable_fast_mode()
         yield
 

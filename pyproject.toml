@@ -7,19 +7,19 @@ requires-python = ">=3.12"
 
 # Requirements
 dependencies = [
-    "vyper>=0.4.0",
-    "snekmate==0.1.0",
-    "titanoboa",       # Keep this as a placeholder in the dependencies array
+    "vyper==0.4.1",
+    "snekmate==0.1.1rc1",
+    "titanoboa==0.2.6",
     "web3>=7.6.0",
 ]
 
 [tool.uv.sources]
-titanoboa = { git = "https://github.com/vyperlang/titanoboa.git", rev = "b6baf252603c70531e26208c06172b8c82d36033" }
+# titanoboa = { git = "https://github.com/vyperlang/titanoboa.git", rev = "c098714a76d9b983e0dda5b2b1954f19d5dd6478" }
 
 [tool.uv]
 dev-dependencies = [
     "pytest-xdist>=3.6.1",
-    "mamushi==0.0.4a3",
+    "mamushi",
     "pre-commit==3.8.0",
     "ruff==0.6.9",
     "pytest==8.2.2",
@@ -27,7 +27,7 @@ dev-dependencies = [
     "curve-dao>=1.0.0",
     "jupyter>=1.0.0",
     "python-dotenv>=1.0.1",
-    "natrix",
+    "natrix==v0.1.4",
     "cryptography",
     "keyring",
     "base58"

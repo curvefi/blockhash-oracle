@@ -90,7 +90,7 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
     current_pos: uint256 = 0
 
     # 1. Skip RLP list length
-    current_pos = self._skip_rlp_list(encoded_header, current_pos)
+    current_pos = self._skip_rlp_list_header(encoded_header, current_pos)
 
     # 2. Extract hashes
     parent_hash: bytes32 = empty(bytes32)
@@ -109,8 +109,8 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
     tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip tx root
     tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip receipt root
 
-    # 6. Skip variable length fields
-    current_pos = self._skip_rlp_string(encoded_header, current_pos)  # skip logs bloom
+    # 6. Skip logs bloom
+    current_pos = self._skip_rlp_string(encoded_header, current_pos)
 
     # 7. Skip difficulty
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)
@@ -142,7 +142,7 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
 
 @pure
 @internal
-def _skip_rlp_list(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
+def _skip_rlp_list_header(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
     """@dev Returns position after list header"""
     first_byte: uint256 = convert(slice(encoded, 0, 1), uint256)
     assert first_byte >= RLP_LIST_SHORT_START, "Not a list"

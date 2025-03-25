@@ -7,38 +7,48 @@ RLP_LIST_SHORT_START = 192  # 0xc0
 RLP_LIST_LONG_START = 247  # 0xf7
 
 
-def test_skip_rlp_list(block_headers_decoder):
+def test_skip_rlp_list_header(block_headers_decoder):
     """
-    Test _skip_rlp_list function with various inputs including boundary conditions
+    Test _skip_rlp_list_header function with various inputs including boundary conditions
     """
     # Test case 1: Short list (below boundary)
     short_list_header = bytes([0xC0])  # Shortest possible list encoding
     current_pos = 0
-    result = block_headers_decoder.eval(f"self._skip_rlp_list({short_list_header}, {current_pos})")
+    result = block_headers_decoder.eval(
+        f"self._skip_rlp_list_header({short_list_header}, {current_pos})"
+    )
     assert result == 1, "Short list header should return position 1"
 
     # Test case 2: Short list (middle of range)
     mid_short_list = bytes([0xE0])  # Some value between 0xc0 and 0xf7
     current_pos = 0
-    result = block_headers_decoder.eval(f"self._skip_rlp_list({mid_short_list}, {current_pos})")
+    result = block_headers_decoder.eval(
+        f"self._skip_rlp_list_header({mid_short_list}, {current_pos})"
+    )
     assert result == 1, "Short list header should return position 1"
 
     # Test case 3: BOUNDARY CASE - exactly at RLP_LIST_LONG_START (0xf7)
     boundary_case = bytes([0xF7])
     current_pos = 0
-    result = block_headers_decoder.eval(f"self._skip_rlp_list({boundary_case}, {current_pos})")
+    result = block_headers_decoder.eval(
+        f"self._skip_rlp_list_header({boundary_case}, {current_pos})"
+    )
     assert result == 1, "Boundary case (0xf7) should be treated as short list"
 
     # Test case 4: Long list header (0xf8) with 1 byte length
     long_list_header = bytes([0xF8, 0x80])  # List with length field of 1 byte
     current_pos = 0
-    result = block_headers_decoder.eval(f"self._skip_rlp_list({long_list_header}, {current_pos})")
+    result = block_headers_decoder.eval(
+        f"self._skip_rlp_list_header({long_list_header}, {current_pos})"
+    )
     assert result == 2, "Long list header (0xf8) should return position 2"
 
     # Test case 5: Long list header (0xf9) with 2 byte length
     very_long_list = bytes([0xF9, 0x01, 0x00])  # List with length field of 2 bytes
     current_pos = 0
-    result = block_headers_decoder.eval(f"self._skip_rlp_list({very_long_list}, {current_pos})")
+    result = block_headers_decoder.eval(
+        f"self._skip_rlp_list_header({very_long_list}, {current_pos})"
+    )
     assert result == 3, "Long list header (0xf9) should return position 3"
 
 

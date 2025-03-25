@@ -293,9 +293,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "snekmate", specifier = "==0.1.0" },
-    { name = "titanoboa", git = "https://github.com/vyperlang/titanoboa.git?rev=b6baf252603c70531e26208c06172b8c82d36033" },
-    { name = "vyper", specifier = ">=0.4.0" },
+    { name = "snekmate", specifier = "==0.1.1rc1" },
+    { name = "titanoboa", specifier = "==0.2.6" },
+    { name = "vyper", specifier = "==0.4.1" },
     { name = "web3", specifier = ">=7.6.0" },
 ]
 
@@ -306,8 +306,8 @@ dev = [
     { name = "curve-dao", specifier = ">=1.0.0" },
     { name = "jupyter", specifier = ">=1.0.0" },
     { name = "keyring" },
-    { name = "mamushi", specifier = "==0.0.4a3" },
-    { name = "natrix" },
+    { name = "mamushi" },
+    { name = "natrix", specifier = "==0.1.4" },
     { name = "plyvel-ci", specifier = "==1.5.1" },
     { name = "pre-commit", specifier = "==3.8.0" },
     { name = "pytest", specifier = "==8.2.2" },
@@ -1677,14 +1677,11 @@ wheels = [
 
 [[package]]
 name = "natrix"
-version = "0.1.2"
+version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic-settings" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/57/90/6c89e1282c9124279cb88fd5def03a5855de5ef6574684237bc4f74b076e/natrix-0.1.2.tar.gz", hash = "sha256:a68aadb82a5781814eb901469ca1ae341cbb4af93ac483fe36b69b04c3332eb5", size = 23116 }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/2a/8732d954f8c0e4340b06489c24dcd63b78dd2ef6870204d232db2bb01835/natrix-0.1.4.tar.gz", hash = "sha256:60626c34b0441bb2418efeca38144c3a18feaf3340051e21de81473e2a4334bf", size = 27566 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/52/9f/5fda9b31e32ce5a69644c4993b8af4d4b9746021a865dfd8e6224f73ef65/natrix-0.1.2-py3-none-any.whl", hash = "sha256:bc0dc05f66613bb2c89b0d37fe38ac7eda5d4959895038f9792b9a193a60f9db", size = 27815 },
+    { url = "https://files.pythonhosted.org/packages/fb/d5/909a17764f1af0b0f912ddfa6b2b4bbd94e1bf984e7479cd0e3b712e8b36/natrix-0.1.4-py3-none-any.whl", hash = "sha256:422f4d28bbe491488624e208be00edf1dd9d7219523b64437f99c429e3863e4a", size = 32379 },
 ]
 
 [[package]]
@@ -2128,19 +2125,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pydantic-settings"
-version = "2.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/86/41/19b62b99e7530cfa1d6ccd16199afd9289a12929bef1a03aa4382b22e683/pydantic_settings-2.7.0.tar.gz", hash = "sha256:ac4bfd4a36831a48dbf8b2d9325425b549a0a6f18cea118436d728eb4f1c4d66", size = 79743 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/00/57b4540deb5c3a39ba689bb519a4e03124b24ab8589e618be4aac2c769bd/pydantic_settings-2.7.0-py3-none-any.whl", hash = "sha256:e00c05d5fa6cbbb227c84bd7487c5c1065084119b750df7c8c1a554aed236eb5", size = 29549 },
-]
-
-[[package]]
 name = "pygments"
 version = "2.19.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2151,15 +2135,15 @@ wheels = [
 
 [[package]]
 name = "pymdown-extensions"
-version = "10.14"
+version = "10.14.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/96/b4337b778d2e9e77541a8d1cab00989aaeb1d6003c891cdc89221bd25651/pymdown_extensions-10.14.tar.gz", hash = "sha256:741bd7c4ff961ba40b7528d32284c53bc436b8b1645e8e37c3e57770b8700a34", size = 844927 }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/44/e6de2fdc880ad0ec7547ca2e087212be815efbc9a425a8d5ba9ede602cbb/pymdown_extensions-10.14.3.tar.gz", hash = "sha256:41e576ce3f5d650be59e900e4ceff231e0aed2a88cf30acaee41e02f063a061b", size = 846846 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/ae/55d347eda5a4c57a2a042fe2e7616d14981115f566b9f8f69901aba3c0c6/pymdown_extensions-10.14-py3-none-any.whl", hash = "sha256:202481f716cc8250e4be8fce997781ebf7917701b59652458ee47f2401f818b5", size = 264264 },
+    { url = "https://files.pythonhosted.org/packages/eb/f5/b9e2a42aa8f9e34d52d66de87941ecd236570c7ed2e87775ed23bbe4e224/pymdown_extensions-10.14.3-py3-none-any.whl", hash = "sha256:05e0bee73d64b9c71a4ae17c72abc2f700e8bc8403755a00580b49a4e9f189e9", size = 264467 },
 ]
 
 [[package]]
@@ -2582,11 +2566,11 @@ wheels = [
 
 [[package]]
 name = "snekmate"
-version = "0.1.0"
+version = "0.1.1rc1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a5/47/33f865f94c8892e3be93eaa103289709dd373442a02dc689452b18527f62/snekmate-0.1.0.tar.gz", hash = "sha256:8446b4c1aac8bf80b5e6a7e4fe7e9b2547200fabd9577bf6e22a2e79ba88d5de", size = 94723 }
+sdist = { url = "https://files.pythonhosted.org/packages/99/29/9e6fc5583cf9b307e7243ccb419cfdbb225c6ba164d1c81a37894370261a/snekmate-0.1.1rc1.tar.gz", hash = "sha256:cdef6e2b6f8e1121f82f4254877456abfee405765038e86bf2424d9e2001916e", size = 97656 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/1c/8d5285626ee40f297cc4bf944ffcb1c4bf02c966fb34ee8c452ab9b232d7/snekmate-0.1.0-py3-none-any.whl", hash = "sha256:0f56078c4237f2f57704ec6c974378751c5f30fb2c19f406aec2f173c002ab85", size = 112946 },
+    { url = "https://files.pythonhosted.org/packages/28/6c/4cbbcaff436fe2360422cadb5f9859c8fc1716a1eae40c09d7bc21eac4a4/snekmate-0.1.1rc1-py3-none-any.whl", hash = "sha256:66255362405019efcf68a990fc162f34d4ea6f9ef1335680fe5a8b273ac54ae6", size = 115432 },
 ]
 
 [[package]]
@@ -2658,8 +2642,8 @@ wheels = [
 
 [[package]]
 name = "titanoboa"
-version = "0.2.5"
-source = { git = "https://github.com/vyperlang/titanoboa.git?rev=b6baf252603c70531e26208c06172b8c82d36033#b6baf252603c70531e26208c06172b8c82d36033" }
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eth-abi" },
     { name = "eth-account" },
@@ -2675,6 +2659,10 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "vvm" },
     { name = "vyper" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/51/0d/cccf3b3cde2eb69ac76f4737fcee9c7045a294c402227a22d12736f8dba2/titanoboa-0.2.6.tar.gz", hash = "sha256:6bbf0063bfc5d7ffab5044da53e23564fcb4cf5cfe39b1e31a2c01df8ccb96e0", size = 99448 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c2/03/1636b511faefb99448180c18a33c3e6b04dcc92e7e8900ab4e086ad70067/titanoboa-0.2.6-py3-none-any.whl", hash = "sha256:63bee3b97428697fa2f269c2d2ecbc763b372dc774e3f6229c90f32827bd1967", size = 111043 },
 ]
 
 [[package]]
@@ -2806,19 +2794,20 @@ wheels = [
 
 [[package]]
 name = "vyper"
-version = "0.4.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asttokens" },
     { name = "cbor2" },
     { name = "importlib-metadata" },
+    { name = "lark" },
     { name = "packaging" },
     { name = "pycryptodome" },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/09/befae43f33161cf817590337f5ea12e8849e401eaaca9eeea22852ae90d1/vyper-0.4.0.tar.gz", hash = "sha256:9687145c6a0bf42de52e92202ce9a913648d3c657ac8e5cfb9b35a100dc47e34", size = 672136 }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/f1/3848bc040c2715bf77e80cc8cd03359257a959d9cf4a037a3506804cb995/vyper-0.4.1.tar.gz", hash = "sha256:2a219b895c9b5ad6a71237a6fb7d03a6eccaa800faa30ba32418847e350a95e3", size = 734208 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/0b/7c14ae8aec83187a67d8c13a4fdff9bc4d72d9ef822ec7ce026b301a00cb/vyper-0.4.0-py3-none-any.whl", hash = "sha256:22d7e1eca229e95a909dc971ff5b1685c8379404e3fc3b7b84dbc59b5de1c262", size = 338856 },
+    { url = "https://files.pythonhosted.org/packages/2f/3f/fb474ea7f3e00a16fb23ea01e1844977e450aca7962e7ad9d11badb61683/vyper-0.4.1-py3-none-any.whl", hash = "sha256:b22e19e20557b3c13fa2721efabc4e926f624af9a3bd328e1da8fb6b727d908f", size = 370776 },
 ]
 
 [[package]]
