@@ -421,7 +421,6 @@ def _request_block_hash(
     @notice Internal function to request block hash from mainnet and broadcast to specified targets
     """
     assert self.read_enabled, "Read not enabled - call set_read_config"
-    assert self.mainnet_block_view != empty(address), "Mainnet view not set - call set_read_config"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
     # Cache target EIDs and fees for lzReceive
@@ -478,7 +477,6 @@ def quote_read_fee(
     @return Fee in native tokens required for the read operation
     """
     assert self.read_enabled, "Read not enabled - call set_read_config"
-    assert self.mainnet_block_view != empty(address), "Mainnet view not set - call set_read_config"
 
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = self._prepare_read_request(_block_number)
 
