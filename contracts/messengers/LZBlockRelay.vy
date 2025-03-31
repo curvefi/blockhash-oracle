@@ -57,7 +57,6 @@ initializes: OApp[ownable := ownable]
 exports: (
     OApp.endpoint,
     OApp.peers,
-    OApp.setPeer,
     OApp.setDelegate,
     OApp.setReadChannel,
     OApp.isComposeMsgSender,
@@ -71,7 +70,7 @@ exports: (
 
 MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
-
+READ_RETURN_SIZE: constant(uint32) = 64
 
 ################################################################
 #                            STORAGE                           #
@@ -89,17 +88,17 @@ block_oracle: public(IBlockOracle)
 # Refund address
 default_lz_refund_address: public(address)
 
-# Default gas limit
-default_gas_limit: public(uint128)
 
 # Struct for cached broadcast info
 struct BroadcastTarget:
     eid: uint32
     fee: uint256
 
-
 # Broadcast targets
 broadcast_targets: HashMap[bytes32, DynArray[BroadcastTarget, MAX_N_BROADCAST]]  # guid -> targets
+
+#Per-chain gas limits
+gas_limit_map: HashMap[uint32, uint128]  # eid -> gas_limit
 
 # lzRead received blocks
 received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
@@ -109,7 +108,6 @@ received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 ################################################################
 
 event BlockHashBroadcast:
-    source_eid: uint32
     block_number: uint256
     block_hash: bytes32
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
@@ -122,11 +120,11 @@ event BlockHashBroadcast:
 @deploy
 def __init__(
     _endpoint: address,
-    _gas_limit: uint256,
+    _gas_limit: uint128,
     _read_channel: uint32,
-    # Can optionally initialize with peers (32 max for initial deployment)
-    _peer_eids: DynArray[uint32, 32],
-    _peers: DynArray[bytes32, 32],
+    # Can optionally initialize with peers (MAX_N_BROADCAST max for initial deployment)
+    _peer_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _peers: DynArray[address, MAX_N_BROADCAST],
 ):
     """
     @notice Initialize contract with core settings
@@ -146,10 +144,11 @@ def __init__(
     OApp.__init__(_endpoint, tx.origin)  # origin also set as delegate
 
     self.default_lz_refund_address = self
+    self.gas_limit_map[0] = _gas_limit # default gas limit
 
     assert len(_peer_eids) == len(_peers), "Invalid peer arrays"
-    for i: uint256 in range(0, len(_peer_eids), bound=32):
-        OApp._setPeer(_peer_eids[i], _peers[i])
+    for i: uint256 in range(0, len(_peer_eids), bound=MAX_N_BROADCAST):
+        OApp._setPeer(_peer_eids[i], convert(_peers[i], bytes32))
 
 
 ################################################################
@@ -157,14 +156,17 @@ def __init__(
 ################################################################
 
 @external
-def set_default_gas(_gas_limit: uint128):
+def set_gas_limits(_eids: DynArray[uint32, MAX_N_BROADCAST], _gas_limits: DynArray[uint128, MAX_N_BROADCAST]):
     """
-    @notice Update default gas limit for messages
-    @param _gas_limit New gas limit
+    @notice Update gas limits for messages per destination EID
+    @param _eids EIDs to update gas limit for
+    @param _gas_limits New gas limit
     """
 
     ownable._check_owner()
-    self.default_gas_limit = _gas_limit
+    assert len(_eids) == len(_gas_limits), "Invalid gas limit arrays"
+    for i: uint256 in range(0, len(_eids), bound=MAX_N_BROADCAST):
+        self.gas_limit_map[_eids[i]] = _gas_limits[i]
 
 
 @external
@@ -193,6 +195,16 @@ def set_read_config(
 
     peer: bytes32 = convert(self, bytes32) if _is_enabled else convert(empty(address), bytes32)
     OApp._setPeer(read_channel, peer)
+
+
+@external
+def set_peer(_eid: uint32, _peer: address):
+    """
+    @notice Set peer address for a corresponding endpoint. Overwrite of OApp.setPeer to accept address (EVM only).
+    @param _eid The endpoint ID.
+    @param _peer The address of the peer to be associated with the corresponding endpoint.
+    """
+    OApp._setPeer(_eid, convert(_peer, bytes32))
 
 
 @external
@@ -232,6 +244,21 @@ def withdraw_eth(_amount: uint256):
 ################################################################
 
 @internal
+@view
+def _get_gas_limit(_eid: uint32) -> uint128:
+    """
+    @notice Get gas limit for a given EID
+    @param _eid EID to get gas limit for
+    @return Gas limit for the given EID
+    """
+    gas_limit: uint128 = self.gas_limit_map[_eid]
+    if gas_limit == 0:
+        # if no gas limit is set for the target, use the default gas limit
+        gas_limit = self.gas_limit_map[0]
+
+    return gas_limit
+
+@internal
 def _commit_block(_block_number: uint256, _block_hash: bytes32):
     """
     @notice Commit block hash to oracle
@@ -240,20 +267,19 @@ def _commit_block(_block_number: uint256, _block_hash: bytes32):
     extcall self.block_oracle.commit_block(_block_number, _block_hash)
 
 
-@view
 @internal
+@view
 def _prepare_read_request(_block_number: uint256) -> Bytes[OApp.MAX_MESSAGE_SIZE]:
     """
     @notice Prepare complete read request message for MainnetBlockView
     @param _block_number Block number to request (0 for latest)
     @return Prepared LayerZero message bytes
     """
-    # Build calldata
+    # 1. Build calldata
     calldata: Bytes[ReadCmdCodecV1.MAX_CALLDATA_SIZE] = abi_encode(
         _block_number, True, method_id=GET_BLOCKHASH_SELECTOR
     )
-    # step 1: prepare read message using ReadCmdCodecV1 module
-    # A: prepare ReadCmdRequestV1 struct
+    # 2. Prepare ReadCmdRequestV1 struct
     request: ReadCmdCodecV1.EVMCallRequestV1 = ReadCmdCodecV1.EVMCallRequestV1(
         appRequestLabel=1,
         targetEid=self.mainnet_eid,
@@ -263,7 +289,7 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[OApp.MAX_MESSAGE_SIZE
         to=self.mainnet_block_view,
         callData=calldata,
     )
-    # B: encode request
+    # 3. Encode request
     encoded_message: Bytes[ReadCmdCodecV1.MAX_MESSAGE_SIZE] = ReadCmdCodecV1.encode(
         1, [request]
     )  # 1 is _appCmdLabel
@@ -273,20 +299,17 @@ def _prepare_read_request(_block_number: uint256) -> Bytes[OApp.MAX_MESSAGE_SIZE
 
 
 @internal
+@payable
 def _request_block_hash(
     _target_eids: DynArray[uint32, MAX_N_BROADCAST],
     _target_fees: DynArray[uint256, MAX_N_BROADCAST],
     _block_number: uint256,
-    _gas_limit: uint128,
-    _request_msg_value: uint256,
+    _read_gas_limit: uint128,
     _refund_address: address,
 ):
     """
     @notice Internal function to request block hash from mainnet and broadcast to specified targets
     """
-    assert self.read_enabled, "Read not enabled - can't broadcast"
-    assert len(_target_eids) == len(_target_fees), "Length mismatch"
-
     # Cache target EIDs and fees for lzReceive
     cached_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     sum_target_fees: uint256 = 0
@@ -299,11 +322,11 @@ def _request_block_hash(
     # Create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
     options = OptionsBuilder.addExecutorLzReadOption(
-        options, _gas_limit, 64, convert(sum_target_fees, uint128)
-    )  # 64 is expected response size
+        options, _read_gas_limit, READ_RETURN_SIZE, convert(sum_target_fees, uint128)
+    )
 
     # Send message
-    fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=_request_msg_value, lzTokenFee=0)
+    fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value-sum_target_fees, lzTokenFee=0)
     receipt: OApp.MessagingReceipt = OApp._lzSend(
         self.read_channel, message, options, fees, _refund_address
     )
@@ -316,7 +339,6 @@ def _broadcast_block(
     _block_number: uint256,
     _block_hash: bytes32,
     _broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST],
-    _source_eid: uint32,
     _refund_address: address,
 ):
     """
@@ -324,27 +346,23 @@ def _broadcast_block(
     @param _block_number Block number to broadcast
     @param _block_hash Block hash to broadcast
     @param _broadcast_targets Array of targets with their fees
-    @param _source_eid Chain ID where the block hash originated from
     """
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = abi_encode(_block_number, _block_hash)
 
     for target: BroadcastTarget in _broadcast_targets:
         # BroadcastTarget is a struct with .eid and .fee
-        target_address: address = convert(OApp.peers[target.eid], address)  # Use peers directly
-        if target_address == empty(address):
+        if OApp.peers[target.eid] == empty(bytes32):
             continue
-
 
         # Сreate options using OptionsBuilder module
         options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
-        options = OptionsBuilder.addExecutorLzReceiveOption(options, self.default_gas_limit, 0)
+        options = OptionsBuilder.addExecutorLzReceiveOption(options, self._get_gas_limit(target.eid), 0)
 
         # Send message
         fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=target.fee, lzTokenFee=0)
         OApp._lzSend(target.eid, message, options, fees, _refund_address)
 
         log BlockHashBroadcast(
-            source_eid=_source_eid,
             block_number=_block_number,
             block_hash=_block_hash,
             targets=_broadcast_targets,
@@ -365,184 +383,193 @@ def __default__():
     pass
 
 
-# @view
-# @external
-# def quote_read_fee(
-#     _block_number: uint256 = 0,
-#     _gas_limit: uint256 = 0,
-#     _value: uint256 = 0,
-#     _data_size: uint32 = 64,
-# ) -> uint256:
-#     """
-#     @notice Quote fee for reading block hash from mainnet
-#     @param _block_number Optional block number (0 means latest)
-#     @param _gas_limit Optional gas limit override
-#     @return Fee in native tokens required for the read operation
-#     """
-#     assert self.read_enabled, "Read not enabled - call set_read_config"
+@external
+@view
+def quote_read_fee(
+    _gas_limit: uint128 = 0,
+    _value: uint128 = 0,
+    _block_number: uint256 = 0,
+) -> uint256:
+    """
+    @notice Quote fee for reading block hash from mainnet
+    @param _gas_limit Gas to be provided in return message (0 means default gas limit)
+    @param _value Value to be provided in return message (0 means no value)
+    @param _block_number Optional block number (0 means latest)
+    @return Fee in native tokens required for the read operation
+    """
+    assert self.read_enabled, "Read not enabled - call set_read_config"
 
-#     message: Bytes[lz.MAX_MESSAGE_SIZE] = self._prepare_read_request(_block_number)
+    message: Bytes[OApp.MAX_MESSAGE_SIZE] = self._prepare_read_request(_block_number)
 
-#     return lz._quote_lz_fee(
-#         lz.LZ_READ_CHANNEL,
-#         self,
-#         message,
-#         _gas_limit,
-#         _value,
-#         _data_size,  # Expected response size
-#     )
+    # Create options using OptionsBuilder module
+    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
+    options = OptionsBuilder.addExecutorLzReadOption(
+        options, self.gas_limit_map[0] if _gas_limit == 0 else _gas_limit, READ_RETURN_SIZE, _value
+    )
 
-
-# @view
-# @external
-# def quote_broadcast_fees(
-#     _target_eids: DynArray[uint32, MAX_N_BROADCAST], _gas_limit: uint256 = 0
-# ) -> DynArray[uint256, MAX_N_BROADCAST]:
-#     """
-#     @notice Quote fees for broadcasting block hash to specified targets
-#     @param _target_eids List of chain IDs to broadcast to
-#     @param _gas_limit Optional gas limit override
-#     @return Array of fees per target chain (0 if target not configured)
-#     """
-#     # Prepare dummy broadcast message (uint256 number, bytes32 hash)
-#     message: Bytes[lz.MAX_MESSAGE_SIZE] = abi_encode(empty(uint256), empty(bytes32))
-
-#     # Get fees per chain
-#     fees: DynArray[uint256, MAX_N_BROADCAST] = []
-
-#     for eid: uint32 in _target_eids:
-#         target: address = lz.LZ_PEERS[eid]  # Use LZ_PEERS directly
-#         if target == empty(address):
-#             fees.append(0)
-#             continue
-
-#         fee: uint256 = lz._quote_lz_fee(eid, target, message, _gas_limit)
-#         fees.append(fee)
-
-#     return fees
+    return OApp._quote(
+        self.read_channel,
+        message,
+        options,
+        False,
+    ).nativeFee
 
 
-# @payable
-# @external
-# def request_block_hash(
-#     _target_eids: DynArray[uint32, MAX_N_BROADCAST],
-#     _target_fees: DynArray[uint256, MAX_N_BROADCAST],
-#     _block_number: uint256 = 0,
-#     _gas_limit: uint256 = 0,
-# ):
-#     """
-#     @notice Request block hash from mainnet and broadcast to specified targets
-#     @param _target_eids List of chain IDs to broadcast to
-#     @param _target_fees List of fees per chain (must match _target_eids length)
-#     @param _block_number Optional block number (0 means latest)
-#     @param _gas_limit Optional gas limit override
-#     @dev User must ensure msg.value is sufficient:
-#          - must cover read fee (quote_read_fee)
-#          - must cover broadcast fees (quote_broadcast_fees)
-#     """
-#     self._request_block_hash(
-#         _target_eids,
-#         _target_fees,
-#         _block_number,
-#         _gas_limit,
-#         msg.value,  # Use full msg.value
-#         msg.sender,  # Refund to sender
-#     )
 
 
-# @payable
-# @external
-# def broadcast_latest_block(
-#     _target_eids: DynArray[uint32, MAX_N_BROADCAST],
-#     _target_fees: DynArray[uint256, MAX_N_BROADCAST],
-# ):
-#     """
-#     @notice Broadcast latest confirmed block hash to specified chains
-#     @param _target_eids List of chain IDs to broadcast to
-#     @param _target_fees List of fees per chain (must match _target_eids length)
-#     @dev Only broadcast what was received via lzRead to prevent potentially malicious hashes from other sources
-#     """
+@external
+@view
+def quote_broadcast_fees(
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST]
+) -> DynArray[uint256, MAX_N_BROADCAST]:
+    """
+    @notice Quote fees for broadcasting block hash to specified targets
+    @param _target_eids List of chain IDs to broadcast to
+    @return Array of fees per target chain (0 if target not configured)
+    """
+    # Prepare dummy broadcast message (uint256 number, bytes32 hash)
+    message: Bytes[OApp.MAX_MESSAGE_SIZE] = abi_encode(empty(uint256), empty(bytes32))
 
-#     assert self.read_enabled, "Can only broadcast from read-enabled chains"
-#     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
-#     assert len(_target_eids) == len(_target_fees), "Length mismatch"
+    # Get fees per chain
+    fees: DynArray[uint256, MAX_N_BROADCAST] = []
 
-#     # Get latest block from oracle
-#     block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
-#     block_hash: bytes32 = staticcall self.block_oracle.block_hash(block_number)
-#     assert block_hash != empty(bytes32), "No confirmed blocks"
+    for eid: uint32 in _target_eids:
+        target: bytes32 = OApp.peers[eid]  # Use peers directly
+        if target == empty(bytes32):
+            fees.append(0)
+            continue
 
-#     # Only broadcast if this block was received via lzRead
-#     assert self.received_blocks[block_number] == block_hash
+        # Сreate options using OptionsBuilder module
+        options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
+        options = OptionsBuilder.addExecutorLzReceiveOption(options, self._get_gas_limit(eid), 0)
 
-#     # Prepare broadcast targets
-#     broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
-#     for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
-#         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
+        fee: uint256 = OApp._quote(eid, message, options, False).nativeFee
+        fees.append(fee)
 
-#     self._broadcast_block(block_number, block_hash, broadcast_targets, lz.EID, msg.sender)
-
-
-# @payable
-# @external
-# def lzReceive(
-#     _origin: lz.Origin,
-#     _guid: bytes32,
-#     _message: Bytes[lz.MAX_MESSAGE_SIZE],
-#     _executor: address,
-#     _extraData: Bytes[64],
-# ) -> bool:
-#     """
-#     @notice Handle messages: read responses, broadcast requests, and regular messages
-#     @dev Three types of messages:
-#          1. Read responses (from read channel)
-#          2. Regular messages (block hash broadcasts)
-#     """
-#     # Verify message source
-#     assert lz._lz_receive(_origin, _guid, _message, _executor, _extraData)
-
-#     if lz._is_read_response(_origin):
-#         # Only handle read response if read is enabled
-#         assert self.read_enabled, "Read not enabled"
-#         # Decode block hash and number from response
-#         block_number: uint256 = 0
-#         block_hash: bytes32 = empty(bytes32)
-#         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
-#         if block_hash == empty(bytes32):
-#             return True  # Invalid response
+    return fees
 
 
-#         # Cache received block hash
-#         self.received_blocks[block_number] = block_hash
+@external
+@payable
+def request_block_hash(
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _block_number: uint256 = 0,
+    _read_gas_limit: uint128 = 0,
+):
+    """
+    @notice Request block hash from mainnet and broadcast to specified targets
+    @param _target_eids List of chain IDs to broadcast to
+    @param _target_fees List of fees per chain (must match _target_eids length)
+    @param _block_number Optional block number (0 means latest)
+    @dev User must ensure msg.value is sufficient:
+         - must cover read fee (quote_read_fee)
+         - must cover broadcast fees (quote_broadcast_fees)
+    """
+    assert self.read_enabled, "Read not enabled"
+    assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
-#         # Commit block hash to oracle
-#         self._commit_block(block_number, block_hash)
 
-#         broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.broadcast_targets[
-#             _guid
-#         ]
+    self._request_block_hash(
+        _target_eids,
+        _target_fees,
+        _block_number,
+        _read_gas_limit,
+        msg.sender,  # Refund to sender
+    )
 
-#         if len(broadcast_targets) > 0:
 
-#             # Verify that attached value covers requested broadcast fees
-#             total_fee: uint256 = 0
-#             for target: BroadcastTarget in broadcast_targets:
-#                 total_fee += target.fee
-#             assert msg.value >= total_fee, "Insufficient msg.value"
+@external
+@payable
+def broadcast_latest_block(
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+):
+    """
+    @notice Broadcast latest confirmed block hash to specified chains
+    @param _target_eids List of chain IDs to broadcast to
+    @param _target_fees List of fees per chain (must match _target_eids length)
+    @dev Only broadcast what was received via lzRead to prevent potentially malicious hashes from other sources
+    """
 
-#             # Perform broadcast
-#             self._broadcast_block(
-#                 block_number,
-#                 block_hash,
-#                 broadcast_targets,
-#                 _origin.srcEid,
-#                 self.default_lz_refund_address,
-#             )
-#     else:
-#         # Regular message - decode and commit block hash
-#         block_number: uint256 = 0
-#         block_hash: bytes32 = empty(bytes32)
-#         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
-#         self._commit_block(block_number, block_hash)
+    assert self.read_enabled, "Can only broadcast from read-enabled chains"
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
-#     return True
+    # Get latest block from oracle
+    block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
+    block_hash: bytes32 = staticcall self.block_oracle.block_hash(block_number)
+    assert block_hash != empty(bytes32), "No confirmed blocks"
+
+    # Only broadcast if this block was received via lzRead
+    assert self.received_blocks[block_number] == block_hash, "Unknown source"
+
+    # Prepare broadcast targets
+    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
+        broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
+
+    self._broadcast_block(block_number, block_hash, broadcast_targets, msg.sender)
+
+
+@payable
+@external
+def lzReceive(
+    _origin: OApp.Origin,
+    _guid: bytes32,
+    _message: Bytes[OApp.MAX_MESSAGE_SIZE],
+    _executor: address,
+    _extraData: Bytes[OApp.MAX_EXTRA_DATA_SIZE],
+) -> bool:
+    """
+    @notice Handle messages: read responses, and regular messages
+    @dev Two types of messages:
+         1. Read responses (from read channel)
+         2. Regular messages (block hash broadcasts from other chains)
+    """
+    # Verify message source
+    OApp._lzReceive(_origin, _guid, _message, _executor, _extraData)
+
+    if _origin.srcEid == self.read_channel:
+        # Only handle read response if read is enabled
+        assert self.read_enabled, "Read not enabled"
+        # Decode block hash and number from response
+        block_number: uint256 = 0
+        block_hash: bytes32 = empty(bytes32)
+        block_number, block_hash = abi_decode(_message, (uint256, bytes32))
+        if block_hash == empty(bytes32):
+            return True  # Invalid response
+
+        # Store received block hash
+        self.received_blocks[block_number] = block_hash
+
+        # Commit block hash to oracle
+        self._commit_block(block_number, block_hash)
+
+        broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = self.broadcast_targets[
+            _guid
+        ]
+
+        if len(broadcast_targets) > 0:
+
+            # Verify that attached value covers requested broadcast fees
+            total_fee: uint256 = 0
+            for target: BroadcastTarget in broadcast_targets:
+                total_fee += target.fee
+            assert msg.value >= total_fee, "Insufficient msg.value"
+
+            # Perform broadcast
+            self._broadcast_block(
+                block_number,
+                block_hash,
+                broadcast_targets,
+                self.default_lz_refund_address,
+            )
+    else:
+        # Regular message - decode and commit block hash
+        block_number: uint256 = 0
+        block_hash: bytes32 = empty(bytes32)
+        block_number, block_hash = abi_decode(_message, (uint256, bytes32))
+        self._commit_block(block_number, block_hash)
+
+    return True
