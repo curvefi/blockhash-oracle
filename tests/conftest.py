@@ -8,11 +8,26 @@ import pickle
 boa.set_etherscan(api_key=os.getenv("ETHERSCAN_API_KEY"))
 
 
+def ensure_bytes(input_value):
+    # Already bytes, return as-is
+    if isinstance(input_value, bytes):
+        return input_value
+
+    # Handle hex strings (e.g., "0x1234" or "1234")
+    if isinstance(input_value, str):
+        try:
+            # Strip "0x" prefix if present, otherwise assume raw hex
+            hex_str = input_value[2:] if input_value.startswith("0x") else input_value
+            return bytes.fromhex(hex_str)
+        except ValueError:
+            raise ValueError(f"Invalid hex string: {input_value}")
+
+
 def encode_headers(block_data):
     fields = [
         block_data["parentHash"],  # 1. parentHash
         block_data["sha3Uncles"],  # 2. uncleHash
-        bytes.fromhex(block_data["miner"][2:]),  # 3. coinbase (returned as string!)
+        ensure_bytes(block_data["miner"]),  # 3. coinbase (returned as string!)
         block_data["stateRoot"],  # 4. root
         block_data["transactionsRoot"],  # 5. txHash
         block_data["receiptsRoot"],  # 6. receiptHash
@@ -39,7 +54,7 @@ def encode_headers(block_data):
     if block_data.get("parentBeaconBlockRoot") not in [None, "0x"]:
         fields.append(block_data["parentBeaconBlockRoot"])
     if block_data.get("requestsHash") not in [None, "0x"]:
-        fields.append(block_data["requestsHash"])
+        fields.append(ensure_bytes(block_data["requestsHash"]))
 
     return encode(fields)
 
@@ -53,6 +68,7 @@ def drpc_api_key():
 
 @pytest.fixture(scope="session")
 def eth_web3_client(drpc_api_key):
+    return Web3(Web3.HTTPProvider("https://eth-sepolia.public.blastapi.io"))
     if drpc_api_key:
         rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
     else:

@@ -453,8 +453,8 @@ def quote_broadcast_fees(
 def request_block_hash(
     _target_eids: DynArray[uint32, MAX_N_BROADCAST],
     _target_fees: DynArray[uint256, MAX_N_BROADCAST],
-    _block_number: uint256 = 0,
     _read_gas_limit: uint128 = 0,
+    _block_number: uint256 = 0,
 ):
     """
     @notice Request block hash from mainnet and broadcast to specified targets
@@ -538,7 +538,6 @@ def lzReceive(
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
         if block_hash == empty(bytes32):
             return True  # Invalid response
-
 
         # Store received block hash
         self.received_blocks[block_number] = block_hash

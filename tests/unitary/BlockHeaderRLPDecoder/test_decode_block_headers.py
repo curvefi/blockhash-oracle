@@ -1,7 +1,10 @@
 import pytest
 
 
-@pytest.mark.gas_profile
+# @pytest.mark.gas_profile
+
+
+@pytest.mark.parametrize("block_number", [8028497], indirect=True)
 def test_default_behavior(block_headers_decoder, block_data, encoded_block_header):
     """Test parent hash extraction from RLP"""
     # Get parent hash via contract
@@ -10,6 +13,12 @@ def test_default_behavior(block_headers_decoder, block_data, encoded_block_heade
     )
 
     # Get expected values from block data
+
+    # self hash
+    expected_self_hash = block_data["hash"]
+    print(f" Expected hash {block_data['hash'].hex()}")
+    print(f" Extracted hash {self_hash.hex()}")
+    assert self_hash == expected_self_hash, "Self hash mismatch"
 
     # parent hash
     expected_hash = block_data["parentHash"]  #
