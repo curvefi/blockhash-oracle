@@ -5,6 +5,11 @@ import json
 
 BOA_CACHE = False
 
+LZ_ENDPOINT = "0x1a44076050125825900e736c501f859c50fE728c"  # mainnet
+LZ_READ_CHANNEL = 4294967295  # max uint32 value as per standard
+LZ_EID = 30101  # Ethereum mainnet
+EMPTY_ADDRESS = boa.eval("empty(address)")
+
 ALL_CHAINS = []
 OP_CHAINS = []
 NON_OP_CHAINS = []
@@ -80,3 +85,9 @@ def op_l1_storage(chains, chain_name):
         pytest.skip("No L1Block contract address found for this chain.")
     _op_l1_storage = boa.load("contracts/OPL1BlockStorage.vy", L1Block_address)
     return _op_l1_storage
+
+
+@pytest.fixture()
+def lz_block_relay(forked_env, dev_deployer):
+    with boa.env.prank(dev_deployer):
+        return boa.load("contracts/messengers/LZBlockRelay.vy", LZ_ENDPOINT, 100_000)

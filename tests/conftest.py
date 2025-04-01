@@ -74,9 +74,21 @@ def blocks_cache_file():
 
 
 @pytest.fixture(scope="session")
-def block_data(eth_web3_client, block_number):
+def block_data(eth_web3_client, block_number, blocks_cache_file):
     """Fetch a real block from mainnet"""
+    # check if its cached
+    if os.path.exists(blocks_cache_file):
+        with open(blocks_cache_file, "rb") as f:
+            cache_dict = pickle.load(f)
+            if block_number in cache_dict:
+                return cache_dict[block_number]
+    else:
+        cache_dict = {}
     block = eth_web3_client.eth.get_block(block_number, full_transactions=False)
+    # update the cache
+    cache_dict[block_number] = block
+    with open(blocks_cache_file, "wb") as f:
+        pickle.dump(cache_dict, f)
     return block
 
 
@@ -93,6 +105,7 @@ def n_blocks_data(eth_web3_client, block_number, request, blocks_cache_file):
             print("Blocks cache loaded from file")
     else:
         cache_dict = {}
+        should_save = True
     if block_number == "latest":
         block_number = eth_web3_client.eth.block_number
     for i in range(block_number, block_number + n_blocks):
@@ -133,19 +146,13 @@ def dev_deployer():
 @pytest.fixture()
 def block_oracle(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/BlockOracle.vy", dev_deployer)
+        return boa.load("contracts/BlockOracle.vy")
 
 
 @pytest.fixture()
 def mainnet_block_view(dev_deployer):
     with boa.env.prank(dev_deployer):
         return boa.load("contracts/MainnetBlockView.vy")
-
-
-@pytest.fixture()
-def lz_block_relay(dev_deployer):
-    with boa.env.prank(dev_deployer):
-        return boa.load("contracts/messengers/LZBlockRelay.vy", dev_deployer)
 
 
 @pytest.fixture()

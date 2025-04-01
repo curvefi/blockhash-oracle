@@ -94,6 +94,7 @@ struct BroadcastTarget:
     eid: uint32
     fee: uint256
 
+
 # Broadcast targets
 broadcast_targets: HashMap[bytes32, DynArray[BroadcastTarget, MAX_N_BROADCAST]]  # guid -> targets
 
@@ -121,19 +122,12 @@ event BlockHashBroadcast:
 def __init__(
     _endpoint: address,
     _gas_limit: uint128,
-    _read_channel: uint32,
-    # Can optionally initialize with peers (MAX_N_BROADCAST max for initial deployment)
-    _peer_eids: DynArray[uint32, MAX_N_BROADCAST],
-    _peers: DynArray[address, MAX_N_BROADCAST],
 ):
     """
     @notice Initialize contract with core settings
     @dev Can only be called once, assumes caller is owner, sets as delegate
     @param _endpoint LayerZero endpoint address
     @param _gas_limit Default gas limit for cross-chain messages
-    @param _read_channel LZ Read channel ID
-    @param _peer_eids Array of peer EIDs
-    @param _peers Array of peer addresses
     @dev Note that peers are bytes32 (LZ specs), convert accordingly
     we could convert inside, but OApp.setPeer requires bytes32,
     so we force devs to have conversion script
@@ -144,11 +138,7 @@ def __init__(
     OApp.__init__(_endpoint, tx.origin)  # origin also set as delegate
 
     self.default_lz_refund_address = self
-    self.gas_limit_map[0] = _gas_limit # default gas limit
-
-    assert len(_peer_eids) == len(_peers), "Invalid peer arrays"
-    for i: uint256 in range(0, len(_peer_eids), bound=MAX_N_BROADCAST):
-        OApp._setPeer(_peer_eids[i], convert(_peers[i], bytes32))
+    self.gas_limit_map[0] = _gas_limit  # default gas limit
 
 
 ################################################################
@@ -156,7 +146,9 @@ def __init__(
 ################################################################
 
 @external
-def set_gas_limits(_eids: DynArray[uint32, MAX_N_BROADCAST], _gas_limits: DynArray[uint128, MAX_N_BROADCAST]):
+def set_gas_limits(
+    _eids: DynArray[uint32, MAX_N_BROADCAST], _gas_limits: DynArray[uint128, MAX_N_BROADCAST]
+):
     """
     @notice Update gas limits for messages per destination EID
     @param _eids EIDs to update gas limit for
@@ -198,13 +190,16 @@ def set_read_config(
 
 
 @external
-def set_peer(_eid: uint32, _peer: address):
+def set_peers(_eids: DynArray[uint32, MAX_N_BROADCAST], _peers: DynArray[address, MAX_N_BROADCAST]):
     """
-    @notice Set peer address for a corresponding endpoint. Overwrite of OApp.setPeer to accept address (EVM only).
-    @param _eid The endpoint ID.
-    @param _peer The address of the peer to be associated with the corresponding endpoint.
+    @notice Set peer addresses for a corresponding endpoints. Batched version of OApp.setPeer that accept address (EVM only).
+    @param _eids The endpoint IDs.
+    @param _peers The addresses of the peers to be associated with the corresponding endpoints.
     """
-    OApp._setPeer(_eid, convert(_peer, bytes32))
+    ownable._check_owner()
+    assert len(_eids) == len(_peers), "Invalid peer arrays"
+    for i: uint256 in range(0, len(_eids), bound=MAX_N_BROADCAST):
+        OApp._setPeer(_eids[i], convert(_peers[i], bytes32))
 
 
 @external
@@ -257,6 +252,7 @@ def _get_gas_limit(_eid: uint32) -> uint128:
         gas_limit = self.gas_limit_map[0]
 
     return gas_limit
+
 
 @internal
 def _commit_block(_block_number: uint256, _block_hash: bytes32):
@@ -317,6 +313,7 @@ def _request_block_hash(
         cached_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
 
+    assert sum_target_fees < msg.value, "Insufficient value"
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = self._prepare_read_request(_block_number)
 
     # Create options using OptionsBuilder module
@@ -326,7 +323,8 @@ def _request_block_hash(
     )
 
     # Send message
-    fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value-sum_target_fees, lzTokenFee=0)
+    fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=0)
+    # Fees cover read fee and broadcast fees
     receipt: OApp.MessagingReceipt = OApp._lzSend(
         self.read_channel, message, options, fees, _refund_address
     )
@@ -354,9 +352,12 @@ def _broadcast_block(
         if OApp.peers[target.eid] == empty(bytes32):
             continue
 
+
         # Сreate options using OptionsBuilder module
         options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
-        options = OptionsBuilder.addExecutorLzReceiveOption(options, self._get_gas_limit(target.eid), 0)
+        options = OptionsBuilder.addExecutorLzReceiveOption(
+            options, self._get_gas_limit(target.eid), 0
+        )
 
         # Send message
         fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=target.fee, lzTokenFee=0)
@@ -415,8 +416,6 @@ def quote_read_fee(
     ).nativeFee
 
 
-
-
 @external
 @view
 def quote_broadcast_fees(
@@ -439,12 +438,12 @@ def quote_broadcast_fees(
             fees.append(0)
             continue
 
+
         # Сreate options using OptionsBuilder module
         options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
         options = OptionsBuilder.addExecutorLzReceiveOption(options, self._get_gas_limit(eid), 0)
 
-        fee: uint256 = OApp._quote(eid, message, options, False).nativeFee
-        fees.append(fee)
+        fees.append(OApp._quote(eid, message, options, False).nativeFee)
 
     return fees
 
@@ -466,16 +465,16 @@ def request_block_hash(
          - must cover read fee (quote_read_fee)
          - must cover broadcast fees (quote_broadcast_fees)
     """
+
     assert self.read_enabled, "Read not enabled"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
-
 
     self._request_block_hash(
         _target_eids,
         _target_fees,
         _block_number,
-        _read_gas_limit,
-        msg.sender,  # Refund to sender
+        _read_gas_limit if _read_gas_limit != 0 else self.gas_limit_map[0],
+        msg.sender  # Refund to sender
     )
 
 
@@ -540,6 +539,7 @@ def lzReceive(
         if block_hash == empty(bytes32):
             return True  # Invalid response
 
+
         # Store received block hash
         self.received_blocks[block_number] = block_hash
 
@@ -551,7 +551,6 @@ def lzReceive(
         ]
 
         if len(broadcast_targets) > 0:
-
             # Verify that attached value covers requested broadcast fees
             total_fee: uint256 = 0
             for target: BroadcastTarget in broadcast_targets:

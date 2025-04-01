@@ -106,15 +106,14 @@ threshold: public(uint256)
 ################################################################
 
 @deploy
-def __init__(_owner: address):
+def __init__():
     """
     @notice Initialize the contract with the owner
-    @param _owner The owner of the contract
     """
 
     # Initialize ownable
     ownable.__init__()
-    ownable._transfer_ownership(_owner)
+    ownable._transfer_ownership(tx.origin)
 
     # Initialize RLP decoder
     bh_rlp.__init__()
