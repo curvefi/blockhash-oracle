@@ -104,8 +104,8 @@ received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 ################################################################
 
 event BlockHashBroadcast:
-    block_number: uint256
-    block_hash: bytes32
+    block_number: indexed(uint256)
+    block_hash: indexed(bytes32)
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
 
 
@@ -363,18 +363,16 @@ def __default__():
 def quote_read_fee(
     _read_gas_limit: uint128,
     _value: uint128,
-    _block_number: uint256 = 0,
 ) -> uint256:
     """
     @notice Quote fee for reading block hash from mainnet
     @param _read_gas_limit Gas to be provided in return message
     @param _value Value to be provided in return message
-    @param _block_number Optional block number (0 means latest)
     @return Fee in native tokens required for the read operation
     """
     assert self.read_enabled, "Read not enabled - call set_read_config"
 
-    message: Bytes[OApp.MAX_MESSAGE_SIZE] = self._prepare_read_request(_block_number)
+    message: Bytes[OApp.MAX_MESSAGE_SIZE] = self._prepare_read_request(0) # dev: 0 for latest block
 
     # Create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
