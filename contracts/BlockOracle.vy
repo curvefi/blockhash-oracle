@@ -84,7 +84,7 @@ MAX_COMMITTERS: constant(uint256) = 32
 #                            STORAGE                           #
 ################################################################
 
-block_hash: public(HashMap[uint256, bytes32])  # block_number => hash
+block_hash: HashMap[uint256, bytes32]  # block_number => hash
 last_confirmed_block_number: public(uint256)  # number of the last confirmed block hash
 
 block_header: public(HashMap[uint256, bh_rlp.BlockHeader])  # block_number => header

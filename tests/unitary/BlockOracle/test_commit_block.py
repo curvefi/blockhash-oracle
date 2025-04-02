@@ -22,14 +22,14 @@ def test_default_behavior(block_oracle, committers):
     mock_block_hash = b"\x01" * 32
     mock_block_num = 11223344
     # initial state - empty(bytes32)
-    assert block_oracle.block_hash(mock_block_num) == b"\x00" * 32
+    assert block_oracle.get_block_hash(mock_block_num) == b"\x00" * 32
 
     # commit and apply
     with boa.env.prank(committer):
         block_oracle.commit_block(mock_block_num, mock_block_hash)
 
     # assert change
-    assert block_oracle.block_hash(mock_block_num) == mock_block_hash
+    assert block_oracle.get_block_hash(mock_block_num) == mock_block_hash
 
 
 def test_multiple_committers_consensus(block_oracle, committers, dev_deployer):
@@ -45,12 +45,12 @@ def test_multiple_committers_consensus(block_oracle, committers, dev_deployer):
         with boa.env.prank(committers[i]):
             assert not block_oracle.commit_block(mock_block_num, mock_block_hash)
             assert block_oracle.commitment_count(mock_block_num, mock_block_hash) == i + 1
-            assert block_oracle.block_hash(mock_block_num) == b"\x00" * 32
+            assert block_oracle.get_block_hash(mock_block_num) == b"\x00" * 32
 
     # Third commit should apply
     with boa.env.prank(committers[2]):
         assert block_oracle.commit_block(mock_block_num, mock_block_hash)
-        assert block_oracle.block_hash(mock_block_num) == mock_block_hash
+        assert block_oracle.get_block_hash(mock_block_num) == mock_block_hash
 
 
 def test_vote_changes(block_oracle, committers):
@@ -97,7 +97,7 @@ def test_competing_hashes(block_oracle, committers):
     # Final vote for hash1 should confirm it
     with boa.env.prank(committers[4]):
         assert block_oracle.commit_block(block_num, hash1)
-        assert block_oracle.block_hash(block_num) == hash1
+        assert block_oracle.get_block_hash(block_num) == hash1
 
 
 def test_permission_commit(block_oracle):
@@ -138,7 +138,7 @@ def test_block_already_committed(block_oracle, committers):
         block_oracle.commit_block(mock_block_num, mock_block_hash2, sender=committers[1])
 
     # Hash should remain unchanged
-    assert block_oracle.block_hash(mock_block_num) == mock_block_hash1
+    assert block_oracle.get_block_hash(mock_block_num) == mock_block_hash1
 
 
 def test_admin_apply_block(block_oracle, dev_deployer):
@@ -154,7 +154,7 @@ def test_admin_apply_block(block_oracle, dev_deployer):
     with boa.env.prank(dev_deployer):
         block_oracle.admin_apply_block(mock_block_num, mock_hash)
 
-    assert block_oracle.block_hash(mock_block_num) == mock_hash
+    assert block_oracle.get_block_hash(mock_block_num) == mock_hash
     assert block_oracle.last_confirmed_block_number() == mock_block_num
 
 
@@ -205,5 +205,5 @@ def test_apply_block_permissionless(block_oracle, committers):
     random_address = boa.env.generate_address()
     with boa.env.prank(random_address):
         block_oracle.apply_block(mock_block_num, mock_hash)
-    result_hash = block_oracle.block_hash(mock_block_num)
+    result_hash = block_oracle.get_block_hash(mock_block_num)
     assert result_hash == mock_hash
