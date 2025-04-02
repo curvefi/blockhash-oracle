@@ -14,15 +14,15 @@ This file contains such constants for the LayerZero OApp.
 """
 
 # Options size limits
-MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = 256
-MAX_OPTION_SINGLE_SIZE: constant(uint256) = 64
+MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = 96
+MAX_OPTION_SINGLE_SIZE: constant(uint256) = 48
 
 # Message size limits
-MAX_MESSAGE_SIZE: constant(uint256) = 512
+MAX_MESSAGE_SIZE: constant(uint256) = 265
 MAX_EXTRA_DATA_SIZE: constant(uint256) = 64
 
 # ReadCmdCodecV1 limits
-MAX_CALLDATA_SIZE: constant(uint256) = 128
+MAX_CALLDATA_SIZE: constant(uint256) = 96
 
 # ConfigUtils limits
 MAX_DVNS: constant(uint256) = 16

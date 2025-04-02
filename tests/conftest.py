@@ -15,12 +15,9 @@ def ensure_bytes(input_value):
 
     # Handle hex strings (e.g., "0x1234" or "1234")
     if isinstance(input_value, str):
-        try:
-            # Strip "0x" prefix if present, otherwise assume raw hex
-            hex_str = input_value[2:] if input_value.startswith("0x") else input_value
-            return bytes.fromhex(hex_str)
-        except ValueError:
-            raise ValueError(f"Invalid hex string: {input_value}")
+        # Strip "0x" prefix if present, otherwise assume raw hex
+        hex_str = input_value[2:] if input_value.startswith("0x") else input_value
+        return bytes.fromhex(hex_str)
 
 
 def encode_headers(block_data):

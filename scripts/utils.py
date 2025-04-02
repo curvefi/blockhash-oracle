@@ -8,12 +8,9 @@ def ensure_bytes(input_value):
 
     # Handle hex strings (e.g., "0x1234" or "1234")
     if isinstance(input_value, str):
-        try:
-            # Strip "0x" prefix if present, otherwise assume raw hex
-            hex_str = input_value[2:] if input_value.startswith("0x") else input_value
-            return bytes.fromhex(hex_str)
-        except ValueError:
-            raise ValueError(f"Invalid hex string: {input_value}")
+        # Strip "0x" prefix if present, otherwise assume raw hex
+        hex_str = input_value[2:] if input_value.startswith("0x") else input_value
+        return bytes.fromhex(hex_str)
 
 
 def encode_headers(block_data):
@@ -48,5 +45,8 @@ def encode_headers(block_data):
         fields.append(block_data["parentBeaconBlockRoot"])
     if block_data.get("requestsHash") not in [None, "0x"]:
         fields.append(ensure_bytes(block_data["requestsHash"]))
+
+    for i, f in enumerate(fields):
+        print(f"Field {i}: {f}")
 
     return encode(fields)

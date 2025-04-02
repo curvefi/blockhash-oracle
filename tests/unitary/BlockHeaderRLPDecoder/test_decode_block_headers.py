@@ -4,7 +4,7 @@ import pytest
 # @pytest.mark.gas_profile
 
 
-@pytest.mark.parametrize("block_number", [8028497], indirect=True)
+@pytest.mark.parametrize("block_number", [8034289], indirect=True)
 def test_default_behavior(block_headers_decoder, block_data, encoded_block_header):
     """Test parent hash extraction from RLP"""
     # Get parent hash via contract
