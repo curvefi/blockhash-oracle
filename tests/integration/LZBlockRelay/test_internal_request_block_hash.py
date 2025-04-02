@@ -24,7 +24,6 @@ def test_request_block_hash(
     # Setup broadcast targets
     test_eids = [2, 3]  # Target chain IDs
     test_fees = [10**16, 2 * 10**16]  # 0.01 ETH and 0.02 ETH fees
-    refund_address = dev_deployer
 
     # Note: In a test environment, the actual cross-chain message will not be sent,
     # but we can verify the function doesn't revert and properly caches targets
@@ -33,11 +32,10 @@ def test_request_block_hash(
     with boa.env.prank(dev_deployer):
         # Request for specific block
         lz_block_relay.internal._request_block_hash(
+            0,
             test_eids,
             test_fees,
-            0,  # block number
             200_000,  # gas limit
-            refund_address,
             value=10**18,  # 1 ETH (should be enough for the message)
         )
     new_targets = list(lz_block_relay._storage.broadcast_targets.get().values())

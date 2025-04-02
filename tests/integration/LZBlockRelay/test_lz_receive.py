@@ -130,7 +130,7 @@ def test_lz_receive_read_response_with_broadcast(
     read_fee = lz_block_relay.quote_read_fee(lz_read_gas_limit, sum(broadcast_fees))
     with boa.env.prank(dev_deployer):
         lz_block_relay.request_block_hash(
-            test_eids, broadcast_fees, 0, lz_read_gas_limit, value=read_fee
+            test_eids, broadcast_fees, lz_read_gas_limit, 0, value=read_fee
         )
     guid = list(lz_block_relay._storage.broadcast_targets.get().keys())[0]
 

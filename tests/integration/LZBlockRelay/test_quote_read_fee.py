@@ -12,24 +12,20 @@ def test_quote_read_fee(forked_env, lz_block_relay, mainnet_block_view, dev_depl
     """Test quoting a fee for reading a block hash."""
     # Should fail if read not enabled initially
     with boa.reverts("Read not enabled - call set_read_config"):
-        lz_block_relay.quote_read_fee()
+        lz_block_relay.quote_read_fee(100_000, 0)
 
     # Enable read functionality
     with boa.env.prank(dev_deployer):
         lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
 
     # Quote with default parameters
-    fee = lz_block_relay.quote_read_fee()
+    fee = lz_block_relay.quote_read_fee(100_000, 0)
     assert isinstance(fee, int)
 
-    # Quote with custom gas limit
-    fee_custom_gas = lz_block_relay.quote_read_fee(300_000)
-    assert isinstance(fee_custom_gas, int)
-
     # Quote with value for return message
-    fee_with_value = lz_block_relay.quote_read_fee(0, 10**17)
+    fee_with_value = lz_block_relay.quote_read_fee(300_000, 10**17)
     assert isinstance(fee_with_value, int)
 
     # Quote for specific block number
-    fee_specific_block = lz_block_relay.quote_read_fee(0, 0, 14000000)
+    fee_specific_block = lz_block_relay.quote_read_fee(300_000, 10**17, 14000000)
     assert isinstance(fee_specific_block, int)
