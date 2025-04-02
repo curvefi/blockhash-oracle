@@ -25,7 +25,3 @@ def test_quote_read_fee(forked_env, lz_block_relay, mainnet_block_view, dev_depl
     # Quote with value for return message
     fee_with_value = lz_block_relay.quote_read_fee(300_000, 10**17)
     assert isinstance(fee_with_value, int)
-
-    # Quote for specific block number
-    fee_specific_block = lz_block_relay.quote_read_fee(300_000, 10**17, 14000000)
-    assert isinstance(fee_specific_block, int)

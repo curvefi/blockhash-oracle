@@ -30,7 +30,7 @@ If chain is not read-enabled, it will only be able to receive blockhashes from o
 interface IBlockOracle:
     def commit_block(block_number: uint256, block_hash: bytes32) -> bool: nonpayable
     def last_confirmed_block_number() -> uint256: view
-    def block_hash(block_number: uint256) -> bytes32: view
+    def get_block_hash(block_number: uint256) -> bytes32: view
 
 
 ################################################################
@@ -470,7 +470,7 @@ def broadcast_latest_block(
 
     # Get latest block from oracle
     block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
-    block_hash: bytes32 = staticcall self.block_oracle.block_hash(block_number)
+    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(block_number)
     assert block_hash != empty(bytes32), "No confirmed blocks"
 
     # Only broadcast if this block was received via lzRead
@@ -492,7 +492,7 @@ def lzReceive(
     _message: Bytes[OApp.MAX_MESSAGE_SIZE],
     _executor: address,
     _extraData: Bytes[OApp.MAX_EXTRA_DATA_SIZE],
-) -> bool:
+):
     """
     @notice Handle messages: read responses, and regular messages
     @dev Two types of messages:
@@ -510,7 +510,7 @@ def lzReceive(
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
         if block_hash == empty(bytes32):
-            return True  # Invalid response
+            return  # Invalid response
 
         # Store received block hash
         self.received_blocks[block_number] = block_hash
@@ -542,5 +542,3 @@ def lzReceive(
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
         self._commit_block(block_number, block_hash)
-
-    return True
