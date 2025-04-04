@@ -37,7 +37,7 @@ def get_blockhash(
     if requested_block_number == 0:
         requested_block_number = block.number - 65
 
-    if requested_block_number > block.number - 256 and requested_block_number < block.number - 64:
+    if requested_block_number >= block.number - 256 and requested_block_number < block.number - 64:
         return (requested_block_number, blockhash(requested_block_number))
     else:
         if _avoid_failure:
