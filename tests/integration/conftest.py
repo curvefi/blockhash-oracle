@@ -90,4 +90,4 @@ def op_l1_storage(chains, chain_name):
 @pytest.fixture()
 def lz_block_relay(forked_env, dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/messengers/LZBlockRelay.vy", LZ_ENDPOINT, 150_000)
+        return boa.load("contracts/messengers/LZBlockRelay.vy", LZ_ENDPOINT)

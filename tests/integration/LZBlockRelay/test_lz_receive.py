@@ -125,14 +125,14 @@ def test_lz_receive_read_response_with_broadcast(
     origin = (LZ_READ_CHANNEL, boa.eval(f"convert({lz_block_relay.address}, bytes32)"), 0)
 
     # emulate request_block_hash flow
-    broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids)
+    broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
     lz_read_gas_limit = 100_000
     read_fee = lz_block_relay.quote_read_fee(lz_read_gas_limit, sum(broadcast_fees))
     with boa.env.prank(dev_deployer):
         lz_block_relay.request_block_hash(
-            test_eids, broadcast_fees, lz_read_gas_limit, 0, value=read_fee
+            test_eids, broadcast_fees, 150_000, lz_read_gas_limit, 0, value=read_fee
         )
-    guid = list(lz_block_relay._storage.broadcast_targets.get().keys())[0]
+    guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
 
     # Create a message with block data
     test_block_number = block_data["number"]

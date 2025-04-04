@@ -27,12 +27,12 @@ def test_broadcast_latest_block(
         block_oracle.add_committer(lz_block_relay.address, True)
 
     # Get broadcast fees
-    broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids)
+    broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
 
     # Should fail if read not enabled
     with boa.env.prank(user):
         with boa.reverts("Can only broadcast from read-enabled chains"):
-            lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees)
+            lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees, 150_000)
 
     # Enable read functionality
     with boa.env.prank(dev_deployer):
@@ -41,12 +41,12 @@ def test_broadcast_latest_block(
     # Should fail with mismatched array lengths
     with boa.env.prank(user):
         with boa.reverts("Length mismatch"):
-            lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees[:1])
+            lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees[:1], 150_000)
 
     # Should fail if no confirmed block
     with boa.env.prank(user):
         with boa.reverts("No confirmed blocks"):
-            lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees)
+            lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees, 150_000)
 
     # Commit and confirm a block in the oracle to test broadcasting
     test_block_number = block_data["number"]
@@ -64,7 +64,7 @@ def test_broadcast_latest_block(
     # Now the broadcast should work
     total_value = sum(broadcast_fees)
     with boa.env.prank(user):
-        lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees, value=total_value)
+        lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees, 150_000, value=total_value)
 
     # Verify event was emitted
     events = lz_block_relay.get_logs()

@@ -26,30 +26,34 @@ def test_request_block_hash(forked_env, lz_block_relay, dev_deployer, mainnet_bl
 
     # Get broadcast fees
     lz_read_gas_limit = 100_000
-
+    lz_receive_gas_limit = 150_000
     # Should fail if read not enabled
     with boa.env.prank(user):
         with boa.reverts("Read not enabled"):
-            lz_block_relay.request_block_hash(test_eids, [10**16, 10**16], lz_read_gas_limit)
+            lz_block_relay.request_block_hash(
+                test_eids, [10**16, 10**16], lz_receive_gas_limit, lz_read_gas_limit
+            )
 
     # Enable read functionality
     with boa.env.prank(dev_deployer):
         lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
 
     # cost to broadcast to all targets
-    broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids)
+    broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids, lz_receive_gas_limit)
     # cost to read from mainnet (including broadcast fees)
     read_fee = lz_block_relay.quote_read_fee(lz_read_gas_limit, sum(broadcast_fees))
 
     # Should fail with mismatched array lengths
     with boa.env.prank(user):
         with boa.reverts("Length mismatch"):
-            lz_block_relay.request_block_hash(test_eids, broadcast_fees[:1], lz_read_gas_limit)
+            lz_block_relay.request_block_hash(
+                test_eids, broadcast_fees[:1], lz_receive_gas_limit, lz_read_gas_limit
+            )
 
     # Valid request (Note: In test environment, this will not actually send a message)
     with boa.env.prank(user):
         lz_block_relay.request_block_hash(
-            test_eids, broadcast_fees, lz_read_gas_limit, value=read_fee
+            test_eids, broadcast_fees, lz_receive_gas_limit, lz_read_gas_limit, value=read_fee
         )
 
     # A real implementation would also verify:

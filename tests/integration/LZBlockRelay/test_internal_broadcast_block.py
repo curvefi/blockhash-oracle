@@ -42,7 +42,7 @@ def test_broadcast_block(forked_env, lz_block_relay, dev_deployer, block_data):
         lz_block_relay.internal._broadcast_block(
             test_block_number,
             test_block_hash,
-            broadcast_targets,
+            (broadcast_targets, 150_000),
             refund_address,
             value=sum(test_fees),
         )

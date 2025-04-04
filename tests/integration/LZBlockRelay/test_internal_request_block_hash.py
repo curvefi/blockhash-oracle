@@ -27,7 +27,7 @@ def test_request_block_hash(
 
     # Note: In a test environment, the actual cross-chain message will not be sent,
     # but we can verify the function doesn't revert and properly caches targets
-    assert lz_block_relay._storage.broadcast_targets.get() == {}
+    assert lz_block_relay._storage.broadcast_data.get() == {}
     # Call the internal request function
     with boa.env.prank(dev_deployer):
         # Request for specific block
@@ -35,11 +35,12 @@ def test_request_block_hash(
             0,
             test_eids,
             test_fees,
-            200_000,  # gas limit
+            150_000,  # lzReceive gas limit
+            200_000,  # lzRead gas limit
             value=10**18,  # 1 ETH (should be enough for the message)
         )
-    new_targets = list(lz_block_relay._storage.broadcast_targets.get().values())
-    assert len(new_targets[0]) == 2
+    new_data = list(lz_block_relay._storage.broadcast_data.get().values())
+    assert len(new_data[0]["targets"]) == 2
 
     # In a production environment, this would test that:
     # 1. LZ message is sent (measurable by checking balance change or events)
