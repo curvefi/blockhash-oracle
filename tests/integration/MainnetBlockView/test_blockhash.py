@@ -42,7 +42,7 @@ def test_out_of_range_failures(mainnet_block_view):
 
     # Too old
     with boa.reverts():
-        mainnet_block_view.get_blockhash(current_block - 256, False)
+        mainnet_block_view.get_blockhash(current_block - 257, False)
 
 
 @pytest.mark.mainnet
@@ -53,4 +53,4 @@ def test_out_of_range_safe(mainnet_block_view):
     assert mainnet_block_view.get_blockhash(current_block - 64, True) == (0, b"\x00" * 32)
 
     # Too old
-    assert mainnet_block_view.get_blockhash(current_block - 256, True) == (0, b"\x00" * 32)
+    assert mainnet_block_view.get_blockhash(current_block - 257, True) == (0, b"\x00" * 32)

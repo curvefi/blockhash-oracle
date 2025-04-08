@@ -225,9 +225,7 @@ def addDVNOption(
     assert (len(_options) + len(_option) <= MAX_OPTIONS_TOTAL_SIZE), "OApp: options size exceeded"
 
     return concat(
-        abi_decode(
-            abi_encode(_options), (Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 5])
-        ),  # -5 for header
+        convert(_options, Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 5]), # downcast Bytes size
         convert(DVN_WORKER_ID, bytes1),
         convert(convert(len(_option) + 2, uint16), bytes2),  # +2 for optionType and dvnIdx
         convert(_dvnIdx, bytes1),

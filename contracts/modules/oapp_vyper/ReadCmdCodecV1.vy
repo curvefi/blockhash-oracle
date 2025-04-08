@@ -126,7 +126,7 @@ def appendEVMCallRequestV1(
     # dev: 42 is length of all fields excluding existing command and callData
     return concat(
         # current cmd
-        abi_decode(abi_encode(_cmd), (Bytes[MAX_MESSAGE_SIZE - MAX_CALLDATA_SIZE - 42])),
+        convert(_cmd, Bytes[MAX_MESSAGE_SIZE - MAX_CALLDATA_SIZE - 42]), # downcast Bytes size
         # newCmd
         convert(REQUEST_VERSION, bytes1),
         convert(_request.appRequestLabel, bytes2),
@@ -157,7 +157,7 @@ def appendEVMCallComputeV1(
     assert len(_cmd) + 39 <= MAX_MESSAGE_SIZE, "OApp: Command too large"
     # dev: 39 is length of all fields excluding existing command
     return concat(
-        abi_decode(abi_encode(_cmd), (Bytes[MAX_MESSAGE_SIZE - 39])),
+        convert(_cmd, Bytes[MAX_MESSAGE_SIZE - 39]), # downcast Bytes size
         convert(COMPUTE_VERSION, bytes1),
         convert(COMPUTE_TYPE_SINGLE_VIEW_EVM_CALL, bytes2),
         convert(_compute.computeSetting, bytes1),

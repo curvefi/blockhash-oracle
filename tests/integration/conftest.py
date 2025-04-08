@@ -54,7 +54,8 @@ def pytest_generate_tests(metafunc):
         if not selected_chains:
             selected_chains.update(ALL_CHAINS)
 
-        metafunc.parametrize("chain_name", selected_chains)
+        # Sort the chain names to ensure consistent ordering across workers
+        metafunc.parametrize("chain_name", sorted(selected_chains))
 
 
 @pytest.fixture(scope="function")
