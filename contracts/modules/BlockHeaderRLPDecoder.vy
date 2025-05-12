@@ -27,9 +27,9 @@ struct BlockHeader:
     block_hash: bytes32
     parent_hash: bytes32
     state_root: bytes32
+    receipt_root: bytes32
     block_number: uint256
     timestamp: uint256
-
 
 ################################################################
 #                         CONSTRUCTOR                          #
@@ -107,23 +107,26 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
 
     # 5. Skip transaction and receipt roots
     tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip tx root
-    tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip receipt root
 
-    # 6. Skip logs bloom
+    # 6. Read receipt root
+    receipt_root: bytes32 = empty(bytes32)
+    receipt_root, current_pos = self._read_hash32(encoded_header, current_pos)
+
+    # 7. Skip logs bloom
     current_pos = self._skip_rlp_string(encoded_header, current_pos)
 
-    # 7. Skip difficulty
+    # 8. Skip difficulty
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)
 
-    # 8. Read block number
+    # 9. Read block number
     block_number: uint256 = 0
     block_number, current_pos = self._read_rlp_number(encoded_header, current_pos)
 
-    # 9. Skip gas fields
+    # 10. Skip gas fields
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)  # skip gas limit
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)  # skip gas used
 
-    # 10. Read timestamp
+    # 11. Read timestamp
     timestamp: uint256 = 0
     timestamp, current_pos = self._read_rlp_number(encoded_header, current_pos)
 
@@ -131,6 +134,7 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
         block_hash=keccak256(encoded_header),
         parent_hash=parent_hash,
         state_root=state_root,
+        receipt_root=receipt_root,
         block_number=block_number,
         timestamp=timestamp,
     )

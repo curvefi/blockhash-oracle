@@ -15,7 +15,7 @@ def ensure_bytes(input_value):
 
 def encode_headers(block_data):
     fields = [
-        block_data["parentHash"],  # 1. parentHash
+        block_data["parentHash"],  # 1. parentHash!
         block_data["sha3Uncles"],  # 2. uncleHash
         ensure_bytes(block_data["miner"]),  # 3. coinbase (returned as string!)
         block_data["stateRoot"],  # 4. root

@@ -37,9 +37,6 @@ exports: (
 # Import RLP Block Header Decoder
 from modules import BlockHeaderRLPDecoder as bh_rlp
 
-initializes: bh_rlp
-
-
 ################################################################
 #                            EVENTS                            #
 ################################################################
@@ -86,6 +83,7 @@ MAX_COMMITTERS: constant(uint256) = 32
 
 block_hash: HashMap[uint256, bytes32]  # block_number => hash
 last_confirmed_block_number: public(uint256)  # number of the last confirmed block hash
+header_verifier: public(address)  # address of the header verifier
 
 block_header: public(HashMap[uint256, bh_rlp.BlockHeader])  # block_number => header
 last_confirmed_header: public(bh_rlp.BlockHeader)  # last confirmed header
@@ -113,15 +111,24 @@ def __init__():
 
     # Initialize ownable
     ownable.__init__()
+    # tx.origin in case of proxy deployment
     ownable._transfer_ownership(tx.origin)
-
-    # Initialize RLP decoder
-    bh_rlp.__init__()
 
 
 ################################################################
 #                      OWNER FUNCTIONS                         #
 ################################################################
+
+@external
+def set_header_verifier(_verifier: address):
+    """
+    @notice Set the block header verifier
+    @param _verifier Address of the block header verifier
+    """
+
+    ownable._check_owner()
+    self.header_verifier = _verifier
+
 
 @external
 def add_committer(_committer: address, _bump_threshold: bool = False):
@@ -180,16 +187,16 @@ def set_threshold(_new_threshold: uint256):
 
 
 @external
-def admin_apply_block(block_number: uint256, block_hash: bytes32):
+def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
     """
     @notice Apply a block hash with admin rights
-    @param block_number The block number to apply
-    @param block_hash The hash to apply
+    @param _block_number The block number to apply
+    @param _block_hash The hash to apply
     @dev Only callable by owner
     """
 
     ownable._check_owner()
-    self._apply_block(block_number, block_hash)
+    self._apply_block(_block_number, _block_hash)
 
 
 ################################################################
@@ -197,18 +204,18 @@ def admin_apply_block(block_number: uint256, block_hash: bytes32):
 ################################################################
 
 @internal
-def _apply_block(block_number: uint256, block_hash: bytes32):
+def _apply_block(_block_number: uint256, _block_hash: bytes32):
     """
     @notice Confirm a block hash and apply it
     @dev All security checks must be performed outside!
-    @param block_number The block number to confirm
-    @param block_hash The hash to confirm
+    @param _block_number The block number to confirm
+    @param _block_hash The hash to confirm
     """
 
-    self.block_hash[block_number] = block_hash
-    if self.last_confirmed_block_number < block_number:
-        self.last_confirmed_block_number = block_number
-    log  ApplyBlock(block_number=block_number, block_hash=block_hash)
+    self.block_hash[_block_number] = _block_hash
+    if self.last_confirmed_block_number < _block_number:
+        self.last_confirmed_block_number = _block_number
+    log  ApplyBlock(block_number=_block_number, block_hash=_block_hash)
 
 
 ################################################################
@@ -216,32 +223,32 @@ def _apply_block(block_number: uint256, block_hash: bytes32):
 ################################################################
 
 @external
-def commit_block(block_number: uint256, block_hash: bytes32, apply: bool = True) -> bool:
+def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = True) -> bool:
     """
     @notice Commit a block hash and optionally attempt to apply it
-    @param block_number The block number to commit
-    @param block_hash The hash to commit
-    @param apply If True, checks if threshold is met and applies block
+    @param _block_number The block number to commit
+    @param _block_hash The hash to commit
+    @param _apply If True, checks if threshold is met and applies block
     @return True if block was applied
     """
 
     assert self.is_committer[msg.sender], "Not authorized"
-    assert self.block_hash[block_number] == empty(bytes32), "Already applied"
-    assert block_hash != empty(bytes32), "Invalid block hash"
+    assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
+    assert _block_hash != empty(bytes32), "Invalid block hash"
 
-    previous_commitment: bytes32 = self.committer_votes[msg.sender][block_number]
+    previous_commitment: bytes32 = self.committer_votes[msg.sender][_block_number]
 
     # Remove previous vote if exists, to avoid duplicate commitments
     if previous_commitment != empty(bytes32):
-        self.commitment_count[block_number][previous_commitment] -= 1
+        self.commitment_count[_block_number][previous_commitment] -= 1
 
-    self.committer_votes[msg.sender][block_number] = block_hash
-    self.commitment_count[block_number][block_hash] += 1
-    log  CommitBlock(committer=msg.sender, block_number=block_number, block_hash=block_hash)
+    self.committer_votes[msg.sender][_block_number] = _block_hash
+    self.commitment_count[_block_number][_block_hash] += 1
+    log  CommitBlock(committer=msg.sender, block_number=_block_number, block_hash=_block_hash)
 
     # Optional attempt to apply block
-    if apply and self.commitment_count[block_number][block_hash] >= self.threshold:
-        self._apply_block(block_number, block_hash)
+    if _apply and self.commitment_count[_block_number][_block_hash] >= self.threshold:
+        self._apply_block(_block_number, _block_hash)
         return True
     return False
 
@@ -251,46 +258,74 @@ def commit_block(block_number: uint256, block_hash: bytes32, apply: bool = True)
 ################################################################
 
 @external
-def apply_block(block_number: uint256, block_hash: bytes32):
+def apply_block(_block_number: uint256, _block_hash: bytes32):
     """
     @notice Apply a block hash if it has sufficient commitments
     """
 
-    assert self.block_hash[block_number] == empty(bytes32), "Already applied"
+    assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
     assert (
-        self.commitment_count[block_number][block_hash] >= self.threshold
+        self.commitment_count[_block_number][_block_hash] >= self.threshold
     ), "Insufficient commitments"
-    self._apply_block(block_number, block_hash)
+    self._apply_block(_block_number, _block_hash)
+
+
+# @external
+# def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
+#     """
+#     @notice Submit a block header. If it's correct and blockhash is applied, store it.
+#     @param encoded_header The block header to submit
+#     """
+#     current_header_block_number: uint256 = self.last_confirmed_header.block_number
+#     # Decode whatever is submitted
+#     decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(encoded_header)
+
+#     # Validate against stored blockhash
+#     block_hash: bytes32 = self.block_hash[decoded_header.block_number]
+#     assert block_hash != empty(bytes32), "Blockhash not applied"
+#     assert (decoded_header.block_hash == block_hash), "Blockhash does not match"
+#     assert self.block_header[decoded_header.block_number].block_hash == empty(
+#         bytes32
+#     ), "Header already submitted"
+
+#     # Store decoded header
+#     self.block_header[decoded_header.block_number] = decoded_header
+#     log  SubmitBlockHeader(
+#         committer=msg.sender,
+#         block_number=decoded_header.block_number,
+#         block_hash=decoded_header.block_hash,
+#     )
+
+#     if decoded_header.block_number > current_header_block_number:
+#         self.last_confirmed_header = decoded_header
 
 
 @external
-def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
+def submit_block_header(_header_data: bh_rlp.BlockHeader):
     """
-    @notice Submit a block header. If it's correct and blockhash is applied, store it.
-    @param encoded_header The block header to submit
+    @notice Submit block header. Available only to whitelisted verifier contract.
+    @param _header_data The block header to submit
     """
-    current_header_block_number: uint256 = self.last_confirmed_header.block_number
-    # Decode whatever is submitted
-    decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(encoded_header)
+    assert msg.sender == self.header_verifier, "Not authorized"
 
-    # Validate against stored blockhash
-    block_hash: bytes32 = self.block_hash[decoded_header.block_number]
-    assert block_hash != empty(bytes32), "Blockhash not applied"
-    assert (decoded_header.block_hash == block_hash), "Blockhash does not match"
-    assert self.block_header[decoded_header.block_number].block_hash == empty(
-        bytes32
-    ), "Header already submitted"
+    # Safety checks
+    assert _header_data.block_hash != empty(bytes32), "Invalid block hash"
+    assert self.block_hash[_header_data.block_number] != empty(bytes32), "Blockhash not applied"
+    assert _header_data.block_hash == self.block_hash[_header_data.block_number], "Blockhash does not match"
+    assert self.block_header[_header_data.block_number].block_hash == empty(bytes32), "Header already submitted"
 
     # Store decoded header
-    self.block_header[decoded_header.block_number] = decoded_header
+    self.block_header[_header_data.block_number] = _header_data
+
+    # Update last confirmed header if new
+    if _header_data.block_number > self.last_confirmed_header.block_number:
+        self.last_confirmed_header = _header_data
+
     log  SubmitBlockHeader(
         committer=msg.sender,
-        block_number=decoded_header.block_number,
-        block_hash=decoded_header.block_hash,
+        block_number=_header_data.block_number,
+        block_hash=_header_data.block_hash,
     )
-
-    if decoded_header.block_number > current_header_block_number:
-        self.last_confirmed_header = decoded_header
 
 
 ################################################################
@@ -308,11 +343,11 @@ def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
 
 @view
 @external
-def get_block_hash(block_number: uint256) -> bytes32:
-    return self.block_hash[block_number]
+def get_block_hash(_block_number: uint256) -> bytes32:
+    return self.block_hash[_block_number]
 
 
 @view
 @external
-def get_state_root(block_number: uint256) -> bytes32:
-    return self.block_header[block_number].state_root
+def get_state_root(_block_number: uint256) -> bytes32:
+    return self.block_header[_block_number].state_root
