@@ -270,36 +270,6 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
     self._apply_block(_block_number, _block_hash)
 
 
-# @external
-# def submit_block_header(encoded_header: Bytes[bh_rlp.BLOCK_HEADER_SIZE]):
-#     """
-#     @notice Submit a block header. If it's correct and blockhash is applied, store it.
-#     @param encoded_header The block header to submit
-#     """
-#     current_header_block_number: uint256 = self.last_confirmed_header.block_number
-#     # Decode whatever is submitted
-#     decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(encoded_header)
-
-#     # Validate against stored blockhash
-#     block_hash: bytes32 = self.block_hash[decoded_header.block_number]
-#     assert block_hash != empty(bytes32), "Blockhash not applied"
-#     assert (decoded_header.block_hash == block_hash), "Blockhash does not match"
-#     assert self.block_header[decoded_header.block_number].block_hash == empty(
-#         bytes32
-#     ), "Header already submitted"
-
-#     # Store decoded header
-#     self.block_header[decoded_header.block_number] = decoded_header
-#     log  SubmitBlockHeader(
-#         committer=msg.sender,
-#         block_number=decoded_header.block_number,
-#         block_hash=decoded_header.block_hash,
-#     )
-
-#     if decoded_header.block_number > current_header_block_number:
-#         self.last_confirmed_header = decoded_header
-
-
 @external
 def submit_block_header(_header_data: bh_rlp.BlockHeader):
     """
