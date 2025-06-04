@@ -1,4 +1,4 @@
-# pragma version ~=0.4
+# pragma version 0.4.2
 
 """
 @title Block Header RLP Decoder Vyper Module

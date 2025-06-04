@@ -1,4 +1,4 @@
-# pragma version 0.4.1
+# pragma version 0.4.2
 
 """
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved

@@ -1,4 +1,4 @@
-# pragma version 0.4.1
+# pragma version 0.4.2
 
 """
 @title OApp (LayerZero V2 OApp Standard)

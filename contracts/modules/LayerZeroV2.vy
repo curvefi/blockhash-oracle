@@ -1,4 +1,4 @@
-# pragma version ~=0.4
+# pragma version 0.4.2
 
 """
 @title Layer Zero V2 Vyper Module
