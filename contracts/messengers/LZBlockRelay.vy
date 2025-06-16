@@ -58,7 +58,6 @@ exports: (
     OApp.endpoint,
     OApp.peers,
     OApp.setDelegate,
-    OApp.setReadChannel,
     OApp.isComposeMsgSender,
     OApp.allowInitializePath,
     OApp.nextNonce,
