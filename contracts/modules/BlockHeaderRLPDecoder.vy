@@ -2,6 +2,8 @@
 
 """
 @title Block Header RLP Decoder Vyper Module
+@author curve.fi
+@license Copyright (c) Curve.Fi, 2025 - all rights reserved
 @notice Decodes RLP-encoded Ethereum block header and stores key fields
 @dev Extracts block number from RLP and uses it as storage key
 """
@@ -58,6 +60,11 @@ def calculate_block_hash(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> bytes32:
 @pure
 @external
 def decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeader:
+    """
+    @notice Decodes RLP encoded block header into BlockHeader struct
+    @param encoded_header RLP encoded header data
+    @return BlockHeader struct containing decoded block data
+    """
     return self._decode_block_header(encoded_header)
 
 
@@ -105,7 +112,7 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
     state_root: bytes32 = empty(bytes32)
     state_root, current_pos = self._read_hash32(encoded_header, current_pos)
 
-    # 5. Skip transaction and receipt roots
+    # 5. Skip transaction root
     tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip tx root
 
     # 6. Read receipt root

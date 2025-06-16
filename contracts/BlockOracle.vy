@@ -261,6 +261,8 @@ def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = Tr
 def apply_block(_block_number: uint256, _block_hash: bytes32):
     """
     @notice Apply a block hash if it has sufficient commitments
+    @param _block_number The block number to apply
+    @param _block_hash The block hash to apply
     """
 
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
@@ -307,6 +309,7 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
 def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
     """
     @notice Utility viewer that returns list of all committers
+    @return Array of all registered committer addresses
     """
     return self.committers
 
@@ -314,10 +317,20 @@ def get_all_committers() -> DynArray[address, MAX_COMMITTERS]:
 @view
 @external
 def get_block_hash(_block_number: uint256) -> bytes32:
+    """
+    @notice Get the confirmed block hash for a given block number
+    @param _block_number The block number to query
+    @return The confirmed block hash, or empty bytes32 if not confirmed
+    """
     return self.block_hash[_block_number]
 
 
 @view
 @external
 def get_state_root(_block_number: uint256) -> bytes32:
+    """
+    @notice Get the state root for a given block number
+    @param _block_number The block number to query
+    @return The state root from the block header, or empty bytes32 if header not submitted
+    """
     return self.block_header[_block_number].state_root
