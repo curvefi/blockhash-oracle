@@ -13,6 +13,8 @@
 @custom:security security@curve.fi
 """
 
+# https://eips.ethereum.org/EIPS/eip-2935
+HISTORY_STORAGE_ADDRESS: constant(address) = 0x0000F90827F1C53a10cb7A02335B175320002935
 
 @deploy
 def __init__():
@@ -37,11 +39,30 @@ def get_blockhash(
     if requested_block_number == 0:
         requested_block_number = block.number - 65
 
-    if requested_block_number >= block.number - 8_192 and requested_block_number < block.number - 64:
-        return (requested_block_number, blockhash(requested_block_number))
+    if requested_block_number < block.number - 64:
+        # We don't trust recent blocks because of possible reorgs
+        if requested_block_number > block.number - 256:
+            # This case can be handled by built-in
+            return (requested_block_number, blockhash(requested_block_number))
+        elif requested_block_number > block.number - 8192:
+            # EIP-2935
+            return (requested_block_number, self._history_storage_get(requested_block_number))
+
+    # If we didn't return anything by now, we should fail (or fail gracefully)
+    if _avoid_failure:
+        # lzread is sensitive to reverts, so return (0,0) instead of reverting
+        return (0, empty(bytes32))
     else:
-        if _avoid_failure:
-            # lzread is sensitive to reverts, so return (0,0) instead of reverting
-            return (0, empty(bytes32))
-        else:
-            raise ("Block is too recent or too old")
+        raise ("Block is too recent or too old")
+
+
+@internal
+@view
+def _history_storage_get(_block_number: uint256) -> bytes32:
+    return convert(
+        raw_call(
+            HISTORY_STORAGE_ADDRESS,
+            abi_encode(_block_number),
+            max_outsize=32,
+            is_static_call=True,
+        ), bytes32)

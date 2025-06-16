@@ -54,3 +54,25 @@ def test_out_of_range_safe(mainnet_block_view):
 
     # Too old
     assert mainnet_block_view.get_blockhash(current_block - 8_192 - 1, True) == (0, b"\x00" * 32)
+
+
+@pytest.mark.mainnet
+@pytest.mark.parametrize("delta", [8192, 8191, 256, 128, 64])
+def test_particular_cases(mainnet_block_view, delta):
+    current_block = boa.env.evm.patch.block_number
+    query_block = current_block - delta
+    number, hash = mainnet_block_view.get_blockhash(query_block, True)
+    if delta < 8192 and delta > 64:
+        assert number != 0, "Return must be nonzero"
+    else:
+        assert number == 0, "Return must be zero"
+
+
+@pytest.mark.mainnet
+def test_raise_on_failure(mainnet_block_view):
+    current_block = boa.env.evm.patch.block_number
+    with boa.reverts():
+        mainnet_block_view.get_blockhash(current_block - 1, False)
+
+    with boa.reverts():
+        mainnet_block_view.get_blockhash(current_block - 8192 - 1, False)
