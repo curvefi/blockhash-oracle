@@ -53,7 +53,6 @@ event ApplyBlock:
 
 
 event SubmitBlockHeader:
-    committer: indexed(address)
     block_number: indexed(uint256)
     block_hash: bytes32
 
@@ -292,7 +291,6 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
         self.last_confirmed_header = _header_data
 
     log  SubmitBlockHeader(
-        committer=msg.sender,
         block_number=_header_data.block_number,
         block_hash=_header_data.block_hash,
     )
