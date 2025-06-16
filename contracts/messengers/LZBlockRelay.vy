@@ -271,7 +271,7 @@ def _request_block_hash(
         cached_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
 
-    assert sum_target_fees < msg.value, "Insufficient value" # dev: check is here because we sum here
+    assert sum_target_fees <= msg.value, "Insufficient value" # dev: check is here because we sum here
 
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = self._prepare_read_request(_block_number)
 
@@ -435,8 +435,8 @@ def request_block_hash(
 
     assert self.read_enabled, "Read not enabled"
     assert len(_target_eids) == len(_target_fees), "Length mismatch"
-    # assert _lz_receive_gas_limit > 0, "Invalid lzReceive gas limit"
-    # assert _read_gas_limit > 0, "Invalid lzRead gas limit"
+    assert _lz_receive_gas_limit > 0, "Invalid lzReceive gas limit"
+    assert _read_gas_limit > 0, "Invalid lzRead gas limit"
 
     self._request_block_hash(
         _block_number,
