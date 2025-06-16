@@ -152,6 +152,17 @@ def set_read_config(
         not _is_enabled and _mainnet_eid == 0 and _mainnet_view == empty(address)
     ), "Invalid read config"
 
+    # Check for redundant operations
+    if _is_enabled and self.read_enabled:
+        assert self.read_channel != _read_channel, "Read channel already enabled"
+    
+    if not _is_enabled and not self.read_enabled:
+        assert False, "Read channel already disabled"
+    
+    # If changing from one enabled channel to another, clear old peer
+    if self.read_enabled and _is_enabled and self.read_channel != _read_channel:
+        OApp._setPeer(self.read_channel, convert(empty(address), bytes32))
+
     self.read_enabled = _is_enabled
     self.read_channel = _read_channel
     self.mainnet_eid = _mainnet_eid

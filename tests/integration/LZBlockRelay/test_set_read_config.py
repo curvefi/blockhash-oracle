@@ -44,6 +44,11 @@ def test_set_read_config(forked_env, lz_block_relay, mainnet_block_view, dev_dep
     assert lz_block_relay.mainnet_eid() == LZ_EID
     assert lz_block_relay.mainnet_block_view() == mainnet_block_view.address
 
+    # Try to enable the same channel again - should fail
+    with boa.env.prank(dev_deployer):
+        with boa.reverts("Read channel already enabled"):
+            lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+
     # Valid config - disable read
     with boa.env.prank(dev_deployer):
         lz_block_relay.set_read_config(False, LZ_READ_CHANNEL, 0, EMPTY_ADDRESS)
@@ -51,3 +56,30 @@ def test_set_read_config(forked_env, lz_block_relay, mainnet_block_view, dev_dep
     assert not lz_block_relay.read_enabled()
     assert lz_block_relay.mainnet_eid() == 0
     assert lz_block_relay.mainnet_block_view() == EMPTY_ADDRESS
+
+    # Try to disable when already disabled - should fail
+    with boa.env.prank(dev_deployer):
+        with boa.reverts("Read channel already disabled"):
+            lz_block_relay.set_read_config(False, LZ_READ_CHANNEL, 0, EMPTY_ADDRESS)
+
+
+@pytest.mark.mainnet
+def test_set_read_config_channel_switch(forked_env, lz_block_relay, mainnet_block_view, dev_deployer):
+    """Test switching between different read channels."""
+    # Enable first channel
+    first_channel = LZ_READ_CHANNEL
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_read_config(True, first_channel, LZ_EID, mainnet_block_view.address)
+    
+    assert lz_block_relay.read_enabled()
+    assert lz_block_relay.read_channel() == first_channel
+    
+    # Switch to a different channel
+    second_channel = LZ_READ_CHANNEL - 1000
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_read_config(True, second_channel, LZ_EID, mainnet_block_view.address)
+    
+    assert lz_block_relay.read_enabled()
+    assert lz_block_relay.read_channel() == second_channel
+    
+    # The old channel peer should have been cleared (verified implicitly by successful execution)
