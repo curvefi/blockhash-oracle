@@ -57,6 +57,7 @@ initializes: OApp[ownable := ownable]
 exports: (
     OApp.endpoint,
     OApp.peers,
+    OApp.setPeer,
     OApp.setDelegate,
     OApp.setReadChannel,
     OApp.isComposeMsgSender,
