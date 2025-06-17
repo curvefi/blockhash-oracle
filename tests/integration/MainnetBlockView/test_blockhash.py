@@ -33,19 +33,6 @@ def test_specific_block(mainnet_block_view, eth_web3_client):
 
 
 @pytest.mark.mainnet
-def test_out_of_range_failures(mainnet_block_view):
-    current_block = boa.env.evm.patch.block_number
-
-    # Too recent
-    with boa.reverts():
-        mainnet_block_view.get_blockhash(current_block - 64, False)
-
-    # Too old
-    with boa.reverts():
-        mainnet_block_view.get_blockhash(current_block - 257, False)
-
-
-@pytest.mark.mainnet
 def test_out_of_range_safe(mainnet_block_view):
     current_block = boa.env.evm.patch.block_number
 
@@ -76,3 +63,9 @@ def test_raise_on_failure(mainnet_block_view):
 
     with boa.reverts():
         mainnet_block_view.get_blockhash(current_block - 8192 - 1, False)
+
+    with boa.reverts():
+        mainnet_block_view.get_blockhash(current_block - 64, False)
+
+    with boa.reverts():
+        mainnet_block_view.get_blockhash(current_block - 8192, False)
