@@ -253,11 +253,10 @@ def allowInitializePath(_origin: Origin) -> bool:
 @pure
 def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
     """
-    @dev Vyper-specific: If your app relies on ordered execution, you must change this function.
-
     @notice Retrieves the next nonce for a given source endpoint and sender address.
-    @dev _srcEid The source endpoint ID.
-    @dev _sender The sender address.
+    @dev Vyper-specific: If your app relies on ordered execution, you must change this function.
+    @param _srcEid The source endpoint ID.
+    @param _sender The sender address.
     @return nonce The next nonce.
     @dev The path nonce starts from 1. If 0 is returned it means that there is NO nonce ordered enforcement.
     @dev Is required by the off-chain executor to determine the OApp expects msg execution is ordered.

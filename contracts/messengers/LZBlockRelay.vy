@@ -501,6 +501,11 @@ def lzReceive(
     @dev Two types of messages:
          1. Read responses (from read channel)
          2. Regular messages (block hash broadcasts from other chains)
+    @param _origin Origin information containing srcEid, sender, and nonce
+    @param _guid Global unique identifier for the message
+    @param _message The encoded message payload containing block number and hash
+    @param _executor Address of the executor for the message
+    @param _extraData Additional data passed by the executor
     """
     # Verify message source
     OApp._lzReceive(_origin, _guid, _message, _executor, _extraData)
