@@ -44,10 +44,15 @@ def test_set_read_config(forked_env, lz_block_relay, mainnet_block_view, dev_dep
     assert lz_block_relay.mainnet_eid() == LZ_EID
     assert lz_block_relay.mainnet_block_view() == mainnet_block_view.address
 
-    # Try to enable the same channel again - should fail
+    # Enable the same channel again - should be idempotent (no error)
     with boa.env.prank(dev_deployer):
-        with boa.reverts("Read channel already enabled"):
-            lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+    
+    # State should remain the same
+    assert lz_block_relay.read_enabled()
+    assert lz_block_relay.read_channel() == LZ_READ_CHANNEL
+    assert lz_block_relay.mainnet_eid() == LZ_EID
+    assert lz_block_relay.mainnet_block_view() == mainnet_block_view.address
 
     # Valid config - disable read
     with boa.env.prank(dev_deployer):
@@ -57,10 +62,14 @@ def test_set_read_config(forked_env, lz_block_relay, mainnet_block_view, dev_dep
     assert lz_block_relay.mainnet_eid() == 0
     assert lz_block_relay.mainnet_block_view() == EMPTY_ADDRESS
 
-    # Try to disable when already disabled - should fail
+    # Disable when already disabled - should be idempotent (no error)
     with boa.env.prank(dev_deployer):
-        with boa.reverts("Read channel already disabled"):
-            lz_block_relay.set_read_config(False, LZ_READ_CHANNEL, 0, EMPTY_ADDRESS)
+        lz_block_relay.set_read_config(False, LZ_READ_CHANNEL, 0, EMPTY_ADDRESS)
+    
+    # State should remain the same
+    assert not lz_block_relay.read_enabled()
+    assert lz_block_relay.mainnet_eid() == 0
+    assert lz_block_relay.mainnet_block_view() == EMPTY_ADDRESS
 
 
 @pytest.mark.mainnet
@@ -82,4 +91,35 @@ def test_set_read_config_channel_switch(forked_env, lz_block_relay, mainnet_bloc
     assert lz_block_relay.read_enabled()
     assert lz_block_relay.read_channel() == second_channel
     
-    # The old channel peer should have been cleared (verified implicitly by successful execution)
+    # Verify the old channel peer has been cleared
+    # The first channel should no longer have a peer set
+    assert lz_block_relay.peers(first_channel) == b'\x00' * 32
+    
+    # The new channel should have the contract itself as the peer
+    expected_peer = lz_block_relay.address.rjust(32, b'\x00')
+    assert lz_block_relay.peers(second_channel) == expected_peer
+
+
+@pytest.mark.mainnet
+def test_set_read_config_reenable_same_channel(forked_env, lz_block_relay, mainnet_block_view, dev_deployer):
+    """Test re-enabling the same channel after disabling."""
+    # Enable channel
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+    
+    expected_peer = lz_block_relay.address.rjust(32, b'\x00')
+    assert lz_block_relay.peers(LZ_READ_CHANNEL) == expected_peer
+    
+    # Disable
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_read_config(False, LZ_READ_CHANNEL, 0, EMPTY_ADDRESS)
+    
+    # Peer should be cleared
+    assert lz_block_relay.peers(LZ_READ_CHANNEL) == b'\x00' * 32
+    
+    # Re-enable with the same channel
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+    
+    # Peer should be set again
+    assert lz_block_relay.peers(LZ_READ_CHANNEL) == expected_peer
