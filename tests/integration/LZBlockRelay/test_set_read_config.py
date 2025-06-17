@@ -96,7 +96,9 @@ def test_set_read_config_channel_switch(forked_env, lz_block_relay, mainnet_bloc
     assert lz_block_relay.peers(first_channel) == b'\x00' * 32
     
     # The new channel should have the contract itself as the peer
-    expected_peer = lz_block_relay.address.rjust(32, b'\x00')
+    # Convert address to bytes32 format (20 bytes address padded to 32 bytes)
+    address_bytes = bytes.fromhex(lz_block_relay.address[2:])  # Remove '0x' prefix
+    expected_peer = b'\x00' * 12 + address_bytes  # Left pad with zeros to make 32 bytes
     assert lz_block_relay.peers(second_channel) == expected_peer
 
 
@@ -107,7 +109,8 @@ def test_set_read_config_reenable_same_channel(forked_env, lz_block_relay, mainn
     with boa.env.prank(dev_deployer):
         lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
     
-    expected_peer = lz_block_relay.address.rjust(32, b'\x00')
+    address_bytes = bytes.fromhex(lz_block_relay.address[2:])  # Remove '0x' prefix
+    expected_peer = b'\x00' * 12 + address_bytes  # Left pad with zeros to make 32 bytes
     assert lz_block_relay.peers(LZ_READ_CHANNEL) == expected_peer
     
     # Disable
