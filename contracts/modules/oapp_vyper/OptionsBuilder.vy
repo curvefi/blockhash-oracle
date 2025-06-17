@@ -1,10 +1,9 @@
 # pragma version 0.4.2
 
 """
+@title LayerZero Options Builder
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
-
 @author curve.fi
-
 @custom:security security@curve.fi
 """
 

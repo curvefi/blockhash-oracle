@@ -1,15 +1,13 @@
 # pragma version 0.4.2
 
 """
+@title LayerZero Vyper Constants
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
-
 @notice Vyper does not allow truly dynamic byte arrays, and requires constants to cap the size of the array.
 This file contains such constants for the LayerZero OApp.
-
 @dev IMPORTANT: Tune these down as much as possible according to intended use case to save on gas.
 
 @author curve.fi
-
 @custom:security security@curve.fi
 """
 
