@@ -29,7 +29,7 @@ def get_blockhash(
     """
     @notice Get block hash for a given block number
     @param _block_number Block number to get hash for, defaults to block.number-65
-    @param _avoid_failure If True, returns latest available block hash when requested block is unavailable
+    @param _avoid_failure If True, returns (0, 0x00...) when requested block is unavailable instead of reverting
     @return Tuple of (actual block number, block hash)
     """
     # local copy of _block_number (to be able to overwrite)
