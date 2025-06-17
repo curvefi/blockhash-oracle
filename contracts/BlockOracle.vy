@@ -70,6 +70,11 @@ event SetThreshold:
     new_threshold: indexed(uint256)
 
 
+event SetHeaderVerifier:
+    old_verifier: indexed(address)
+    new_verifier: indexed(address)
+
+
 ################################################################
 #                            CONSTANTS                          #
 ################################################################
@@ -123,11 +128,14 @@ def __init__():
 def set_header_verifier(_verifier: address):
     """
     @notice Set the block header verifier
+    @dev Emits SetHeaderVerifier event
     @param _verifier Address of the block header verifier
     """
 
     ownable._check_owner()
+    old_verifier: address = self.header_verifier
     self.header_verifier = _verifier
+    log SetHeaderVerifier(old_verifier=old_verifier, new_verifier=_verifier)
 
 
 @external

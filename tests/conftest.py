@@ -65,7 +65,7 @@ def drpc_api_key():
 
 @pytest.fixture(scope="session")
 def eth_web3_client(drpc_api_key):
-    return Web3(Web3.HTTPProvider("https://eth-sepolia.public.blastapi.io"))
+    # return Web3(Web3.HTTPProvider("https://eth-sepolia.public.blastapi.io"))
     if drpc_api_key:
         rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
     else:
