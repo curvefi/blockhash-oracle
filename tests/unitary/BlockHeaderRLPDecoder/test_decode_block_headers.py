@@ -1,15 +1,23 @@
 import pytest
 
 
-@pytest.mark.gas_profile
-def test_default_behavior(block_headers_decoder, block_data, encoded_block_header):
+# @pytest.mark.gas_profile
+
+
+@pytest.mark.parametrize("block_number", [8034289], indirect=True)
+def test_default_behavior(block_headers_decoder_module, block_data, encoded_block_header):
     """Test parent hash extraction from RLP"""
     # Get parent hash via contract
-    self_hash, parent_hash, state_root, block_number, timestamp = block_headers_decoder.eval(
-        f"self._decode_block_header({encoded_block_header})"
-    )
+    output = block_headers_decoder_module.eval(f"self._decode_block_header({encoded_block_header})")
+    self_hash, parent_hash, state_root, receipt_root, block_number, timestamp = output
 
     # Get expected values from block data
+
+    # self hash
+    expected_self_hash = block_data["hash"]
+    print(f" Expected hash {block_data['hash'].hex()}")
+    print(f" Extracted hash {self_hash.hex()}")
+    assert self_hash == expected_self_hash, "Self hash mismatch"
 
     # parent hash
     expected_hash = block_data["parentHash"]  #
@@ -23,6 +31,14 @@ def test_default_behavior(block_headers_decoder, block_data, encoded_block_heade
     print(f"Extracted state root: {state_root.hex()}, type: {type(state_root)}")
     print(f"Expected state root: {expected_state_root.hex()}, type: {type(expected_state_root)}")
     assert state_root == expected_state_root, "State root mismatch"
+
+    # receipt root
+    expected_receipt_root = block_data["receiptsRoot"]
+    print(f"Extracted receipt root: {receipt_root.hex()}, type: {type(receipt_root)}")
+    print(
+        f"Expected receipt root: {expected_receipt_root.hex()}, type: {type(expected_receipt_root)}"
+    )
+    assert receipt_root == expected_receipt_root, "Receipt root mismatch"
 
     # block number
     expected_block_number = block_data["number"]

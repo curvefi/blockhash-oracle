@@ -1,11 +1,11 @@
 from web3 import Web3
 
 
-def test_default_behavior(block_headers_decoder, block_data, encoded_block_header):
+def test_default_behavior(block_headers_decoder_module, block_data, encoded_block_header):
     """Test that block hash calculation matches web3's hash"""
 
     # Calculate hash via contract
-    contract_hash = block_headers_decoder.calculate_block_hash(encoded_block_header)
+    contract_hash = block_headers_decoder_module.calculate_block_hash(encoded_block_header)
 
     # Calculate expected hash
     expected_hash = Web3.keccak(encoded_block_header)

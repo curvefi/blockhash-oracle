@@ -8,11 +8,23 @@ import pickle
 boa.set_etherscan(api_key=os.getenv("ETHERSCAN_API_KEY"))
 
 
+def ensure_bytes(input_value):
+    # Already bytes, return as-is
+    if isinstance(input_value, bytes):
+        return input_value
+
+    # Handle hex strings (e.g., "0x1234" or "1234")
+    if isinstance(input_value, str):
+        # Strip "0x" prefix if present, otherwise assume raw hex
+        hex_str = input_value[2:] if input_value.startswith("0x") else input_value
+        return bytes.fromhex(hex_str)
+
+
 def encode_headers(block_data):
     fields = [
         block_data["parentHash"],  # 1. parentHash
         block_data["sha3Uncles"],  # 2. uncleHash
-        bytes.fromhex(block_data["miner"][2:]),  # 3. coinbase (returned as string!)
+        ensure_bytes(block_data["miner"]),  # 3. coinbase (returned as string!)
         block_data["stateRoot"],  # 4. root
         block_data["transactionsRoot"],  # 5. txHash
         block_data["receiptsRoot"],  # 6. receiptHash
@@ -39,7 +51,7 @@ def encode_headers(block_data):
     if block_data.get("parentBeaconBlockRoot") not in [None, "0x"]:
         fields.append(block_data["parentBeaconBlockRoot"])
     if block_data.get("requestsHash") not in [None, "0x"]:
-        fields.append(block_data["requestsHash"])
+        fields.append(ensure_bytes(block_data["requestsHash"]))
 
     return encode(fields)
 
@@ -53,6 +65,7 @@ def drpc_api_key():
 
 @pytest.fixture(scope="session")
 def eth_web3_client(drpc_api_key):
+    # return Web3(Web3.HTTPProvider("https://eth-sepolia.public.blastapi.io"))
     if drpc_api_key:
         rpc_url = f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
     else:
@@ -74,9 +87,21 @@ def blocks_cache_file():
 
 
 @pytest.fixture(scope="session")
-def block_data(eth_web3_client, block_number):
+def block_data(eth_web3_client, block_number, blocks_cache_file):
     """Fetch a real block from mainnet"""
+    # check if its cached
+    if os.path.exists(blocks_cache_file):
+        with open(blocks_cache_file, "rb") as f:
+            cache_dict = pickle.load(f)
+            if block_number in cache_dict:
+                return cache_dict[block_number]
+    else:
+        cache_dict = {}
     block = eth_web3_client.eth.get_block(block_number, full_transactions=False)
+    # update the cache
+    cache_dict[block_number] = block
+    with open(blocks_cache_file, "wb") as f:
+        pickle.dump(cache_dict, f)
     return block
 
 
@@ -93,6 +118,7 @@ def n_blocks_data(eth_web3_client, block_number, request, blocks_cache_file):
             print("Blocks cache loaded from file")
     else:
         cache_dict = {}
+        should_save = True
     if block_number == "latest":
         block_number = eth_web3_client.eth.block_number
     for i in range(block_number, block_number + n_blocks):
@@ -133,7 +159,7 @@ def dev_deployer():
 @pytest.fixture()
 def block_oracle(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/BlockOracle.vy", dev_deployer)
+        return boa.load("contracts/BlockOracle.vy")
 
 
 @pytest.fixture()
@@ -143,12 +169,12 @@ def mainnet_block_view(dev_deployer):
 
 
 @pytest.fixture()
-def lz_block_relay(dev_deployer):
+def block_headers_decoder(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/messengers/LZBlockRelay.vy", dev_deployer)
+        return boa.load("contracts/HeaderVerifier.vy")
 
 
 @pytest.fixture()
-def block_headers_decoder(dev_deployer):
+def block_headers_decoder_module(dev_deployer):
     with boa.env.prank(dev_deployer):
         return boa.load("contracts/modules/BlockHeaderRLPDecoder.vy")

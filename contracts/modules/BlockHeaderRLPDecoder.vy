@@ -1,7 +1,9 @@
-# pragma version ~=0.4
+# pragma version 0.4.2
 
 """
 @title Block Header RLP Decoder Vyper Module
+@author curve.fi
+@license Copyright (c) Curve.Fi, 2025 - all rights reserved
 @notice Decodes RLP-encoded Ethereum block header and stores key fields
 @dev Extracts block number from RLP and uses it as storage key
 """
@@ -27,9 +29,9 @@ struct BlockHeader:
     block_hash: bytes32
     parent_hash: bytes32
     state_root: bytes32
+    receipt_root: bytes32
     block_number: uint256
     timestamp: uint256
-
 
 ################################################################
 #                         CONSTRUCTOR                          #
@@ -58,6 +60,11 @@ def calculate_block_hash(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> bytes32:
 @pure
 @external
 def decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeader:
+    """
+    @notice Decodes RLP encoded block header into BlockHeader struct
+    @param encoded_header RLP encoded header data
+    @return BlockHeader struct containing decoded block data
+    """
     return self._decode_block_header(encoded_header)
 
 
@@ -86,8 +93,11 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
     tmp_int: uint256 = 0
     tmp_bytes: bytes32 = empty(bytes32)
 
-    # 1. Parse RLP list header
-    current_pos: uint256 = self._read_rlp_list_header(encoded_header)
+    # Current position in the encoded header
+    current_pos: uint256 = 0
+
+    # 1. Skip RLP list length
+    current_pos = self._skip_rlp_list_header(encoded_header, current_pos)
 
     # 2. Extract hashes
     parent_hash: bytes32 = empty(bytes32)
@@ -102,25 +112,28 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
     state_root: bytes32 = empty(bytes32)
     state_root, current_pos = self._read_hash32(encoded_header, current_pos)
 
-    # 5. Skip transaction and receipt roots
+    # 5. Skip transaction root
     tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip tx root
-    tmp_bytes, current_pos = self._read_hash32(encoded_header, current_pos)  # skip receipt root
 
-    # 6. Skip variable length fields
-    current_pos = self._skip_rlp_string(encoded_header, current_pos)  # skip logs bloom
+    # 6. Read receipt root
+    receipt_root: bytes32 = empty(bytes32)
+    receipt_root, current_pos = self._read_hash32(encoded_header, current_pos)
 
-    # 7. Skip difficulty
+    # 7. Skip logs bloom
+    current_pos = self._skip_rlp_string(encoded_header, current_pos)
+
+    # 8. Skip difficulty
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)
 
-    # 8. Read block number
+    # 9. Read block number
     block_number: uint256 = 0
     block_number, current_pos = self._read_rlp_number(encoded_header, current_pos)
 
-    # 9. Skip gas fields
+    # 10. Skip gas fields
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)  # skip gas limit
     tmp_int, current_pos = self._read_rlp_number(encoded_header, current_pos)  # skip gas used
 
-    # 10. Read timestamp
+    # 11. Read timestamp
     timestamp: uint256 = 0
     timestamp, current_pos = self._read_rlp_number(encoded_header, current_pos)
 
@@ -128,6 +141,7 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
         block_hash=keccak256(encoded_header),
         parent_hash=parent_hash,
         state_root=state_root,
+        receipt_root=receipt_root,
         block_number=block_number,
         timestamp=timestamp,
     )
@@ -139,23 +153,41 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
 
 @pure
 @internal
-def _read_rlp_list_header(encoded: Bytes[BLOCK_HEADER_SIZE]) -> uint256:
+def _skip_rlp_list_header(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
     """@dev Returns position after list header"""
     first_byte: uint256 = convert(slice(encoded, 0, 1), uint256)
     assert first_byte >= RLP_LIST_SHORT_START, "Not a list"
-
-    if first_byte < RLP_LIST_LONG_START:
-        return 1
+    if first_byte <= RLP_LIST_LONG_START:
+        return pos + 1
     else:
-        len_of_len: uint256 = first_byte - RLP_LIST_LONG_START
-        return 1 + len_of_len
+        return pos + 1 + (first_byte - RLP_LIST_LONG_START)
+
+
+@pure
+@internal
+def _skip_rlp_string(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
+    """@dev Skip RLP string field, returns next_pos"""
+    prefix: uint256 = convert(slice(encoded, pos, 1), uint256)
+    if prefix < RLP_SHORT_START:
+        return pos + 1
+    elif prefix <= RLP_LONG_START:
+        return pos + 1 + (prefix - RLP_SHORT_START)
+    else:
+        # Sanity check: ensure this is a string, not a list
+        assert prefix < RLP_LIST_SHORT_START, "Expected string, found list prefix"
+
+        len_of_len: uint256 = prefix - RLP_LONG_START
+        data_length: uint256 = convert(
+            abi_decode(abi_encode(slice(encoded, pos + 1, len_of_len)), (Bytes[32])), uint256
+        )
+        return pos + 1 + len_of_len + data_length
 
 
 @pure
 @internal
 def _read_hash32(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (bytes32, uint256):
     """@dev Read 32-byte hash field, returns (hash, next_pos)"""
-    assert convert(slice(encoded, pos, 1), uint256) == 160  # 0xa0
+    assert convert(slice(encoded, pos, 1), uint256) == 160  # RLP_SHORT_START + 32
     return extract32(encoded, pos + 1), pos + 33
 
 
@@ -167,26 +199,12 @@ def _read_rlp_number(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> (uint25
     if prefix < RLP_SHORT_START:
         return prefix, pos + 1
 
+    # Sanity check: ensure this is a short string (not a long string or list)
+    assert prefix <= RLP_LONG_START, "Invalid RLP number encoding"
+
     length: uint256 = prefix - RLP_SHORT_START
     value: uint256 = convert(
         abi_decode(abi_encode(slice(encoded, pos + 1, length)), (Bytes[32])), uint256
     )
     # abi_decode(abi_encode(bytesA), bytesB) is needed to unsafe cast bytesA to bytesB
     return value, pos + 1 + length
-
-
-@pure
-@internal
-def _skip_rlp_string(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
-    """@dev Skip RLP string field, returns next_pos"""
-    prefix: uint256 = convert(slice(encoded, pos, 1), uint256)
-    if prefix < RLP_SHORT_START:
-        return pos + 1
-    elif prefix < RLP_LONG_START:
-        return pos + 1 + (prefix - RLP_SHORT_START)
-    else:
-        len_of_len: uint256 = prefix - RLP_LONG_START
-        data_length: uint256 = convert(
-            abi_decode(abi_encode(slice(encoded, pos + 1, len_of_len)), (Bytes[32])), uint256
-        )
-        return pos + 1 + len_of_len + data_length
