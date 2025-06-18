@@ -48,9 +48,9 @@ exports: (
 )
 
 # Import LayerZero module for cross-chain messaging
-from ..modules.oapp_vyper.contracts.oapp_vyper import OApp  # main module
-from ..modules.oapp_vyper.contracts.oapp_vyper import OptionsBuilder  # module for creating options
-from ..modules.oapp_vyper.contracts.oapp_vyper import ReadCmdCodecV1  # module for reading commands
+from ..modules.oapp_vyper.src import OApp  # main module
+from ..modules.oapp_vyper.src import OptionsBuilder  # module for creating options
+from ..modules.oapp_vyper.src import ReadCmdCodecV1  # module for reading commands
 
 initializes: OApp[ownable := ownable]
 
