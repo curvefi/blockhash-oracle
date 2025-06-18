@@ -275,7 +275,7 @@ def _request_block_hash(
         cached_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
 
-    assert sum_target_fees < msg.value, "Insufficient value" # dev: check is here because we sum here
+    assert sum_target_fees <= msg.value, "Insufficient value" # dev: check is here because we sum here
 
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = self._prepare_read_request(_block_number)
 
