@@ -1,0 +1,144 @@
+{
+  "mainnets": {
+    "ethereum": {
+      "chain_id": 1,
+      "rpc_template": "https://rpc.ankr.com/eth/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api",
+      "is_main_chain": true
+    },
+    "arbitrum": {
+      "chain_id": 42161,
+      "rpc_template": "https://rpc.ankr.com/arbitrum/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "optimism": {
+      "chain_id": 10,
+      "rpc_template": "https://rpc.ankr.com/optimism/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "base": {
+      "chain_id": 8453,
+      "rpc_template": "https://rpc.ankr.com/base/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "polygon": {
+      "chain_id": 137,
+      "rpc_template": "https://rpc.ankr.com/polygon/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "bsc": {
+      "chain_id": 56,
+      "rpc_template": "https://rpc.ankr.com/bsc/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "avalanche": {
+      "chain_id": 43114,
+      "rpc_template": "https://rpc.ankr.com/avalanche/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "fraxtal": {
+      "chain_id": 252,
+      "rpc_template": "https://lb.drpc.org/ogrpc?network=fraxtal&dkey={}",
+      "rpc_env_var": "DRPC_API_KEY",
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "gnosis": {
+      "chain_id": 100,
+      "rpc_template": "https://rpc.ankr.com/gnosis/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "sonic": {
+      "chain_id": 146,
+      "rpc_template": "https://rpc.ankr.com/sonic_mainnet/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "ink": {
+      "chain_id": 57073,
+      "rpc_template": "https://lb.drpc.org/ogrpc?network=ink&dkey={}",
+      "rpc_env_var": "DRPC_API_KEY",
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "mp1": {
+      "chain_id": 21000000,
+      "rpc_template": "https://rpc.ankr.com/corn_maizenet/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "mantle": {
+      "chain_id": 5000,
+      "rpc_template": "https://rpc.ankr.com/mantle/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "fantom": {
+      "chain_id": 250,
+      "rpc_template": "https://lb.drpc.org/ogrpc?network=fantom&dkey={}",
+      "rpc_env_var": "DRPC_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "xlayer": {
+      "chain_id": 196,
+      "rpc_template": "https://rpc.ankr.com/xlayer/{}",
+      "rpc_env_var": "ANKR_API_KEY",
+      "evm_version": "paris",
+      "explorer": "https://www.oklink.com/api/v5/explorer/contract/verify-contract-sourcecode"
+    },
+    "taiko": {
+      "chain_id": 167000,
+      "rpc_template": "https://lb.drpc.org/ogrpc?network=taiko&dkey={}",
+      "rpc_env_var": "DRPC_API_KEY",
+      "evm_version": "shanghai",
+      "explorer": "https://api.etherscan.io/v2/api"
+    }
+  },
+  "testnets": {
+    "sepolia": {
+      "chain_id": 11155111,
+      "rpc": "https://eth-sepolia.public.blastapi.io",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api",
+      "is_main_chain": true
+    },
+    "base-sepolia": {
+      "chain_id": 84532,
+      "rpc": "https://sepolia.base.org",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "optimism-sepolia": {
+      "chain_id": 11155420,
+      "rpc": "https://sepolia.optimism.io",
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api"
+    },
+    "arbitrum-sepolia": {
+      "chain_id": 421614,
+      "rpc": "https://sepolia-rollup.arbitrum.io/rpc",
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api"
+    }
+  }
+}
