@@ -293,9 +293,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "snekmate", specifier = "==0.1.2rc1" },
-    { name = "titanoboa", git = "https://github.com/vyperlang/titanoboa.git?rev=ac37ac4925eaf4284dd843ca0fa834e7c44a95a7" },
-    { name = "vyper", specifier = "==0.4.2" },
+    { name = "snekmate", specifier = "==0.1.2rc2" },
+    { name = "titanoboa", specifier = "==0.2.7" },
+    { name = "vyper", specifier = "==0.4.3" },
     { name = "web3", specifier = ">=7.6.0" },
 ]
 
@@ -2578,11 +2578,11 @@ wheels = [
 
 [[package]]
 name = "snekmate"
-version = "0.1.2rc1"
+version = "0.1.2rc2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/00/9e/a76c79b9b518804ce8445626e453317e0303df5d524ba30401735c468aa2/snekmate-0.1.2rc1.tar.gz", hash = "sha256:b94e0b1c220a9eae179aa33d787319cd4f9a1e0a406396701898d6fb2ae5cfc5", size = 102057, upload-time = "2025-06-01T14:46:40.132Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/45/b4309738aa99e98ec800572ee6ca39293c84a34dcf867c641c461f66a035/snekmate-0.1.2rc2.tar.gz", hash = "sha256:4380490d38d904248b58f29a948de8c7377bf2eb31497bce106d3e4ba07425a2", size = 102061, upload-time = "2025-06-19T10:23:28.134Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/f6/8e5c5b089a59d84b40e4cb7c8725bdcffed2a78ee3d1332704beab8a0694/snekmate-0.1.2rc1-py3-none-any.whl", hash = "sha256:4d70357ffe4b7174d614ea116325ddc2c72a2b63cab920417aa5808b187d3e94", size = 120719, upload-time = "2025-06-01T14:46:38.371Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/3b/48b887c30cd904ad81affbb3fe85ccb7315dd225dde78a4257f74567f2a4/snekmate-0.1.2rc2-py3-none-any.whl", hash = "sha256:3df072afed64f74d620ef0d9593624170896a26d148da0cda96dba09fc0939de", size = 120672, upload-time = "2025-06-19T10:23:26.503Z" },
 ]
 
 [[package]]
@@ -2654,8 +2654,8 @@ wheels = [
 
 [[package]]
 name = "titanoboa"
-version = "0.2.6"
-source = { git = "https://github.com/vyperlang/titanoboa.git?rev=ac37ac4925eaf4284dd843ca0fa834e7c44a95a7#ac37ac4925eaf4284dd843ca0fa834e7c44a95a7" }
+version = "0.2.7"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eth-abi" },
     { name = "eth-account" },
@@ -2671,6 +2671,10 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "vvm" },
     { name = "vyper" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9c/85/2cfd05b649cf173714ea7a2b3597228b7a577cab7fe4696e67879b8784b7/titanoboa-0.2.7.tar.gz", hash = "sha256:4fb931747bf9beb05ea39b149878bb7d89525bcfacf1a903e4d14da91f7c49de", size = 99921, upload-time = "2025-06-04T14:24:40.401Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/fd/25ccd329bb68c2251b1fbb30aa799cfaca67ab262b2da05c5997e6b73e38/titanoboa-0.2.7-py3-none-any.whl", hash = "sha256:75771f5e8183c073f2c37d8925f583abd2c6b56eae4d087dbf1e33f809ea7ca5", size = 111582, upload-time = "2025-06-04T14:24:38.601Z" },
 ]
 
 [[package]]
@@ -2802,7 +2806,7 @@ wheels = [
 
 [[package]]
 name = "vyper"
-version = "0.4.2"
+version = "0.4.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asttokens" },
@@ -2813,9 +2817,9 @@ dependencies = [
     { name = "pycryptodome" },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/aa/ddff45356369b6593665300061186bcce1f7abbf629034e75dbf72cc5af5/vyper-0.4.2.tar.gz", hash = "sha256:4de5cc48f6d9710d097857d4446a9ddccef5826030f34f6f7cc076cd0135806d", size = 872732, upload-time = "2025-05-31T18:01:16.056Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/d5/958145eb2f88b95a2f3d43785e41dcdc2ab5a01af5d88199248dbed33774/vyper-0.4.3.tar.gz", hash = "sha256:22a7573657401d8a3bc690d65d6b7741680007180978c3a05f9892db31d5dcf5", size = 877634, upload-time = "2025-06-18T20:09:54.022Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/68/57ef12cfe5a4e116eadc754a8c2e84ab6dfd566cd671958e0d01da7c74aa/vyper-0.4.2-py3-none-any.whl", hash = "sha256:847d2310551273519b9e7eb46191fdcf61943865e251b28157f773aa5beea9a1", size = 401724, upload-time = "2025-05-31T18:01:13.354Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/45/ad3c7d78aaa3e50d229968bc39eaf193f9b8eee79b5f16a3bed8f35e1395/vyper-0.4.3-py3-none-any.whl", hash = "sha256:3b9671727c888363740dc678e60336759871487d0e4e9fdd973048fa9635c4fd", size = 403104, upload-time = "2025-06-18T20:09:52.4Z" },
 ]
 
 [[package]]

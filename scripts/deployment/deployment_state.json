@@ -1,102 +1,10 @@
 {
-  "deployments": {
-    "testnets": {
-      "sepolia": {
-        "MainnetBlockView": "0x1e929dff3e8226Bbb39FDAa24A7b2F7D1F7C5340"
-      },
-      "base-sepolia": {
-        "BlockOracle": "0xba10e1452862bad930DDCE6B1b3ca698a9Fe8f79",
-        "HeaderVerifier": "0x3141Bc729fbB54edA1204bb5e148d48a52e5d4C9",
-        "LZBlockRelay": "0x52eA49d8cF55368CF0b9d6e461BbE20AE018a54f"
-      },
-      "arbitrum-sepolia": {
-        "BlockOracle": "0xba10e1452862bad930DDCE6B1b3ca698a9Fe8f79",
-        "HeaderVerifier": "0x3141Bc729fbB54edA1204bb5e148d48a52e5d4C9",
-        "LZBlockRelay": "0x52eA49d8cF55368CF0b9d6e461BbE20AE018a54f"
-      },
-      "optimism-sepolia": {
-        "BlockOracle": "0xba10e1452862bad930DDCE6B1b3ca698a9Fe8f79",
-        "HeaderVerifier": "0x3141Bc729fbB54edA1204bb5e148d48a52e5d4C9",
-        "LZBlockRelay": "0x52eA49d8cF55368CF0b9d6e461BbE20AE018a54f"
-      }
-    }
-  },
+  "deployments": {},
   "salts": {
-    "view": "73241e98090042a718f7eb1af07fad27ff09a3f300ada614b0e5c5d50bbb5c93",
-    "oracle": "73241e98090042a718f7eb1af07fad27ff09a3f300f512a27a936e11f9d78159",
-    "header_verifier": "73241e98090042a718f7eb1af07fad27ff09a3f30035d0fd41e5c0a0584ce7fb",
-    "relay": "73241e98090042a718f7eb1af07fad27ff09a3f300262d4c4fc9ec39984173b0"
+    "view": "73241e98090042a718f7eb1af07fad27ff09a3f3005035042d0b28e63ed298d8",
+    "oracle": "73241e98090042a718f7eb1af07fad27ff09a3f300aea03b6776f395484722cd",
+    "header_verifier": "73241e98090042a718f7eb1af07fad27ff09a3f30025a923e65777008f8eb843",
+    "relay": "73241e98090042a718f7eb1af07fad27ff09a3f300ec1139925646004cc7dca9"
   },
-  "deployment_history": [
-    {
-      "timestamp": "2025-06-19T22:20:49.607640+00:00",
-      "network_type": "testnets",
-      "chain": "sepolia",
-      "contract_type": "MainnetBlockView",
-      "address": "0x1e929dff3e8226Bbb39FDAa24A7b2F7D1F7C5340"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:11.590163+00:00",
-      "network_type": "testnets",
-      "chain": "base-sepolia",
-      "contract_type": "BlockOracle",
-      "address": "0xba10e1452862bad930DDCE6B1b3ca698a9Fe8f79"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:15.889569+00:00",
-      "network_type": "testnets",
-      "chain": "base-sepolia",
-      "contract_type": "HeaderVerifier",
-      "address": "0x3141Bc729fbB54edA1204bb5e148d48a52e5d4C9"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:20.482422+00:00",
-      "network_type": "testnets",
-      "chain": "arbitrum-sepolia",
-      "contract_type": "BlockOracle",
-      "address": "0xba10e1452862bad930DDCE6B1b3ca698a9Fe8f79"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:24.816703+00:00",
-      "network_type": "testnets",
-      "chain": "arbitrum-sepolia",
-      "contract_type": "HeaderVerifier",
-      "address": "0x3141Bc729fbB54edA1204bb5e148d48a52e5d4C9"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:26.378817+00:00",
-      "network_type": "testnets",
-      "chain": "optimism-sepolia",
-      "contract_type": "BlockOracle",
-      "address": "0xba10e1452862bad930DDCE6B1b3ca698a9Fe8f79"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:28.341232+00:00",
-      "network_type": "testnets",
-      "chain": "optimism-sepolia",
-      "contract_type": "HeaderVerifier",
-      "address": "0x3141Bc729fbB54edA1204bb5e148d48a52e5d4C9"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:45.390562+00:00",
-      "network_type": "testnets",
-      "chain": "base-sepolia",
-      "contract_type": "LZBlockRelay",
-      "address": "0x52eA49d8cF55368CF0b9d6e461BbE20AE018a54f"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:50.655923+00:00",
-      "network_type": "testnets",
-      "chain": "arbitrum-sepolia",
-      "contract_type": "LZBlockRelay",
-      "address": "0x52eA49d8cF55368CF0b9d6e461BbE20AE018a54f"
-    },
-    {
-      "timestamp": "2025-06-19T22:21:54.623883+00:00",
-      "network_type": "testnets",
-      "chain": "optimism-sepolia",
-      "contract_type": "LZBlockRelay",
-      "address": "0x52eA49d8cF55368CF0b9d6e461BbE20AE018a54f"
-    }
-  ]
+  "deployment_history": []
 }

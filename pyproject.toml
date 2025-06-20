@@ -1,20 +1,20 @@
 [project]
 name            = "blockhash-oracle"
 version         = "0.1.0"
-description     = "Add your description here"
+description     = "ETH Mainnet Blockhash Oracle for L2s"
 readme          = "README.md"
 requires-python = ">=3.12"
 
 # Requirements
 dependencies = [
-    "vyper==0.4.2",
-    "snekmate==0.1.2rc1",
+    "vyper==0.4.3",
+    "snekmate==0.1.2rc2",
     "titanoboa==0.2.7",
     "web3>=7.6.0",
 ]
 
 [tool.uv.sources]
-titanoboa = { git = "https://github.com/vyperlang/titanoboa.git", rev = "ac37ac4925eaf4284dd843ca0fa834e7c44a95a7" }
+# titanoboa = { git = "https://github.com/vyperlang/titanoboa.git", rev = "ac37ac4925eaf4284dd843ca0fa834e7c44a95a7" }
 
 [tool.uv]
 dev-dependencies = [
