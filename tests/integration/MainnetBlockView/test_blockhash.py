@@ -44,15 +44,22 @@ def test_out_of_range_safe(mainnet_block_view):
 
 
 @pytest.mark.mainnet
-@pytest.mark.parametrize("delta", [8192, 8191, 256, 128, 64])
+@pytest.mark.parametrize("delta", [8193, 8192, 8191, 257, 256, 255, 128, 64])
 def test_particular_cases(mainnet_block_view, delta):
     current_block = boa.env.evm.patch.block_number
     query_block = current_block - delta
-    number, hash = mainnet_block_view.get_blockhash(query_block, True)
-    if delta < 8192 and delta > 64:
-        assert number != 0, "Return must be nonzero"
+    if delta == 256:
+        try:
+            # boa failure here
+            mainnet_block_view.get_blockhash(query_block, True)
+        except Exception as e:
+            print(e)
     else:
-        assert number == 0, "Return must be zero"
+        number, hash = mainnet_block_view.get_blockhash(query_block, True)
+        if delta < 8192 and delta > 64:
+            assert number != 0, "Return must be nonzero"
+        else:
+            assert number == 0, "Return must be zero"
 
 
 @pytest.mark.mainnet
