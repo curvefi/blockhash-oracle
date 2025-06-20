@@ -1,10 +1,102 @@
 {
-  "deployments": {},
-  "salts": {
-    "view": "73241e98090042a718f7eb1af07fad27ff09a3f3005035042d0b28e63ed298d8",
-    "oracle": "73241e98090042a718f7eb1af07fad27ff09a3f300aea03b6776f395484722cd",
-    "header_verifier": "73241e98090042a718f7eb1af07fad27ff09a3f30025a923e65777008f8eb843",
-    "relay": "73241e98090042a718f7eb1af07fad27ff09a3f300ec1139925646004cc7dca9"
+  "deployments": {
+    "testnets": {
+      "sepolia": {
+        "MainnetBlockView": "0xd9e20E40E99a85F084A3FfDFC43DA22b326E8279"
+      },
+      "arbitrum-sepolia": {
+        "BlockOracle": "0x766E2632393634967744e6E46f9970a18bdBcc71",
+        "HeaderVerifier": "0x53f561aBFBEBfa4e07E8E2741Bff1Cf291A420c7",
+        "LZBlockRelay": "0x5Adc2216ACC057A0B05dFe1e962Ef2252fE90fB3"
+      },
+      "base-sepolia": {
+        "BlockOracle": "0x766E2632393634967744e6E46f9970a18bdBcc71",
+        "HeaderVerifier": "0x53f561aBFBEBfa4e07E8E2741Bff1Cf291A420c7",
+        "LZBlockRelay": "0x5Adc2216ACC057A0B05dFe1e962Ef2252fE90fB3"
+      },
+      "optimism-sepolia": {
+        "BlockOracle": "0x766E2632393634967744e6E46f9970a18bdBcc71",
+        "HeaderVerifier": "0x53f561aBFBEBfa4e07E8E2741Bff1Cf291A420c7",
+        "LZBlockRelay": "0x5Adc2216ACC057A0B05dFe1e962Ef2252fE90fB3"
+      }
+    }
   },
-  "deployment_history": []
+  "salts": {
+    "view": "73241e98090042a718f7eb1af07fad27ff09a3f3003723bbbe954634ffc0772c",
+    "oracle": "73241e98090042a718f7eb1af07fad27ff09a3f30005bc7a9aa4f561bc84fc81",
+    "header_verifier": "73241e98090042a718f7eb1af07fad27ff09a3f300659e4e1048f84b7571d3a0",
+    "relay": "73241e98090042a718f7eb1af07fad27ff09a3f3004c477d125dd49d865ba1e3"
+  },
+  "deployment_history": [
+    {
+      "timestamp": "2025-06-20T23:19:36.589424+00:00",
+      "network_type": "testnets",
+      "chain": "sepolia",
+      "contract_type": "MainnetBlockView",
+      "address": "0xd9e20E40E99a85F084A3FfDFC43DA22b326E8279"
+    },
+    {
+      "timestamp": "2025-06-20T23:19:59.871715+00:00",
+      "network_type": "testnets",
+      "chain": "arbitrum-sepolia",
+      "contract_type": "BlockOracle",
+      "address": "0x766E2632393634967744e6E46f9970a18bdBcc71"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:03.626463+00:00",
+      "network_type": "testnets",
+      "chain": "arbitrum-sepolia",
+      "contract_type": "HeaderVerifier",
+      "address": "0x53f561aBFBEBfa4e07E8E2741Bff1Cf291A420c7"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:09.682602+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "BlockOracle",
+      "address": "0x766E2632393634967744e6E46f9970a18bdBcc71"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:15.520570+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "HeaderVerifier",
+      "address": "0x53f561aBFBEBfa4e07E8E2741Bff1Cf291A420c7"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:18.204019+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "BlockOracle",
+      "address": "0x766E2632393634967744e6E46f9970a18bdBcc71"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:20.525766+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "HeaderVerifier",
+      "address": "0x53f561aBFBEBfa4e07E8E2741Bff1Cf291A420c7"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:29.682748+00:00",
+      "network_type": "testnets",
+      "chain": "arbitrum-sepolia",
+      "contract_type": "LZBlockRelay",
+      "address": "0x5Adc2216ACC057A0B05dFe1e962Ef2252fE90fB3"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:35.447386+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "LZBlockRelay",
+      "address": "0x5Adc2216ACC057A0B05dFe1e962Ef2252fE90fB3"
+    },
+    {
+      "timestamp": "2025-06-20T23:20:38.358951+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "LZBlockRelay",
+      "address": "0x5Adc2216ACC057A0B05dFe1e962Ef2252fE90fB3"
+    }
+  ]
 }
