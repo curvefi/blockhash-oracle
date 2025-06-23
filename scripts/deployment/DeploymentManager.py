@@ -71,7 +71,11 @@ class DeploymentManager:
 
     def get_salt(self, salt_type: str) -> Optional[str]:
         """Get saved salt for deterministic deployment"""
-        return self.state["salts"].get(salt_type)
+        salt = self.state["salts"].get(salt_type)
+        # if it starts from 0x, truncate it:
+        if salt and salt.startswith("0x"):
+            salt = salt[2:]
+        return salt
 
     def save_salt(self, salt_type: str, salt: bytes):
         """Save salt for future deployments"""
