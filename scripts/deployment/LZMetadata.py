@@ -86,7 +86,7 @@ class LZMetadata:
 
             # Filter active v2+ DVNs
             active_dvns = {
-                addr: data
+                addr.lower(): data
                 for addr, data in network_data["dvns"].items()
                 if not data.get("deprecated", False) and data.get("version", 0) >= 2
             }
