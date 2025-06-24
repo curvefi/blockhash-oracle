@@ -21,7 +21,7 @@ wheels/
 *.DS_Store
 
 block_cache.pkl
-scripts/vanity_salt.txt
+scripts/deployment/salts/
 *lz_metadata.json
 
 # temporary files for contract verification

@@ -69,17 +69,19 @@ class DeploymentManager:
         """Get all deployed contracts for a network type"""
         return self.state["deployments"].get(network_type, {})
 
-    def get_salt(self, salt_type: str) -> Optional[str]:
+    def get_salt(self, network_type: str, salt_type: str) -> Optional[str]:
         """Get saved salt for deterministic deployment"""
-        salt = self.state["salts"].get(salt_type)
+        salt = self.state["salts"].get(network_type, {}).get(salt_type)
         # if it starts from 0x, truncate it:
         if salt and salt.startswith("0x"):
             salt = salt[2:]
         return salt
 
-    def save_salt(self, salt_type: str, salt: bytes):
+    def save_salt(self, network_type: str, salt_type: str, salt: bytes):
         """Save salt for future deployments"""
-        self.state["salts"][salt_type] = salt.hex()
+        op_dict = self.state["salts"].get(network_type, {})
+        op_dict[salt_type] = salt.hex()
+        self.state["salts"][network_type] = op_dict
         self.save_state()
 
     def get_deployment_summary(self, network_type: str) -> Dict:
