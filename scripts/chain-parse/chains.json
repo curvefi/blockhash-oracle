@@ -71,7 +71,7 @@
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/tac/{}",
       "drpc": null,
-      "public": "https://rpc.ankr.com/tac"
+      "public": "https://rpc.tac.build"
     },
     "fantom": {
       "chain_id": 250,

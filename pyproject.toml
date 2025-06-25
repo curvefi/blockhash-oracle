@@ -12,6 +12,7 @@ dependencies = [
     "titanoboa==0.2.7",
     "web3>=7.6.0",
     "py-evm>=0.12.0",
+    "hyperliquid-python-sdk>=0.15.0",
 ]
 
 [tool.uv.sources]

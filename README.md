@@ -1,68 +1,167 @@
-# Ethereum Mainnet Block Oracle System
-
-The Ethereum Mainnet Block Oracle System provides decentralized, permissionless access to Ethereum mainnet block hashes and state roots across multiple chains. Governed by Curve DAO, the system leverages LayerZero relayers and a multi-committer consensus mechanism to securely propagate block data in a trust-minimized manner.
+# Curve Block Oracle
 
 ## Overview
 
-- **MainnetBlockView:** A contract on Ethereum mainnet that retrieves block hashes for blocks that are safely aged (greater than 64 and less than 256 blocks old). It defaults to `block.number - 65` to avoid reorg risks.
-- **BlockOracle:** A non-mainnet-chain contract (e.g., on Arbitrum, Gnosis, etc.) that accepts block header submissions from trusted committers using a threshold-based consensus mechanism. When the required threshold is met, the block data becomes immutable.
-- **LayerZero Integration (LZBlockRelay):** Contracts deployed on multiple chains that handle cross-chain messaging. LayerZero relayers, configured with multiple DVNs, enable permissionless broadcasts of block data. For the moment, this relayer is sole commiter of blockhashes.
+The Curve Block Oracle is a decentralized system for securely providing Ethereum mainnet block hashes and state roots to other blockchain networks. This enables permissionless storage proofs and cross-chain verification of Ethereum state.
 
-## System Operation
+## Key Features
 
-1. **Block Data Request:**
-   Users or relayers trigger a block data request via `request_block_hash`, which initiates a LayerZero read from MainnetBlockView.
+- **Permissionless Access**: Anyone can use the oracle to verify Ethereum state on supported chains
+- **Multi-Chain Support**: Deployed across 20+ EVM-compatible chains
+- **Decentralized Security**: Multi-committer consensus mechanism with threshold validation
+- **LayerZero Integration**: Leverages LayerZero for secure cross-chain messaging
+- **Storage Proof Ready**: Provides block hashes and state roots needed for Ethereum storage proofs
 
-2. **Broadcasting:**
-   Received block data is sent using `broadcast_latest_block` across chains through LayerZero’s messaging system.
+## How It Works
 
-3. **Commitment & Validation:**
-   LZ Relayers commit block headers to the BlockOracle. Once a configurable threshold (currently just 1) is reached, the block hash is confirmed and stored permanently.
+### Architecture
 
-4. **Block Header Submission:**
-   RLP encoded block headers can be submitted by anyone to the BlockOracle using `submit_block_header`.
+The system consists of four main components:
 
-## Use Cases
+1. **MainnetBlockView** (Ethereum only)
+   - Contract: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
+   - Provides aged block hashes (65+ blocks old) to prevent reorg issues
+   - Called off-chain via LayerZero's lzRead functionality
 
-- **State Proofs:**
-  Prove mainnet state on sidechains and verify transaction inclusion.
+2. **BlockOracle** (All supported chains)
+   - Contract: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
+   - Stores confirmed block hashes and decoded block headers
+   - Uses threshold-based consensus (currently 1 committer: LZBlockRelay)
+   - Immutable once applied
 
+3. **LZBlockRelay** (All supported chains)
+   - Contract: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
+   - Handles cross-chain messaging via LayerZero
+   - Commits block hashes to BlockOracle
+   - Supports read-enabled chains for direct Ethereum queries
 
-## Deployments & Configuration
+4. **HeaderVerifier** (All supported chains)
+   - Contract: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
+   - Decodes RLP-encoded Ethereum block headers
+   - Extracts state root, parent hash, and other fields
 
-MainnetBlockView is deployed on Ethereum mainnet: [0xB10CFACE40490D798770FEdd104e0a013eD308a6](https://etherscan.io/address/0xB10CFACE40490D798770FEdd104e0a013eD308a6)
+### Block Hash Flow
 
-Oracles and LZ Relayers are deployed across many chains where Curve Finance is live:
+1. **Request**: User calls `request_block_hash()` on a read-enabled chain's LZBlockRelay
+2. **Read**: LayerZero reads the block hash from MainnetBlockView on Ethereum
+3. **Commit**: LZBlockRelay receives the response and commits to BlockOracle
+4. **Broadcast**: Optionally broadcasts the block hash to other specified chains
+5. **Verify**: Anyone can submit the RLP-encoded header to extract state roots
 
-| Chain     | Oracle Address | Block Relay Address |
-|-----------|----------------|---------------------|
-| Arbitrum  | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://arbiscan.io/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://arbiscan.io/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Polygon   | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://polygonscan.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://polygonscan.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| BSC       | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://bscscan.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://bscscan.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Base      | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://basescan.org/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://basescan.org/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Avalanche | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://snowtrace.io/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://snowtrace.io/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Optimism  | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://optimistic.etherscan.io/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://optimistic.etherscan.io/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Fraxtal   | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://fraxscan.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://fraxscan.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Gnosis    | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://gnosisscan.io/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://gnosisscan.io/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Sonic     | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://sonicscan.org/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://sonicscan.org/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Ink       | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://explorer.inkonchain.com/address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://explorer.inkonchain.com/address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
-| Corn      | [0xb10cface0f31830b780C453031d8E803b442e0A4](https://maizenet-explorer.usecorn.com//address/0xb10cface0f31830b780C453031d8E803b442e0A4) | [0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F](https://maizenet-explorer.usecorn.com//address/0xfacefeedcc1a5FDdCa97a20511e6641a5c44370F) |
+## Usage
 
-## Usage Instructions
+### For Developers
 
-To request and broadcast block data, follow the recommended process:
-1. Choose a broadcaster chain (e.g., Optimism, Arbitrum, Base).
-2. Quote the read fee from the chosen broadcaster chain.
-3. Check fees for each target chain by calling `quote_broadcast_fees`.
-4. Calculate the total fees and then complete the broadcast call.
-You can find example use scripts in `scripts/` notebook files.
+To use block hashes for storage proofs:
 
+```solidity
+// Get confirmed block hash
+bytes32 blockHash = IBlockOracle(ORACLE_ADDRESS).get_block_hash(blockNumber);
 
-## Future Enhancements
+// Get state root for proofs
+bytes32 stateRoot = IBlockOracle(ORACLE_ADDRESS).get_state_root(blockNumber);
+```
 
-- **Expanded Committer Network:** Onboard additional trusted committers to further decentralize the consensus process.
-- **Fee Optimization:** Enhance fee management for improved efficiency in cross-chain messaging.
+### Requesting Block Hashes
 
+On read-enabled chains (Optimism, Arbitrum, Base):
 
-##
-© Curve.Fi, 2025. All rights reserved.
+```python
+# 1. Quote fees
+read_fee = relay.quote_read_fee(read_gas_limit=200000, value=0)
+broadcast_fees = relay.quote_broadcast_fees(target_chains, gas_limit=100000)
+
+# 2. Request block hash
+relay.request_block_hash(
+    target_chains,
+    broadcast_fees,
+    lz_receive_gas_limit=100000,
+    read_gas_limit=200000,
+    block_number=0,  # 0 = latest safe block
+    value=read_fee + sum(broadcast_fees)
+)
+```
+
+### Submitting Block Headers
+
+Anyone can submit headers for confirmed block hashes:
+
+```python
+# Get RLP-encoded header from Ethereum
+encoded_header = eth.get_block(block_number).rawHeader
+
+# Submit to HeaderVerifier
+verifier.submit_block_header(oracle_address, encoded_header)
+```
+
+## Deployed Addresses
+
+### Ethereum Mainnet
+- MainnetBlockView: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
+
+### All Other Chains
+- BlockOracle: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
+- LZBlockRelay: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
+- HeaderVerifier: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
+
+### Supported Chains
+- Arbitrum, Optimism, Base, Polygon, BSC
+- Avalanche, Fantom, Gnosis, Celo, Moonbeam
+- Fraxtal, Mantle, Taiko, Sonic, Kava
+- Aurora, X Layer, Hyperliquid, Ink, Corn
+
+## Security Model
+
+### Trust Assumptions
+- **Curve DAO**: Controls oracle ownership and committer management
+- **LayerZero**: Trusted for message delivery and lzRead functionality
+- **Threshold Security**: Requires threshold committers to agree on block hashes
+- **Chain Security**: System is as secure as the least secure supported chain
+
+### Current Configuration
+- Threshold: 1 committer (LZBlockRelay only)
+- Read-enabled chains can query Ethereum directly
+- Non-read chains rely on broadcasts from read-enabled chains
+
+## Technical Details
+
+### Block Hash Constraints
+- Minimum age: 65 blocks (reorg protection)
+- Maximum age: 8192 blocks (EVM limit post EIP-2935)
+- Default: `block.number - 65` for safety
+
+### Gas Considerations
+- Read operations: ~200,000 gas recommended
+- Broadcast receive: ~100,000 gas per chain
+- Headers must be under 1024 bytes
+
+### RLP Header Decoding
+The system extracts:
+- `block_hash`: Keccak256 of the header
+- `parent_hash`: Previous block reference
+- `state_root`: Merkle root for storage proofs
+- `receipt_root`: Transaction receipt root
+- `block_number`: Block height
+- `timestamp`: Block timestamp
+
+## Example Use Cases
+
+1. **Cross-Chain Governance**: Verify mainnet votes on L2s
+2. **Bridge Security**: Validate token locks on Ethereum
+3. **State Synchronization**: Prove account balances across chains
+4. **DeFi Protocols**: Access mainnet price feeds on L2s
+5. **Cross-Chain dApps**: Build applications using mainnet state
+
+## Resources
+
+- Example scripts: `/scripts/deployment/`
+- Contract source: `/contracts/`
+- Security audit: `/report/`
+
+## License
+
+Copyright (c) Curve.Fi, 2025 - all rights reserved
+
+## Contact
+
+Security: security@curve.fi
