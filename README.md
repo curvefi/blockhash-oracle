@@ -105,10 +105,7 @@ verifier.submit_block_header(oracle_address, encoded_header)
 - HeaderVerifier: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
 
 ### Supported Chains
-- Arbitrum, Optimism, Base, Polygon, BSC
-- Avalanche, Fantom, Gnosis, Celo, Moonbeam
-- Fraxtal, Mantle, Taiko, Sonic, Kava
-- Aurora, X Layer, Hyperliquid, Ink, Corn
+Ethereum, optimism, xdc, bsc, gnosis, polygon, sonic, xlayer, tac, fantom, fraxtal, hyperliquid, moonbeam, kava, mantle, base, arbitrum, celo, avalanche, ink, plumep taiko, corn, aurora
 
 ## Security Model
 
