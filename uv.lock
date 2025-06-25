@@ -268,6 +268,7 @@ name = "blockhash-oracle"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "py-evm" },
     { name = "snekmate" },
     { name = "titanoboa" },
     { name = "vyper" },
@@ -293,7 +294,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "snekmate", specifier = "==0.1.2rc2" },
+    { name = "py-evm", specifier = ">=0.12.0" },
+    { name = "snekmate", specifier = "==0.1.2" },
     { name = "titanoboa", git = "https://github.com/vyperlang/titanoboa.git?rev=801e322aef0cb9b9e91b0cdc4c7603c8e09de4d4" },
     { name = "vyper", specifier = "==0.4.3" },
     { name = "web3", specifier = ">=7.6.0" },
@@ -776,14 +778,14 @@ wheels = [
 
 [[package]]
 name = "eth-typing"
-version = "5.0.1"
+version = "5.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/32/d5a1bdf872f92a7c3361396b684aeba7abaabb341bd22a80029abcd1f68e/eth_typing-5.0.1.tar.gz", hash = "sha256:83debf88c9df286db43bb7374974681ebcc9f048fac81be2548dbc549a3203c0", size = 22716, upload-time = "2024-10-14T20:12:30.629Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/54/62aa24b9cc708f06316167ee71c362779c8ed21fc8234a5cd94a8f53b623/eth_typing-5.2.1.tar.gz", hash = "sha256:7557300dbf02a93c70fa44af352b5c4a58f94e997a0fd6797fb7d1c29d9538ee", size = 21806, upload-time = "2025-04-14T20:39:28.217Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/ef/a66ff9b83df51b83c1af468fc7b5e4a3855d9e3c01e2365ecfe1c5e84077/eth_typing-5.0.1-py3-none-any.whl", hash = "sha256:f30d1af16aac598f216748a952eeb64fbcb6e73efa691d2de31148138afe96de", size = 20085, upload-time = "2024-10-14T20:12:27.791Z" },
+    { url = "https://files.pythonhosted.org/packages/30/72/c370bbe4c53da7bf998d3523f5a0f38867654923a82192df88d0705013d3/eth_typing-5.2.1-py3-none-any.whl", hash = "sha256:b0c2812ff978267563b80e9d701f487dd926f1d376d674f3b535cfe28b665d3d", size = 19163, upload-time = "2025-04-14T20:39:26.571Z" },
 ]
 
 [[package]]
@@ -2023,21 +2025,20 @@ wheels = [
 
 [[package]]
 name = "py-ecc"
-version = "7.0.1"
+version = "8.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cached-property" },
     { name = "eth-typing" },
     { name = "eth-utils" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/bd/dfe49226d5f137d11a946c4b3f3db2ff87b6b02390db8d95b0098365a2db/py_ecc-7.0.1.tar.gz", hash = "sha256:557461f42e57294d734305a30faf6b8903421651871e9cdeff8d8e67c6796c70", size = 45428, upload-time = "2024-04-23T15:54:55.947Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/96/e73075d5c885274efada2fbc5db6377022036c2f5b4b470dbcf4106e07d5/py_ecc-8.0.0.tar.gz", hash = "sha256:56aca19e5dc37294f60c1cc76666c03c2276e7666412b9a559fa0145d099933d", size = 51193, upload-time = "2025-04-14T16:14:03.29Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/f0/a899d0d3e0d2fb5eb95c15ae9f277cb3ee139d4f1576c4c68f08a1301470/py_ecc-7.0.1-py3-none-any.whl", hash = "sha256:84a8b4d436163c83c65345a68e32f921ef6e64374a36f8e561f0455b4b08f5f2", size = 43309, upload-time = "2024-04-23T15:54:53.524Z" },
+    { url = "https://files.pythonhosted.org/packages/81/58/383335eac96d2f1aba78741c6ce128c54e7eba2ea1dc47408257d751d35c/py_ecc-8.0.0-py3-none-any.whl", hash = "sha256:c0b2dfc4bde67a55122a392591a10e851a986d5128f680628c80b405f7663e13", size = 47814, upload-time = "2025-04-14T16:14:01.827Z" },
 ]
 
 [[package]]
 name = "py-evm"
-version = "0.10.1b2"
+version = "0.12.1b1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cached-property" },
@@ -2051,9 +2052,9 @@ dependencies = [
     { name = "rlp" },
     { name = "trie" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/56/f90ebb53e121d5e1dea0eff713dd0434d2ea938431311e6d8e99fdbb8a8d/py_evm-0.10.1b2.tar.gz", hash = "sha256:7a06fbd1d966eb0cd4f6c6d9e7fe1e2c43473804ac12b12325b0a31cbab5670f", size = 836114, upload-time = "2024-08-21T17:25:28.075Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/57/a0a84d991bac43058200245d853de9e7e819d216b56e22f66654fdf596d5/py_evm-0.12.1b1.tar.gz", hash = "sha256:7bcd9935a3ac2989c8f068b2006f136189281ebc6e279663405cb2c5397ed890", size = 851927, upload-time = "2025-05-14T17:25:14.686Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/86/c5/9f3e66a43083a715055f0503d283dca7186f4253754b474f5804304ef297/py_evm-0.10.1b2-py3-none-any.whl", hash = "sha256:511bd52c9c08837ae2a02cce923a756e85330dc14cc6abb15986ea99dc2832ac", size = 778907, upload-time = "2024-08-21T17:25:26.187Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/be/1e0de8a1f1dbe3911ccae2d598a2c60610e2f4984a918690b5469e8c8774/py_evm-0.12.1b1-py3-none-any.whl", hash = "sha256:015ebc8dd95925030be87ce4b3fd31e3c70df626c5ad8665fb06cd611c73eb68", size = 798589, upload-time = "2025-05-14T17:25:12.707Z" },
 ]
 
 [[package]]
@@ -2578,11 +2579,11 @@ wheels = [
 
 [[package]]
 name = "snekmate"
-version = "0.1.2rc2"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f3/45/b4309738aa99e98ec800572ee6ca39293c84a34dcf867c641c461f66a035/snekmate-0.1.2rc2.tar.gz", hash = "sha256:4380490d38d904248b58f29a948de8c7377bf2eb31497bce106d3e4ba07425a2", size = 102061, upload-time = "2025-06-19T10:23:28.134Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/f5/5b285024f0a18e699f2b144d9821b2572e8665331261c9078fdad6a7aa38/snekmate-0.1.2.tar.gz", hash = "sha256:8ed2c6a29b90424543d1792599c5c0b5ccf6988931b43029d1ca7e520a045038", size = 102051, upload-time = "2025-06-25T07:58:29.589Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/3b/48b887c30cd904ad81affbb3fe85ccb7315dd225dde78a4257f74567f2a4/snekmate-0.1.2rc2-py3-none-any.whl", hash = "sha256:3df072afed64f74d620ef0d9593624170896a26d148da0cda96dba09fc0939de", size = 120672, upload-time = "2025-06-19T10:23:26.503Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/94/c7e58d2b19e05c91454ca64bdeb109969e4fac580c7eb2a50994859b1379/snekmate-0.1.2-py3-none-any.whl", hash = "sha256:df439ba25843f52e6d7e1b58000192f77cd0a5caa9a756075655ead2b66e6314", size = 120637, upload-time = "2025-06-25T07:58:28.114Z" },
 ]
 
 [[package]]

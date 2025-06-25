@@ -19,6 +19,8 @@
         "HeaderVerifier": "0xdec0deda0da712f939DB4D9C9131618b301aFcb0",
         "LZBlockRelay": "0xFaceFeedCa70a35fBE763bcEF0a1572E3f1d7307"
       }
+    },
+    "mainnets": {
     }
   },
   "salts": {
@@ -27,78 +29,14 @@
       "oracle": "0x73241e98090042a718f7eb1af07fad27ff09a3f300a747da9aadbcc700da14bd",
       "header_verifier": "0x73241e98090042a718f7eb1af07fad27ff09a3f300375a43ac9bbe67010e7d38",
       "relay": "0x73241e98090042a718f7eb1af07fad27ff09a3f30082dd86a90fbd3501e84d71"
+    },
+    "mainnets": {
+      "view": "0xb101b2b0aa02b7167d238b98dc1b0b0404a760e8005b8106ffa45eed03395f86",
+      "oracle": "0xb101b2b0aa02b7167d238b98dc1b0b0404a760e800de4e16ec68f1b40284bfa4",
+      "header_verifier": "0xb101b2b0aa02b7167d238b98dc1b0b0404a760e800a2839ce1306e1002c322c3",
+      "relay": "0xb101b2b0aa02b7167d238b98dc1b0b0404a760e8005d74a0b6c0712800c1b6c2"
     }
   },
   "deployment_history": [
-    {
-      "timestamp": "2025-06-23T15:35:00.825449+00:00",
-      "network_type": "testnets",
-      "chain": "sepolia",
-      "contract_type": "MainnetBlockView",
-      "address": "0xB10CFACE697A22291Ab22CBf73005618bb9B79Cb"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:08.336721+00:00",
-      "network_type": "testnets",
-      "chain": "optimism-sepolia",
-      "contract_type": "BlockOracle",
-      "address": "0xb10cface822f5FF69896aA632cbC955bd58978Fb"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:10.386856+00:00",
-      "network_type": "testnets",
-      "chain": "optimism-sepolia",
-      "contract_type": "HeaderVerifier",
-      "address": "0xdec0deda0da712f939DB4D9C9131618b301aFcb0"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:15.718250+00:00",
-      "network_type": "testnets",
-      "chain": "base-sepolia",
-      "contract_type": "BlockOracle",
-      "address": "0xb10cface822f5FF69896aA632cbC955bd58978Fb"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:21.621934+00:00",
-      "network_type": "testnets",
-      "chain": "base-sepolia",
-      "contract_type": "HeaderVerifier",
-      "address": "0xdec0deda0da712f939DB4D9C9131618b301aFcb0"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:25.806562+00:00",
-      "network_type": "testnets",
-      "chain": "arbitrum-sepolia",
-      "contract_type": "BlockOracle",
-      "address": "0xb10cface822f5FF69896aA632cbC955bd58978Fb"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:29.708916+00:00",
-      "network_type": "testnets",
-      "chain": "arbitrum-sepolia",
-      "contract_type": "HeaderVerifier",
-      "address": "0xdec0deda0da712f939DB4D9C9131618b301aFcb0"
-    },
-    {
-      "timestamp": "2025-06-23T15:35:56.361037+00:00",
-      "network_type": "testnets",
-      "chain": "optimism-sepolia",
-      "contract_type": "LZBlockRelay",
-      "address": "0xFaceFeedCa70a35fBE763bcEF0a1572E3f1d7307"
-    },
-    {
-      "timestamp": "2025-06-23T15:36:01.724260+00:00",
-      "network_type": "testnets",
-      "chain": "base-sepolia",
-      "contract_type": "LZBlockRelay",
-      "address": "0xFaceFeedCa70a35fBE763bcEF0a1572E3f1d7307"
-    },
-    {
-      "timestamp": "2025-06-23T15:36:06.628057+00:00",
-      "network_type": "testnets",
-      "chain": "arbitrum-sepolia",
-      "contract_type": "LZBlockRelay",
-      "address": "0xFaceFeedCa70a35fBE763bcEF0a1572E3f1d7307"
-    }
   ]
 }

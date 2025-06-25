@@ -8,9 +8,10 @@ requires-python = ">=3.12"
 # Requirements
 dependencies = [
     "vyper==0.4.3",
-    "snekmate==0.1.2rc2",
+    "snekmate==0.1.2",
     "titanoboa==0.2.7",
     "web3>=7.6.0",
+    "py-evm>=0.12.0",
 ]
 
 [tool.uv.sources]
@@ -30,7 +31,7 @@ dev-dependencies = [
     "natrix==v0.1.4",
     "cryptography",
     "keyring",
-    "base58"
+    "base58",
 ]
 
 [tool.ruff]

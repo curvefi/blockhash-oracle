@@ -5,7 +5,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/eth/{}",
-      "drpc": "https://ethereum.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=ethereum&dkey={}",
       "public": "https://eth.drpc.org",
       "is_main_chain": true
     },
@@ -14,7 +14,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/optimism/{}",
-      "drpc": "https://optimism.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=optimism&dkey={}",
       "public": "https://mainnet.optimism.io"
     },
     "xdc": {
@@ -30,15 +30,15 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/bsc/{}",
-      "drpc": "https://bsc.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=bsc&dkey={}",
       "public": "https://56.rpc.thirdweb.com"
     },
     "gnosis": {
       "chain_id": 100,
-      "evm_version": "shanghai",
+      "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/gnosis/{}",
-      "drpc": "https://gnosis.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=gnosis&dkey={}",
       "public": "https://rpc.gnosischain.com"
     },
     "polygon": {
@@ -46,7 +46,7 @@
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/polygon/{}",
-      "drpc": "https://polygon.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=polygon&dkey={}",
       "public": "https://polygon-rpc.com"
     },
     "sonic": {
@@ -54,15 +54,15 @@
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/sonic_mainnet/{}",
-      "drpc": null,
+      "drpc": "https://lb.drpc.org/ogrpc?network=sonic&dkey={}",
       "public": "https://rpc.soniclabs.com"
     },
     "xlayer": {
       "chain_id": 196,
       "evm_version": "shanghai",
-      "explorer": "https://www.oklink.com/api/v5/explorer/contract/verify-contract-sourcecode",
+      "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/xlayer/{}",
-      "drpc": "https://xlayer.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=xlayer&dkey={}",
       "public": "https://rpc.xlayer.tech"
     },
     "tac": {
@@ -78,7 +78,7 @@
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/fantom/{}",
-      "drpc": "https://fantom.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=fantom&dkey={}",
       "public": "https://250.rpc.thirdweb.com"
     },
     "fraxtal": {
@@ -86,7 +86,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": null,
-      "drpc": "https://fraxtal.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=fraxtal&dkey={}",
       "public": "https://rpc.frax.com"
     },
     "hyperliquid": {
@@ -94,7 +94,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": null,
-      "drpc": "https://hyperliquid.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=hyperliquid&dkey={}",
       "public": "https://rpc.hyperliquid.xyz/evm"
     },
     "moonbeam": {
@@ -102,7 +102,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/moonbeam/{}",
-      "drpc": "https://moonbeam.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=moonbeam&dkey={}",
       "public": "https://moonbeam.public.blastapi.io"
     },
     "kava": {
@@ -110,7 +110,7 @@
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": null,
-      "drpc": "https://kava.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=kava&dkey={}",
       "public": "https://evm.kava.io"
     },
     "mantle": {
@@ -118,7 +118,7 @@
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/mantle/{}",
-      "drpc": "https://mantle.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=mantle&dkey={}",
       "public": "https://rpc.mantle.xyz"
     },
     "base": {
@@ -126,7 +126,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/base/{}",
-      "drpc": "https://base.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=base&dkey={}",
       "public": "https://mainnet.base.org"
     },
     "arbitrum": {
@@ -134,7 +134,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/arbitrum/{}",
-      "drpc": "https://arbitrum.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=arbitrum&dkey={}",
       "public": "https://arb1.arbitrum.io/rpc"
     },
     "celo": {
@@ -142,7 +142,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/celo/{}",
-      "drpc": "https://celo.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=celo&dkey={}",
       "public": "https://forno.celo.org"
     },
     "avalanche": {
@@ -150,7 +150,7 @@
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/avalanche/{}",
-      "drpc": "https://avalanche.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=avalanche&dkey={}",
       "public": "https://api.avax.network/ext/bc/C/rpc"
     },
     "ink": {
@@ -158,7 +158,7 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": null,
-      "drpc": "https://ink.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=ink&dkey={}",
       "public": "https://rpc-gel.inkonchain.com"
     },
     "plumephoenix": {
@@ -174,7 +174,7 @@
       "evm_version": "shanghai",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/taiko/{}",
-      "drpc": "https://taiko.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=taiko&dkey={}",
       "public": "https://rpc.ankr.com/taiko"
     },
     "mp1": {
@@ -190,33 +190,33 @@
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": null,
-      "drpc": "https://aurora.drpc.org",
+      "drpc": "https://lb.drpc.org/ogrpc?network=aurora&dkey={}",
       "public": "https://mainnet.aurora.dev"
     }
   },
   "testnets": {
     "sepolia": {
       "chain_id": 11155111,
-      "public": "https://eth-sepolia.public.blastapi.io",
+      "rpc": "https://eth-sepolia.public.blastapi.io",
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "is_main_chain": true
     },
     "base-sepolia": {
       "chain_id": 84532,
-      "public": "https://sepolia.base.org",
+      "rpc": "https://sepolia.base.org",
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api"
     },
     "optimism-sepolia": {
       "chain_id": 11155420,
-      "public": "https://sepolia.optimism.io",
+      "rpc": "https://sepolia.optimism.io",
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api"
     },
     "arbitrum-sepolia": {
       "chain_id": 421614,
-      "public": "https://sepolia-rollup.arbitrum.io/rpc",
+      "rpc": "https://sepolia-rollup.arbitrum.io/rpc",
       "evm_version": "cancun",
       "explorer": "https://api.etherscan.io/v2/api"
     }

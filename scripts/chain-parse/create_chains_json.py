@@ -23,6 +23,14 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+CHAIN_NICKNAMES = {
+    "mp1": ["corn_maizenet"],
+    "ethereum": ["eth"],
+    "sonic": ["sonic_mainnet"],
+    "taiko": ["taiko", "taiko_mainnet"],
+    "kava": ["kava", "kava_api"],
+}
+
 
 def parse_fe_chains(filepath: str) -> Dict[str, List[str]]:
     """Parse fe_chains.txt to extract chain names and their RPC URLs."""
@@ -94,14 +102,12 @@ def check_ankr_support(chain_name: str, lz_key: str, chain_id: int) -> Optional[
     # Use actual ANKR API key from environment or a test key
     test_key = os.environ.get("ANKR_API_KEY", "test123")
 
-    # Special case mappings
-    special_mappings = {"mp1": "corn_maizenet", "ethereum": "eth", "sonic": "sonic_mainnet"}
-
     # Try different ANKR URL patterns
     patterns = []
 
-    if lz_key in special_mappings:
-        patterns.append(f"https://rpc.ankr.com/{special_mappings[lz_key]}/{test_key}")
+    if lz_key in CHAIN_NICKNAMES:
+        for nick in CHAIN_NICKNAMES[lz_key]:
+            patterns.append(f"https://rpc.ankr.com/{nick}/{test_key}")
 
     patterns.extend(
         [
@@ -122,18 +128,22 @@ def check_ankr_support(chain_name: str, lz_key: str, chain_id: int) -> Optional[
 def check_drpc_support(chain_name: str, lz_key: str, chain_id: int) -> Optional[str]:
     """Check if DRPC supports the chain and return the URL template."""
     # Try different DRPC URL patterns
+    test_key = os.environ.get("DRPC_API_KEY", "test123")
+    patterns = []
+
+    if lz_key in CHAIN_NICKNAMES:
+        for nick in CHAIN_NICKNAMES[lz_key]:
+            patterns.append(f"https://lb.drpc.org/ogrpc?network={nick}&dkey={test_key}")
+
     patterns = [
-        f"https://lb.drpc.org/ogrpc?network={lz_key.lower()}&dkey=test",
-        f"https://lb.drpc.org/ogrpc?network={chain_name.lower()}&dkey=test",
-        f"https://{lz_key.lower()}.drpc.org",
-        "https://eth.drpc.org" if lz_key == "ethereum" else None,
-        "https://bsc.drpc.org" if lz_key == "bsc" else None,
+        f"https://lb.drpc.org/ogrpc?network={lz_key.lower()}&dkey={test_key}",
+        f"https://lb.drpc.org/ogrpc?network={chain_name.lower()}&dkey={test_key}",
     ]
 
     for pattern in patterns:
         if pattern and test_rpc_provider(pattern, chain_id):
             if "dkey=" in pattern:
-                return pattern.replace("&dkey=test", "&dkey={}")
+                return pattern.replace(f"&dkey={test_key}", "&dkey={}")
             return pattern
 
     return None
@@ -168,7 +178,7 @@ def main():
 
     # Step 1: Parse fe_chains.txt
     print("📄 Parsing fe_chains.txt...")
-    chain_rpcs = parse_fe_chains("scripts/chain-research/fe_chains.txt")
+    chain_rpcs = parse_fe_chains("scripts/chain-parse/fe_chains.txt")
     print(f"   Found {len(chain_rpcs)} chains")
 
     # Step 2: Get chain IDs
@@ -271,15 +281,10 @@ def main():
         if lz_key == "ethereum":
             chain_config["is_main_chain"] = True
 
-        if lz_key == "xlayer":
-            chain_config["explorer"] = (
-                "https://www.oklink.com/api/v5/explorer/contract/verify-contract-sourcecode"
-            )
-
         chains_config["mainnets"][lz_key] = chain_config
 
     # Save the configuration
-    with open("scripts/chain-research/chains.json", "w") as f:
+    with open("scripts/chain-parse/chains.json", "w") as f:
         json.dump(chains_config, f, indent=2)
 
     # Summary
