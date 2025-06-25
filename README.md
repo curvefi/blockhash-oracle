@@ -1,164 +1,232 @@
 # Curve Block Oracle
 
-## Overview
+[![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](LICENSE)
 
-The Curve Block Oracle is a decentralized system for securely providing Ethereum mainnet block hashes and state roots to other blockchain networks. This enables permissionless storage proofs and cross-chain verification of Ethereum state.
+## 1. Overview
 
-## Key Features
+The Curve Block Oracle is a decentralized system for securely providing Ethereum mainnet block hashes and state roots to other blockchain networks. This enables permissionless storage proofs and cross-chain verification of Ethereum state, which is essential for a variety of use cases, including cross-chain governance, bridge security, and DeFi protocols.
 
-- **Permissionless Access**: Anyone can use the oracle to verify Ethereum state on supported chains
-- **Multi-Chain Support**: Deployed across 20+ EVM-compatible chains
-- **Decentralized Security**: Multi-committer consensus mechanism with threshold validation
-- **LayerZero Integration**: Leverages LayerZero for secure cross-chain messaging
-- **Storage Proof Ready**: Provides block hashes and state roots needed for Ethereum storage proofs
+The system is designed to be highly reliable and secure, leveraging a multi-committer consensus mechanism and LayerZero's cross-chain messaging protocol. It is currently deployed on over 20 EVM-compatible chains.
 
-## How It Works
+## 2. Key Features
 
-### Architecture
+- **Permissionless Access**: Anyone can use the oracle to verify Ethereum state on supported chains.
+- **Multi-Chain Support**: Deployed across a wide range of EVM-compatible chains.
+- **Decentralized Security**: Utilizes a multi-committer consensus mechanism with threshold validation to ensure the integrity of block data.
+- **LayerZero Integration**: Leverages LayerZero for secure and efficient cross-chain messaging.
+- **Storage Proof Ready**: Provides the necessary block hashes and state roots for Ethereum storage proofs.
+- **Resilient Design**: The system is designed to be resilient to reorgs and other network disruptions.
 
-The system consists of four main components:
+## 3. System Architecture
 
-1. **MainnetBlockView** (Ethereum only)
-   - Contract: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
-   - Provides aged block hashes (65+ blocks old) to prevent reorg issues
-   - Called off-chain via LayerZero's lzRead functionality
+The Curve Block Oracle consists of four main smart contracts:
 
-2. **BlockOracle** (All supported chains)
-   - Contract: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
-   - Stores confirmed block hashes and decoded block headers
-   - Uses threshold-based consensus (currently 1 committer: LZBlockRelay)
-   - Immutable once applied
+1.  **`MainnetBlockView`** (Ethereum only):
+    -   **Address**: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
+    -   Provides access to historical block hashes on the Ethereum mainnet.
+    -   To prevent reorg-related issues, it only returns hashes for blocks that are at least 65 blocks old.
+    -   This contract is called off-chain via LayerZero's `lzRead` functionality.
 
-3. **LZBlockRelay** (All supported chains)
-   - Contract: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
-   - Handles cross-chain messaging via LayerZero
-   - Commits block hashes to BlockOracle
-   - Supports read-enabled chains for direct Ethereum queries
+2.  **`BlockOracle`** (All supported chains):
+    -   **Address**: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
+    -   Stores confirmed block hashes and decoded block headers.
+    -   Uses a threshold-based consensus mechanism to validate block data. Currently, the threshold is set to 1, with `LZBlockRelay` as the sole committer.
+    -   Once a block hash is confirmed, it is immutable.
 
-4. **HeaderVerifier** (All supported chains)
-   - Contract: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
-   - Decodes RLP-encoded Ethereum block headers
-   - Extracts state root, parent hash, and other fields
+3.  **`LZBlockRelay`** (All supported chains):
+    -   **Address**: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
+    -   Handles cross-chain messaging via LayerZero.
+    -   Commits block hashes to the `BlockOracle`.
+    -   Supports read-enabled chains for direct queries to Ethereum.
 
-### Block Hash Flow
+4.  **`HeaderVerifier`** (All supported chains):
+    -   **Address**: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
+    -   Decodes RLP-encoded Ethereum block headers.
+    -   Extracts key information, such as the state root, parent hash, and other fields.
 
-1. **Request**: User calls `request_block_hash()` on a read-enabled chain's LZBlockRelay
-2. **Read**: LayerZero reads the block hash from MainnetBlockView on Ethereum
-3. **Commit**: LZBlockRelay receives the response and commits to BlockOracle
-4. **Broadcast**: Optionally broadcasts the block hash to other specified chains
-5. **Verify**: Anyone can submit the RLP-encoded header to extract state roots
+### Data Flow
 
-## Usage
+The process of retrieving and verifying a block hash is as follows:
+
+1.  **Request**: A user initiates a request for a block hash by calling the `request_block_hash()` function on a read-enabled chain's `LZBlockRelay` contract.
+2.  **Read**: LayerZero reads the requested block hash from the `MainnetBlockView` contract on the Ethereum mainnet.
+3.  **Commit**: The `LZBlockRelay` contract receives the response from LayerZero and commits the block hash to the `BlockOracle`.
+4.  **Broadcast**: The `LZBlockRelay` can optionally broadcast the block hash to other specified chains.
+5.  **Verify**: Once the block hash is confirmed, anyone can submit the RLP-encoded block header to the `HeaderVerifier` to extract the state root and other data.
+
+## 4. Usage
 
 ### For Developers
 
-To use block hashes for storage proofs:
+To use the block hashes for storage proofs, you can interact with the `BlockOracle` contract as follows:
 
 ```solidity
-// Get confirmed block hash
+// Get the confirmed block hash for a given block number
 bytes32 blockHash = IBlockOracle(ORACLE_ADDRESS).get_block_hash(blockNumber);
 
-// Get state root for proofs
+// Get the state root for storage proofs
 bytes32 stateRoot = IBlockOracle(ORACLE_ADDRESS).get_state_root(blockNumber);
 ```
 
 ### Requesting Block Hashes
 
-On read-enabled chains (Optimism, Arbitrum, Base):
+On read-enabled chains (such as Optimism, Arbitrum, and Base), you can request a block hash using the following steps:
 
 ```python
-# 1. Quote fees
+# 1. Quote the required fees
 read_fee = relay.quote_read_fee(read_gas_limit=200000, value=0)
 broadcast_fees = relay.quote_broadcast_fees(target_chains, gas_limit=100000)
 
-# 2. Request block hash
+# 2. Request the block hash
 relay.request_block_hash(
     target_chains,
     broadcast_fees,
     lz_receive_gas_limit=100000,
     read_gas_limit=200000,
-    block_number=0,  # 0 = latest safe block
+    block_number=0,  # 0 indicates the latest safe block
     value=read_fee + sum(broadcast_fees)
 )
 ```
 
 ### Submitting Block Headers
 
-Anyone can submit headers for confirmed block hashes:
+Anyone can submit a block header for a confirmed block hash:
 
 ```python
-# Get RLP-encoded header from Ethereum
+# Get the RLP-encoded header from an Ethereum node
 encoded_header = eth.get_block(block_number).rawHeader
 
-# Submit to HeaderVerifier
+# Submit the header to the HeaderVerifier
 verifier.submit_block_header(oracle_address, encoded_header)
 ```
 
-## Deployed Addresses
+## 5. Deployed Addresses
 
 ### Ethereum Mainnet
-- MainnetBlockView: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
+
+-   **`MainnetBlockView`**: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
 
 ### All Other Chains
-- BlockOracle: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
-- LZBlockRelay: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
-- HeaderVerifier: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
+
+-   **`BlockOracle`**: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
+-   **`LZBlockRelay`**: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
+-   **`HeaderVerifier`**: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
 
 ### Supported Chains
-Ethereum, optimism, xdc, bsc, gnosis, polygon, sonic, xlayer, tac, fantom, fraxtal, hyperliquid, moonbeam, kava, mantle, base, arbitrum, celo, avalanche, ink, plumep taiko, corn, aurora
 
-## Security Model
+The Curve Block Oracle is deployed on the following chains:
+
+-   Ethereum
+-   Optimism
+-   XDC
+-   BSC
+-   Gnosis
+-   Polygon
+-   Sonic
+-   XLayer
+-   TAC
+-   Fantom
+-   Fraxtal
+-   Hyperliquid
+-   Moonbeam
+-   Kava
+-   Mantle
+-   Base
+-   Arbitrum
+-   Celo
+-   Avalanche
+-   Ink
+-   Plume
+-   Taiko
+-   Corn
+-   Aurora
+
+## 6. Security Model
 
 ### Trust Assumptions
-- **Curve DAO**: Controls oracle ownership and committer management
-- **LayerZero**: Trusted for message delivery and lzRead functionality
-- **Threshold Security**: Requires threshold committers to agree on block hashes
-- **Chain Security**: System is as secure as the least secure supported chain
+
+-   **Curve DAO**: The Curve DAO controls the ownership of the oracle and the management of committers.
+-   **LayerZero**: LayerZero is trusted for message delivery and the `lzRead` functionality.
+-   **Threshold Security**: The system requires a threshold of committers to agree on a block hash before it is confirmed.
+-   **Chain Security**: The overall security of the system is dependent on the security of the least secure supported chain.
 
 ### Current Configuration
-- Threshold: 1 committer (LZBlockRelay only)
-- Read-enabled chains can query Ethereum directly
-- Non-read chains rely on broadcasts from read-enabled chains
 
-## Technical Details
+-   **Threshold**: 1 committer (with `LZBlockRelay` as the sole committer).
+-   **Read-Enabled Chains**: Can query Ethereum directly.
+-   **Non-Read-Enabled Chains**: Rely on broadcasts from read-enabled chains.
+
+## 7. Technical Details
 
 ### Block Hash Constraints
-- Minimum age: 65 blocks (reorg protection)
-- Maximum age: 8192 blocks (EVM limit post EIP-2935)
-- Default: `block.number - 65` for safety
+
+-   **Minimum Age**: 65 blocks (for reorg protection).
+-   **Maximum Age**: 8192 blocks (due to the EVM limit post-EIP-2935).
+-   **Default**: `block.number - 65` for safety.
 
 ### Gas Considerations
-- Read operations: ~200,000 gas recommended
-- Broadcast receive: ~100,000 gas per chain
-- Headers must be under 1024 bytes
+
+-   **Read Operations**: Approximately 200,000 gas is recommended.
+-   **Broadcast Receive**: Approximately 100,000 gas per chain.
+-   **Header Size**: Headers must be under 1024 bytes.
 
 ### RLP Header Decoding
-The system extracts:
-- `block_hash`: Keccak256 of the header
-- `parent_hash`: Previous block reference
-- `state_root`: Merkle root for storage proofs
-- `receipt_root`: Transaction receipt root
-- `block_number`: Block height
-- `timestamp`: Block timestamp
 
-## Example Use Cases
+The system extracts the following fields from the RLP-encoded block header:
 
-1. **Cross-Chain Governance**: Verify mainnet votes on L2s
-2. **Bridge Security**: Validate token locks on Ethereum
-3. **State Synchronization**: Prove account balances across chains
-4. **DeFi Protocols**: Access mainnet price feeds on L2s
-5. **Cross-Chain dApps**: Build applications using mainnet state
+-   `block_hash`: The Keccak256 hash of the header.
+-   `parent_hash`: A reference to the previous block.
+-   `state_root`: The Merkle root for storage proofs.
+-   `receipt_root`: The root of the transaction receipt trie.
+-   `block_number`: The block height.
+-   `timestamp`: The block timestamp.
 
-## Resources
+## 8. Example Use Cases
 
-- Example scripts: `/scripts/deployment/`
-- Contract source: `/contracts/`
-- Security audit: `/report/`
+1.  **Cross-Chain Governance**: Verify mainnet votes on L2s.
+2.  **Bridge Security**: Validate token locks on Ethereum.
+3.  **State Synchronization**: Prove account balances across different chains.
+4.  **DeFi Protocols**: Access mainnet price feeds on L2s.
+5.  **Cross-Chain dApps**: Build applications that utilize mainnet state.
 
-## License
+## 9. Development
 
-Copyright (c) Curve.Fi, 2025 - all rights reserved
+### Prerequisites
 
-## Contact
+-   Python 3.12+
+-   [uv](https://github.com/astral-sh/uv)
 
-Security: security@curve.fi
+### Setup
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/curvefi/blockhash-oracle.git
+    cd blockhash-oracle
+    ```
+
+2.  Install dependencies:
+    ```bash
+    uv sync
+    ```
+
+### Running Tests
+
+To run the test suite:
+
+```bash
+pytest
+```
+
+### Deployment
+
+The `scripts/deployment` directory contains scripts for deploying and configuring the contracts. The `DeploymentManager.py` class helps manage the deployment state across multiple sessions.
+
+## 10. Resources
+
+-   **Example Scripts**: `/scripts/deployment/`
+-   **Contract Source Code**: `/contracts/`
+-   **Security Audit**: `/report/`
+
+## 11. License
+
+Copyright (c) Curve.Fi, 2025 - All Rights Reserved.
