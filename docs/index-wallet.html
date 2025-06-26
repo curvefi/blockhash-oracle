@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blockhash Oracle Status</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        h1 { font-size: 2em; margin-bottom: 0.5em; }
+        h2 { font-size: 1.5em; margin-top: 1em; }
+        a { color: #6366f1; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+        th, td { text-align: left; padding: 8px; border: 1px solid #333; }
+        th { background: #1a1a1a; }
+        td { background: #0a0a0a; }
+        .mainnet { background: #1a1a1a; padding: 1em; margin: 1em 0; border: 1px solid #333; border-radius: 8px; }
+        .number { font-size: 2em; font-weight: bold; color: #6366f1; }
+        .error { color: #ef4444; }
+        .outdated { color: #f59e0b; }
+        .loading { color: #888; }
+        button {
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            margin: 2px;
+        }
+        button:hover { background: #5558e3; }
+        button:disabled { background: #444; cursor: not-allowed; }
+        button.connected { background: #10b981; }
+
+        /* Tiny buttons */
+        .tiny-btn {
+            font-size: 11px;
+            padding: 2px 6px;
+            margin: 1px;
+        }
+        small { color: #888; }
+        hr { border: 1px solid #333; }
+        .wallet-info { display: inline-block; margin-left: 20px; color: #888; }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .peer-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        .peer-cost { color: #10b981; font-family: monospace; font-size: 12px; }
+        .total-cost {
+            margin-top: 15px;
+            padding: 15px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .flip-btn {
+            background: #444;
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .flip-btn:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <h1>Curve Block Oracle Status</h1>
+
+    <div>
+        <button id="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
+        <button onclick="location.reload()">Refresh</button>
+        <span class="wallet-info" id="wallet-info"></span>
+    </div>
+
+    <div class="mainnet">
+        <h2>Ethereum Mainnet</h2>
+        <div class="number" id="mainnet-block">Loading...</div>
+        <div id="mainnet-address"></div>
+    </div>
+
+    <h2>Oracle Status</h2>
+    <table id="oracle-table">
+        <thead>
+            <tr>
+                <th>Chain</th>
+                <th>Read</th>
+                <th>Block</th>
+                <th>Header</th>
+                <th>Contracts</th>
+                <th style="width: 140px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="oracle-tbody">
+            <tr><td colspan="6">Loading...</td></tr>
+        </tbody>
+    </table>
+
+    <!-- Modal for broadcast destinations -->
+    <div id="peerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Select Broadcast Destinations</h3>
+                <button class="modal-close" onclick="closePeerModal()">&times;</button>
+            </div>
+            <button class="flip-btn" onclick="flipAllPeers()">Flip All</button>
+            <div id="peerList"></div>
+            <div class="total-cost">
+                <span>Total Cost:</span>
+                <span id="totalCost" class="peer-cost">0 ETH</span>
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button onclick="closePeerModal()">Cancel</button>
+                <button onclick="proceedWithBroadcast()">Confirm Broadcast</button>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script>
+        // Configuration
+        const DEPLOYMENTS_URL = '../scripts/deployment/deployment_state.json';
+        const CHAINS_URL = '../scripts/chain-parse/chains.json';
+        const LZ_METADATA_URL = 'https://metadata.layerzero-api.com/v1/metadata/deployments';
+
+        // Explorer URLs
+        const EXPLORERS = {
+            ethereum: 'https://etherscan.io/address/',
+            arbitrum: 'https://arbiscan.io/address/',
+            optimism: 'https://optimistic.etherscan.io/address/',
+            polygon: 'https://polygonscan.com/address/',
+            avalanche: 'https://snowscan.xyz/address/',
+            bsc: 'https://bscscan.com/address/',
+            fantom: 'https://ftmscan.com/address/',
+            base: 'https://basescan.org/address/',
+            gnosis: 'https://gnosisscan.io/address/',
+            celo: 'https://celoscan.io/address/',
+            moonbeam: 'https://moonscan.io/address/',
+            mantle: 'https://explorer.mantle.xyz/address/',
+            fraxtal: 'https://fraxscan.com/address/',
+            taiko: 'https://taikoscan.io/address/',
+            sonic: 'https://sonicscan.org/address/',
+            xlayer: 'https://www.oklink.com/x-layer/address/',
+            kava: 'https://kavascan.com/address/',
+            aurora: 'https://explorer.aurora.dev/address/',
+            xdc: 'https://xdcscan.com/address/',
+            tac: 'https://explorer.tac.build/address/',
+            hyperliquid: 'https://purrsec.com/explorer/address/',
+            ink: 'https://explorer.inkonchain.com/address/',
+            plume_phoenix: 'https://explorer.plumenetwork.xyz/address/',
+            mp1: 'https://cornscan.io/address/'
+        };
+
+        // Contract ABIs
+        const ORACLE_ABI = [
+            "function last_confirmed_block_number() view returns (uint256)",
+            "function last_confirmed_header() view returns (bytes32, bytes32, bytes32, bytes32, uint256, uint256)"
+        ];
+
+        const RELAY_ABI = [
+            "function quote_read_fee(uint128 gas, uint128 value) view returns (uint256)",
+            "function quote_broadcast_fees(uint32[] eids, uint128 gas) view returns (uint256[])",
+            "function request_block_hash(uint32[] receive_eids, uint256[] amounts, uint128 gas, uint128 read_gas) payable",
+            "function peers(uint32) view returns (bytes32)",
+            "function read_enabled() view returns (bool)",
+            "function mainnet_eid() view returns (uint32)"
+        ];
+
+        const HEADER_VERIFIER_ABI = [
+            "function submit_block_header(address oracle, bytes header) returns (bool)"
+        ];
+
+        // Global state
+        let mainnetBlock = 0;
+        let walletConnected = false;
+        let provider = null;
+        let signer = null;
+        let deployments = {};
+        let chains = {};
+        let lzMetadata = {};
+        let peerCache = {};
+        let currentBroadcastData = null;
+
+        // Format address
+        function formatAddress(addr) {
+            return `${addr.slice(0, 12)}...${addr.slice(-5)}`;
+        }
+
+        // Get explorer link
+        function explorerLink(chain, addr) {
+            const base = EXPLORERS[chain] || 'https://blockscan.com/address/';
+            return `<a href="${base}${addr}" target="_blank">${formatAddress(addr)}</a>`;
+        }
+
+        // Calculate time ago
+        function timeAgo(blockNum) {
+            if (!mainnetBlock || blockNum <= 0) return '';
+            const diff = mainnetBlock - blockNum;
+            const seconds = diff * 12;
+            if (seconds < 60) return `${seconds}s ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            return `${days}d${hours}h ago`;
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    alert('Please install MetaMask');
+                    return;
+                }
+
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+
+                const address = await signer.getAddress();
+                walletConnected = true;
+
+                document.getElementById('wallet-btn').textContent = `${address.slice(0,6)}...${address.slice(-4)}`;
+                document.getElementById('wallet-btn').className = 'connected';
+                document.getElementById('wallet-btn').disabled = true;
+
+                const network = await provider.getNetwork();
+                document.getElementById('wallet-info').textContent = `Chain ID: ${network.chainId}`;
+
+                // Enable all action buttons
+                document.querySelectorAll('.tiny-btn').forEach(btn => {
+                    btn.disabled = false;
+                });
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                alert('Failed to connect wallet');
+            }
+        }
+
+        // Get chain EID from LZ metadata
+        function getChainEid(chainName) {
+            for (const [chainId, data] of Object.entries(lzMetadata)) {
+                if (data.chainKey === chainName) {
+                    const v2Deployment = data.deployments?.find(d => d.version === 2);
+                    if (v2Deployment && v2Deployment.eid) {
+                        return parseInt(v2Deployment.eid);
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Get chain name from EID
+        function getChainNameFromEid(eid) {
+            for (const [chainId, data] of Object.entries(lzMetadata)) {
+                const v2Deployment = data.deployments?.find(d => d.version === 2);
+                if (v2Deployment && parseInt(v2Deployment.eid) === eid) {
+                    return data.chainKey;
+                }
+            }
+            return null;
+        }
+
+        // Get peer EIDs
+        async function getPeerEids(chainName, relay) {
+            // Check cache
+            const cacheKey = `${chainName}_peers`;
+            const cached = peerCache[cacheKey];
+            if (cached && Date.now() - cached.timestamp < 300000) {
+                return cached.peers;
+            }
+
+            // Get mainnet EID to exclude
+            let mainnetEid;
+            try {
+                mainnetEid = await relay.mainnet_eid();
+            } catch {
+                mainnetEid = getChainEid('ethereum');
+            }
+
+            // Build potential peers
+            const potentialPeers = [];
+            for (const [peerChain, contracts] of Object.entries(deployments)) {
+                if (peerChain === chainName || peerChain === 'ethereum' || !contracts.LZBlockRelay) continue;
+
+                const peerEid = getChainEid(peerChain);
+                if (!peerEid || peerEid === mainnetEid) continue;
+
+                potentialPeers.push({ chain: peerChain, eid: peerEid });
+            }
+
+            // Check peers in parallel
+            const peerChecks = await Promise.allSettled(
+                potentialPeers.map(async ({ chain, eid }) => {
+                    try {
+                        const peer = await relay.peers(eid);
+                        if (peer !== '0x' + '00'.repeat(32)) {
+                            return parseInt(eid);
+                        }
+                        return null;
+                    } catch {
+                        return null;
+                    }
+                })
+            );
+
+            const peers = peerChecks
+                .filter(result => result.status === 'fulfilled' && result.value !== null)
+                .map(result => result.value);
+
+            // Cache result
+            peerCache[cacheKey] = { peers, timestamp: Date.now() };
+            return peers;
+        }
+
+        // Read and broadcast
+        async function readAndBroadcast(chainName) {
+            if (!walletConnected) {
+                alert('Please connect wallet first');
+                return;
+            }
+
+            const btn = document.getElementById(`broadcast-${chainName}`);
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+
+            try {
+                const contracts = deployments[chainName];
+                const chainConfig = chains[chainName];
+                const provider = new ethers.providers.JsonRpcProvider(chainConfig.public);
+                const relay = new ethers.Contract(contracts.LZBlockRelay, RELAY_ABI, provider);
+
+                // Get chain EID
+                const chainEid = getChainEid(chainName);
+                if (!chainEid) {
+                    alert('Chain EID not found');
+                    btn.disabled = false;
+                    btn.textContent = 'Broadcast';
+                    return;
+                }
+
+                // Get peer EIDs
+                const peerEids = await getPeerEids(chainName, relay);
+                if (peerEids.length === 0) {
+                    alert('No peers configured');
+                    btn.disabled = false;
+                    btn.textContent = 'Broadcast';
+                    return;
+                }
+
+                // Quote fees
+                const receiveGas = 150000;
+                const broadcastFees = await relay.quote_broadcast_fees(peerEids, receiveGas);
+
+                // Prepare peer data
+                const peerData = peerEids.map((eid, index) => {
+                    const chainName = getChainNameFromEid(eid);
+                    const fee = broadcastFees[index];
+                    const feeWithBuffer = ethers.BigNumber.from(fee).mul(101).div(100);
+                    return {
+                        eid,
+                        chainName: chainName || `EID ${eid}`,
+                        fee: feeWithBuffer,
+                        selected: true
+                    };
+                });
+
+                // Sort by fee (expensive first)
+                peerData.sort((a, b) => b.fee.gt(a.fee) ? 1 : -1);
+
+                // Store data for modal
+                currentBroadcastData = {
+                    chainName,
+                    contracts,
+                    chainConfig,
+                    relay,
+                    peerData,
+                    receiveGas,
+                    BROADCAST_GAS: 5000000
+                };
+
+                // Show modal
+                showPeerModal(peerData);
+
+            } catch (error) {
+                console.error('Broadcast error:', error);
+                alert('Failed: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Broadcast';
+            }
+        }
+
+        // Submit header
+        async function submitHeader(chainName) {
+            if (!walletConnected) {
+                alert('Please connect wallet first');
+                return;
+            }
+
+            const btn = document.getElementById(`submit-${chainName}`);
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const contracts = deployments[chainName];
+                const chainConfig = chains[chainName];
+
+                // Get block number from stored data
+                const blockNum = parseInt(btn.dataset.blockNum);
+
+                // Get block from mainnet
+                const ethProvider = new ethers.providers.JsonRpcProvider(chains.ethereum.public);
+                const blockHex = ethers.utils.hexValue(blockNum);
+                const block = await ethProvider.send('eth_getBlockByNumber', [blockHex, false]);
+
+                if (!block) {
+                    alert('Block not found on mainnet');
+                    btn.disabled = false;
+                    btn.textContent = 'Submit';
+                    return;
+                }
+
+                // Encode header
+                const encodedHeader = encodeBlockHeader(block);
+
+                // Switch network
+                const network = await signer.provider.getNetwork();
+                if (network.chainId !== chainConfig.chain_id) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x' + chainConfig.chain_id.toString(16) }],
+                        });
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+                        signer = web3Provider.getSigner();
+                    } catch (error) {
+                        if (error.code === 4902) {
+                            alert(`Please add ${chainName} network to your wallet`);
+                        } else {
+                            alert(`Please switch to ${chainName} network`);
+                        }
+                        btn.disabled = false;
+                        btn.textContent = 'Submit';
+                        return;
+                    }
+                }
+
+                // Submit header
+                const verifier = new ethers.Contract(
+                    contracts.HeaderVerifier,
+                    HEADER_VERIFIER_ABI,
+                    signer
+                );
+
+                const tx = await verifier.submit_block_header(
+                    contracts.BlockOracle,
+                    encodedHeader
+                );
+
+                btn.textContent = 'Confirming...';
+                await tx.wait();
+
+                alert('Header submitted successfully!');
+                location.reload();
+
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Failed: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Submit';
+            }
+        }
+
+        // Encode block header
+        function encodeBlockHeader(block) {
+            const toRlpNumber = (value) => {
+                let bn;
+                try {
+                    if (typeof value === 'string' && value.startsWith('0x')) {
+                        bn = ethers.BigNumber.from(value);
+                    } else {
+                        bn = ethers.BigNumber.from(value || 0);
+                    }
+                } catch (e) {
+                    bn = ethers.BigNumber.from(0);
+                }
+
+                if (bn.isZero()) {
+                    return "0x";
+                }
+
+                return bn.toHexString();
+            };
+
+            const fields = [
+                block.parentHash,
+                block.sha3Uncles || block.uncleHash || '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+                block.miner,
+                block.stateRoot,
+                block.transactionsRoot || block.transactionRoot,
+                block.receiptsRoot || block.receiptRoot,
+                block.logsBloom,
+                toRlpNumber(block.difficulty),
+                toRlpNumber(block.number),
+                toRlpNumber(block.gasLimit),
+                toRlpNumber(block.gasUsed),
+                toRlpNumber(block.timestamp),
+                block.extraData || block.proofOfAuthorityData || '0x',
+                block.mixHash || '0x0000000000000000000000000000000000000000000000000000000000000000',
+                block.nonce || '0x0000000000000000'
+            ];
+
+            // Add optional fields
+            if (block.baseFeePerGas !== undefined && block.baseFeePerGas !== null) {
+                fields.push(toRlpNumber(block.baseFeePerGas));
+            }
+            if (block.withdrawalsRoot && block.withdrawalsRoot !== '0x') {
+                fields.push(block.withdrawalsRoot);
+            }
+            if (block.blobGasUsed !== undefined && block.blobGasUsed !== null) {
+                fields.push(toRlpNumber(block.blobGasUsed));
+            }
+            if (block.excessBlobGas !== undefined && block.excessBlobGas !== null) {
+                fields.push(toRlpNumber(block.excessBlobGas));
+            }
+            if (block.parentBeaconBlockRoot && block.parentBeaconBlockRoot !== '0x') {
+                fields.push(block.parentBeaconBlockRoot);
+            }
+            if (block.requestsHash && block.requestsHash !== '0x') {
+                fields.push(block.requestsHash);
+            }
+
+            return ethers.utils.RLP.encode(fields);
+        }
+
+        // Modal functions
+        function showPeerModal(peerData) {
+            const modal = document.getElementById('peerModal');
+            const peerList = document.getElementById('peerList');
+
+            peerList.innerHTML = '';
+
+            peerData.forEach((peer, index) => {
+                const item = document.createElement('div');
+                item.className = 'peer-item';
+
+                // Create checkbox container
+                const checkboxDiv = document.createElement('div');
+
+                // Create checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'peer-' + index;
+                checkbox.checked = true;
+                checkbox.onchange = updateTotalCost;
+
+                // Create label
+                const label = document.createElement('label');
+                label.htmlFor = 'peer-' + index;
+                label.textContent = peer.chainName;
+
+                checkboxDiv.appendChild(checkbox);
+                checkboxDiv.appendChild(label);
+
+                // Create cost span
+                const costSpan = document.createElement('span');
+                costSpan.className = 'peer-cost';
+                costSpan.textContent = ethers.utils.formatEther(peer.fee) + ' ETH';
+
+                item.appendChild(checkboxDiv);
+                item.appendChild(costSpan);
+                peerList.appendChild(item);
+            });
+
+            updateTotalCost();
+            modal.className = 'modal active';
+        }
+
+        function closePeerModal() {
+            document.getElementById('peerModal').className = 'modal';
+            currentBroadcastData = null;
+        }
+
+        function flipAllPeers() {
+            const checkboxes = document.querySelectorAll('#peerList input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !checkbox.checked;
+            });
+            updateTotalCost();
+        }
+
+        async function updateTotalCost() {
+            if (!currentBroadcastData) return;
+
+            let total = ethers.BigNumber.from(0);
+            const checkboxes = document.querySelectorAll('#peerList input[type="checkbox"]');
+
+            checkboxes.forEach((checkbox, index) => {
+                if (checkbox.checked) {
+                    total = total.add(currentBroadcastData.peerData[index].fee);
+                }
+            });
+
+            try {
+                const broadcastGasUint128 = Math.min(currentBroadcastData.BROADCAST_GAS, 2**128 - 1);
+                const totalBroadcastFeeUint128 = total.gt(ethers.BigNumber.from(2).pow(128).sub(1))
+                    ? ethers.BigNumber.from(2).pow(128).sub(1)
+                    : total;
+
+                const totalFee = await currentBroadcastData.relay.quote_read_fee(
+                    broadcastGasUint128,
+                    totalBroadcastFeeUint128
+                );
+
+                document.getElementById('totalCost').textContent = ethers.utils.formatEther(totalFee) + ' ETH';
+            } catch (error) {
+                document.getElementById('totalCost').textContent = 'Error';
+            }
+        }
+
+        async function proceedWithBroadcast() {
+            if (!currentBroadcastData) return;
+
+            try {
+                // Get selected peers
+                const checkboxes = document.querySelectorAll('#peerList input[type="checkbox"]');
+                const selectedPeers = [];
+                const selectedFees = [];
+
+                checkboxes.forEach((checkbox, index) => {
+                    if (checkbox.checked) {
+                        selectedPeers.push(currentBroadcastData.peerData[index].eid);
+                        selectedFees.push(currentBroadcastData.peerData[index].fee);
+                    }
+                });
+
+                if (selectedPeers.length === 0) {
+                    alert('Please select at least one destination');
+                    return;
+                }
+
+                const totalBroadcastFee = selectedFees.reduce((sum, fee) => sum.add(fee), ethers.BigNumber.from(0));
+
+                // Calculate total fee
+                const broadcastGasUint128 = Math.min(currentBroadcastData.BROADCAST_GAS, 2**128 - 1);
+                const totalBroadcastFeeUint128 = totalBroadcastFee.gt(ethers.BigNumber.from(2).pow(128).sub(1))
+                    ? ethers.BigNumber.from(2).pow(128).sub(1)
+                    : totalBroadcastFee;
+
+                const totalFee = await currentBroadcastData.relay.quote_read_fee(
+                    broadcastGasUint128,
+                    totalBroadcastFeeUint128
+                );
+
+                // Switch network
+                const network = await signer.provider.getNetwork();
+                if (network.chainId !== currentBroadcastData.chainConfig.chain_id) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x' + currentBroadcastData.chainConfig.chain_id.toString(16) }],
+                        });
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+                        signer = web3Provider.getSigner();
+                    } catch (error) {
+                        if (error.code === 4902) {
+                            alert(`Please add ${currentBroadcastData.chainName} network to your wallet`);
+                        } else {
+                            alert(`Please switch to ${currentBroadcastData.chainName} network`);
+                        }
+                        return;
+                    }
+                }
+
+                // Send transaction
+                const relayWithSigner = new ethers.Contract(currentBroadcastData.contracts.LZBlockRelay, RELAY_ABI, signer);
+                const tx = await relayWithSigner.request_block_hash(
+                    selectedPeers,
+                    selectedFees,
+                    currentBroadcastData.receiveGas,
+                    currentBroadcastData.BROADCAST_GAS,
+                    { value: totalFee, gasLimit: 5000000 }
+                );
+
+                closePeerModal();
+                alert('Transaction sent: ' + tx.hash);
+
+                await tx.wait();
+                alert('Broadcast successful!');
+                location.reload();
+
+            } catch (error) {
+                console.error('Broadcast error:', error);
+                alert('Transaction failed: ' + error.message);
+            }
+        }
+
+        // Load everything
+        async function loadData() {
+            try {
+                // Fetch config files
+                const [depRes, chainsRes, lzRes] = await Promise.all([
+                    fetch(DEPLOYMENTS_URL),
+                    fetch(CHAINS_URL),
+                    fetch(LZ_METADATA_URL)
+                ]);
+
+                const depData = await depRes.json();
+                deployments = depData.deployments.mainnets || {};
+                chains = (await chainsRes.json()).mainnets || {};
+                lzMetadata = await lzRes.json();
+
+                // Get mainnet block
+                if (chains.ethereum?.public) {
+                    try {
+                        const provider = new ethers.providers.JsonRpcProvider(chains.ethereum.public);
+                        mainnetBlock = await provider.getBlockNumber();
+                        document.getElementById('mainnet-block').textContent = mainnetBlock.toLocaleString();
+                    } catch (e) {
+                        document.getElementById('mainnet-block').textContent = 'Error';
+                    }
+                }
+
+                // Show mainnet address
+                if (deployments.ethereum?.MainnetBlockView) {
+                    document.getElementById('mainnet-address').innerHTML =
+                        `View: ${explorerLink('ethereum', deployments.ethereum.MainnetBlockView)}`;
+                }
+
+                // Build table rows
+                const tbody = document.getElementById('oracle-tbody');
+                tbody.innerHTML = '';
+
+                // Initialize chain data for sorting
+                window.chainData = {};
+
+                // Process each chain
+                for (const [chainName, contracts] of Object.entries(deployments)) {
+                    if (chainName === 'ethereum' || !contracts.BlockOracle) continue;
+
+                    const row = document.createElement('tr');
+                    const chain = chains[chainName] || {};
+
+                    // Chain name
+                    const chainCell = document.createElement('td');
+                    chainCell.textContent = chainName;
+                    row.appendChild(chainCell);
+
+                    // Read enabled status
+                    const readCell = document.createElement('td');
+                    readCell.id = `read-${chainName}`;
+                    readCell.innerHTML = '<span class="loading">...</span>';
+                    row.appendChild(readCell);
+
+                    // Block number
+                    const blockCell = document.createElement('td');
+                    blockCell.innerHTML = '<span class="loading">...</span>';
+                    row.appendChild(blockCell);
+
+                    // Header block
+                    const headerCell = document.createElement('td');
+                    headerCell.innerHTML = '<span class="loading">...</span>';
+                    row.appendChild(headerCell);
+
+                    // Contract links
+                    const contractCell = document.createElement('td');
+                    const links = [];
+                    if (contracts.BlockOracle) links.push(explorerLink(chainName, contracts.BlockOracle));
+                    if (contracts.LZBlockRelay) links.push(explorerLink(chainName, contracts.LZBlockRelay));
+                    if (contracts.HeaderVerifier) links.push(explorerLink(chainName, contracts.HeaderVerifier));
+                    contractCell.innerHTML = links.join(' | ');
+                    row.appendChild(contractCell);
+
+                    // Actions (always show buttons, disabled if wallet not connected)
+                    const actionCell = document.createElement('td');
+                    actionCell.style.textAlign = 'right';
+                    actionCell.setAttribute('data-chain', chainName);
+
+                    // Always create header button (will be enabled/disabled based on data)
+                    const headerBtn = document.createElement('button');
+                    headerBtn.className = 'tiny-btn';
+                    headerBtn.id = 'submit-' + chainName;
+                    headerBtn.textContent = 'Header';
+                    headerBtn.disabled = true; // Start disabled, enable when conditions are met
+                    headerBtn.onclick = function() { submitHeader(chainName); };
+                    actionCell.appendChild(headerBtn);
+
+                    // Broadcast button will be added only for read-enabled chains
+
+                    row.appendChild(actionCell);
+
+                    tbody.appendChild(row);
+
+                    // Fetch chain data async
+                    if (chain.public) {
+                        fetchChainData(chainName, chain.public, contracts, blockCell, headerCell, readCell);
+                    } else {
+                        readCell.innerHTML = '<span class="error">-</span>';
+                        blockCell.innerHTML = '<span class="error">No RPC</span>';
+                        headerCell.innerHTML = '<span class="error">No RPC</span>';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load:', error);
+                document.getElementById('oracle-tbody').innerHTML =
+                    '<tr><td colspan="6" class="error">Failed to load data</td></tr>';
+            }
+        }
+
+        // Sort table rows
+        function sortTable() {
+            const tbody = document.getElementById('oracle-tbody');
+            const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+            rows.sort((a, b) => {
+                const aName = a.cells[0].textContent;
+                const bName = b.cells[0].textContent;
+                const aData = window.chainData[aName];
+                const bData = window.chainData[bName];
+
+                if (!aData || !bData) return 0;
+
+                // First sort by read-enabled (true first)
+                if (aData.readEnabled !== bData.readEnabled) {
+                    return aData.readEnabled ? -1 : 1;
+                }
+
+                // Then by block freshness (higher block number first)
+                if (aData.lastBlock !== bData.lastBlock) {
+                    return bData.lastBlock - aData.lastBlock;
+                }
+
+                // Finally alphabetically
+                return aName.localeCompare(bName);
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Fetch data for a single chain
+        async function fetchChainData(chainName, rpc, contracts, blockCell, headerCell, readCell) {
+            try {
+                const provider = new ethers.providers.JsonRpcProvider(rpc);
+                const oracle = new ethers.Contract(contracts.BlockOracle, ORACLE_ABI, provider);
+
+                // Get last block
+                const lastBlockNum = await oracle.last_confirmed_block_number();
+                const lastBlock = lastBlockNum.toNumber();
+                blockCell.innerHTML = `${lastBlock.toLocaleString()} <small>(${timeAgo(lastBlock)})</small>`;
+
+                // Get last header
+                let lastHeaderBlock = 0;
+                let readEnabled = false;
+
+                try {
+                    const lastHeader = await oracle.last_confirmed_header();
+                    if (lastHeader && lastHeader[4]) {
+                        lastHeaderBlock = lastHeader[4].toNumber();
+                    }
+                } catch (e) {
+                    // No header
+                }
+
+                // Check if read enabled
+                if (contracts.LZBlockRelay) {
+                    try {
+                        const relay = new ethers.Contract(contracts.LZBlockRelay, RELAY_ABI, provider);
+                        readEnabled = await relay.read_enabled();
+                    } catch {}
+                }
+
+                if (lastHeaderBlock > 0) {
+                    const isOutdated = lastHeaderBlock < lastBlock;
+                    headerCell.innerHTML =
+                        `<span class="${isOutdated ? 'outdated' : ''}">${lastHeaderBlock.toLocaleString()}</span> ` +
+                        `<small>(${timeAgo(lastHeaderBlock)})</small>`;
+                } else {
+                    headerCell.innerHTML = '<span class="error">None</span>';
+                }
+
+                // Update read enabled cell
+                if (readCell) {
+                    readCell.innerHTML = readEnabled ? '✓' : '-';
+                    readCell.style.color = readEnabled ? '#10b981' : '#666';
+                    readCell.style.textAlign = 'center';
+                }
+
+                // Store chain data for sorting
+                if (!window.chainData) window.chainData = {};
+                window.chainData[chainName] = {
+                    readEnabled: readEnabled,
+                    lastBlock: lastBlock,
+                    loaded: true
+                };
+
+                // Re-sort table when data loads
+                sortTable();
+
+                // Update button states based on capabilities
+                const actionCell = document.querySelector(`td[data-chain="${chainName}"]`);
+                if (actionCell) {
+                    // Add broadcast button if read enabled and not already there
+                    if (readEnabled && contracts.LZBlockRelay && !document.getElementById(`broadcast-${chainName}`)) {
+                        const broadcastBtn = document.createElement('button');
+                        broadcastBtn.className = 'tiny-btn';
+                        broadcastBtn.id = 'broadcast-' + chainName;
+                        broadcastBtn.textContent = 'Broadcast';
+                        broadcastBtn.disabled = !walletConnected;
+                        broadcastBtn.onclick = function() { readAndBroadcast(chainName); };
+                        // Insert before header button
+                        actionCell.insertBefore(broadcastBtn, actionCell.firstChild);
+                    }
+
+                    // Update header button state
+                    const headerBtn = document.getElementById(`submit-${chainName}`);
+                    if (headerBtn) {
+                        const canSubmit = lastHeaderBlock < lastBlock && contracts.HeaderVerifier;
+                        headerBtn.disabled = !walletConnected || !canSubmit;
+                        if (canSubmit) {
+                            headerBtn.dataset.blockNum = lastBlock;
+                        }
+                    }
+                }
+            } catch (error) {
+                blockCell.innerHTML = '<span class="error">Error</span>';
+                headerCell.innerHTML = '<span class="error">Error</span>';
+            }
+        }
+
+        // Load on start
+        loadData();
+    </script>
+</body>
+</html>
