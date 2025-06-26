@@ -341,7 +341,7 @@
 
                 // Try to load LZ metadata
                 try {
-                    const metadataRes = await fetch(`${GITHUB_RAW_BASE}/scripts/deployment/lz_metadata.json`);
+                    const metadataRes = await fetch(`https://metadata.layerzero-api.com/v1/metadata/deployments`);
                     if (metadataRes.ok) {
                         lzMetadata = await metadataRes.json();
                     }
