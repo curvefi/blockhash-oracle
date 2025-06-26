@@ -27,7 +27,9 @@ def encode_headers(block_data):
         block_data["gasLimit"],  # 10. gasLimit
         block_data["gasUsed"],  # 11. gasUsed
         block_data["timestamp"],  # 12. timestamp
-        block_data["extraData"],  # 13. extraData
+        block_data.get(
+            "extraData", block_data["proofOfAuthorityData"]
+        ),  # 13. extraData or proofOfAuthorityData
         block_data["mixHash"],  # 14. mixHash
         block_data["nonce"],  # 15. nonce (8 bytes)
     ]
