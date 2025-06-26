@@ -2,324 +2,54 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Curve Blockhash Oracle Status</title>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blockhash Oracle Status - Minimal</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: monospace;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
             background: #0a0a0a;
             color: #fff;
-            padding: 20px;
-            line-height: 1.6;
         }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 15px 20px;
-            background: #1a1a1a;
-            border-radius: 8px;
-            border: 1px solid #333;
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: 500;
-        }
-
+        h1 { font-size: 2em; margin-bottom: 0.5em; }
+        h2 { font-size: 1.5em; margin-top: 1em; }
+        a { color: #6366f1; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+        th, td { text-align: left; padding: 8px; border: 1px solid #333; }
+        th { background: #1a1a1a; }
+        td { background: #0a0a0a; }
+        .mainnet { background: #1a1a1a; padding: 1em; margin: 1em 0; border: 1px solid #333; border-radius: 8px; }
+        .number { font-size: 2em; font-weight: bold; color: #6366f1; }
+        .error { color: #ef4444; }
+        .outdated { color: #f59e0b; }
+        .loading { color: #888; }
         button {
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
             background: #6366f1;
             color: white;
             border: none;
-            padding: 10px 20px;
             border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
+            margin: 2px;
         }
-
         button:hover { background: #5558e3; }
-        button:disabled { background: #444; cursor: not-allowed; }
-
-        .broadcast-btn {
-            background: #10b981;
-            padding: 6px 12px;
-            font-size: 12px;
-            margin-top: 8px;
-        }
-
-        .broadcast-btn:hover { background: #0ea968; }
-        .broadcast-btn:disabled { background: #444; }
-
-        .main-block {
-            text-align: center;
-            padding: 15px;
-            background: #1a1a1a;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #333;
-        }
-
-        .main-block .number {
-            font-size: 28px;
-            font-weight: bold;
-            color: #6366f1;
-        }
-
-        .main-block .contract-info {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #888;
-        }
-
-        .main-block .contract-info a {
-            color: #6366f1;
-            text-decoration: none;
-        }
-
-        .main-block .contract-info a:hover {
-            text-decoration: underline;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 15px;
-        }
-
-        .chain {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 12px 15px;
-            transition: transform 0.2s, border-color 0.2s;
-        }
-
-        .chain:hover {
-            transform: translateY(-1px);
-            border-color: #444;
-        }
-
-        .chain-name {
-            font-size: 16px;
-            font-weight: 500;
-            margin-bottom: 4px;
-            text-transform: capitalize;
-        }
-
-        .contract-links {
-            font-size: 11px;
-            color: #666;
-            margin-bottom: 8px;
-        }
-
-        .contract-links a {
-            color: #888;
-            text-decoration: none;
-            margin-right: 8px;
-        }
-
-        .contract-links a:hover {
-            color: #6366f1;
-            text-decoration: underline;
-        }
-
-        .chain-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 4px;
-        }
-
-        .action-btn {
-            background: #10b981;
-            padding: 4px 8px;
-            font-size: 11px;
-            border-radius: 4px;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-
-        .action-btn:hover { background: #0ea968; }
-        .action-btn:disabled { background: #444; }
-
-        .submit-header-btn {
-            background: #3b82f6;
-        }
-
-        .submit-header-btn:hover { background: #2563eb; }
-
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 4px 0;
-            font-size: 13px;
-            align-items: baseline;
-        }
-
-        .label { color: #888; font-size: 12px; }
-        .value { font-family: monospace; font-size: 12px; text-align: right; }
-        .time { color: #f59e0b; font-size: 11px; }
-        .error { color: #ef4444; font-size: 12px; }
-        .loading { color: #888; font-style: italic; font-size: 12px; }
-        .outdated { color: #f59e0b; }
-
-        .wallet-info {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 6px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .wallet-info.connected { display: block; }
-
-        .status {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.8);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #1a1a1a;
-            padding: 20px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 85vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .modal-header h2 {
-            margin: 0;
-            font-size: 18px;
-        }
-
-        .close {
-            color: #888;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            line-height: 20px;
-        }
-
-        .close:hover { color: #fff; }
-
-        .peer-list {
-            margin: 10px 0;
-        }
-
-        .peer-controls {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 10px;
-        }
-
-        .flip-all-btn {
+        button:disabled {
             background: #444;
-            padding: 5px 12px;
-            font-size: 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-            color: white;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
-
-        .flip-all-btn:hover { background: #555; }
-
-        .peer-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 10px;
-            margin: 3px 0;
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 4px;
+        /* Tiny buttons */
+        .tiny-btn {
+            font-size: 11px;
+            padding: 2px 6px;
+            margin: 1px;
         }
-
-        .peer-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-        }
-
-        .peer-cost {
-            color: #10b981;
-            font-family: monospace;
-            font-size: 12px;
-        }
-
-        .total-cost {
-            margin-top: 15px;
-            padding: 12px;
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 6px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 14px;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            justify-content: flex-end;
-        }
-
-        .modal-buttons button {
-            padding: 8px 16px;
-            font-size: 13px;
-        }
-
+        small { color: #888; }
+        hr { border: 1px solid #333; }
         .notice {
             background: #f59e0b20;
             border: 1px solid #f59e0b;
@@ -331,59 +61,54 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Blockhash Oracle Status</h1>
-            <div style="display: flex; gap: 10px;">
-                <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
-                <button id="refresh-btn" onclick="refreshData()">Refresh</button>
-            </div>
-        </header>
+    <h1>Blockhash Oracle Status</h1>
+    <p>Minimal dashboard - GitHub Pages version.</p>
 
-        <div class="notice">
-            <p>⚠️ This is a read-only GitHub Pages version. Write functionality is disabled.</p>
-            <p>For full functionality, clone the repository and run locally.</p>
-        </div>
-
-        <div class="main-block">
-            <div>Ethereum Mainnet</div>
-            <div class="number" id="main-block">-</div>
-            <div class="contract-info" id="mainnet-contract-info"></div>
-        </div>
-
-        <div class="grid" id="chains-grid"></div>
+    <div>
+        <button disabled title="Wallet connection is disabled on GitHub Pages">Connect Wallet</button>
+        <button onclick="location.reload()">Refresh</button>
     </div>
 
-    <div class="status" id="status"></div>
-    <div class="wallet-info" id="wallet-info"></div>
-
-    <div class="modal" id="peerModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Select Broadcast Destinations</h2>
-                <span class="close" onclick="closePeerModal()">&times;</span>
-            </div>
-            <div class="peer-list" id="peerList"></div>
-            <div class="total-cost">
-                <span>Total Cost:</span>
-                <span id="totalCost" class="peer-cost">0 ETH</span>
-            </div>
-            <div class="modal-buttons">
-                <button onclick="closePeerModal()">Cancel</button>
-                <button id="confirmBroadcast" onclick="proceedWithBroadcast()">Confirm Broadcast</button>
-            </div>
-        </div>
+    <div class="notice">
+        <p>⚠️ This is a read-only GitHub Pages version. Transaction features are disabled.</p>
+        <p>For full functionality, clone the repository and run locally.</p>
     </div>
 
+    <div class="mainnet">
+        <h2>Ethereum Mainnet</h2>
+        <div class="number" id="mainnet-block">Loading...</div>
+        <div id="mainnet-address"></div>
+    </div>
+
+    <h2>Oracle Status</h2>
+    <table id="oracle-table">
+        <thead>
+            <tr>
+                <th>Chain</th>
+                <th>Read</th>
+                <th>Block</th>
+                <th>Header</th>
+                <th>Contracts</th>
+                <th style="width: 140px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="oracle-tbody">
+            <tr><td colspan="6">Loading...</td></tr>
+        </tbody>
+    </table>
+
+    <hr>
+    <p><small>Minimal HTML dashboard. Transaction features require local hosting.</small></p>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script>
         // GitHub Pages URLs
         const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/curvefi/blockhash-oracle/main';
         const DEPLOYMENT_URL = `${GITHUB_RAW_BASE}/scripts/deployment/deployment_state.json`;
         const CHAINS_URL = `${GITHUB_RAW_BASE}/scripts/chain-parse/chains.json`;
-        const TIMEOUT = 10000;
 
-        // Block explorer URLs
-        const EXPLORER_URLS = {
+        // Explorer URLs
+        const EXPLORERS = {
             ethereum: 'https://etherscan.io/address/',
             arbitrum: 'https://arbiscan.io/address/',
             optimism: 'https://optimistic.etherscan.io/address/',
@@ -395,329 +120,284 @@
             gnosis: 'https://gnosisscan.io/address/',
             celo: 'https://celoscan.io/address/',
             moonbeam: 'https://moonscan.io/address/',
-            xdc: 'https://xdcscan.com/address/',
             mantle: 'https://explorer.mantle.xyz/address/',
             fraxtal: 'https://fraxscan.com/address/',
             taiko: 'https://taikoscan.io/address/',
             sonic: 'https://sonicscan.org/address/',
             xlayer: 'https://www.oklink.com/x-layer/address/',
-            tac: 'https://explorer.tac.build/address/',
             kava: 'https://kavascan.com/address/',
             aurora: 'https://explorer.aurora.dev/address/',
-            hyperliquid: 'https://purrsec.com/explorer/address/',
-            ink: 'https://explorer.inkonchain.com/address/',
-            plume_phoenix: 'https://explorer.plumenetwork.xyz/address/',
-            mp1: 'https://cornscan.io/address/'
         };
 
+        // ABIs
         const ORACLE_ABI = [
             "function last_confirmed_block_number() view returns (uint256)",
-            "function block_header(uint256) view returns (bytes32, bytes32, bytes32, bytes32, uint256, uint256)",
             "function last_confirmed_header() view returns (bytes32, bytes32, bytes32, bytes32, uint256, uint256)"
         ];
 
         const RELAY_ABI = [
-            "function quote_read_fee(uint128 gas, uint128 value) view returns (uint256)",
-            "function quote_broadcast_fees(uint32[] eids, uint128 gas) view returns (uint256[])",
-            "function request_block_hash(uint32[] receive_eids, uint256[] amounts, uint128 gas, uint128 read_gas) payable",
-            "function peers(uint32) view returns (bytes32)",
-            "function read_enabled() view returns (bool)",
-            "function mainnet_eid() view returns (uint32)"
+            "function read_enabled() view returns (bool)"
         ];
 
-        const HEADER_VERIFIER_ABI = [
-            "function submit_block_header(address oracle, bytes header) returns (bool)"
-        ];
+        let mainnetBlock = 0;
 
-        let deployments = null;
-        let chains = null;
-        let lzMetadata = null;
-        let mainBlock = 0;
-        let provider = null;
-        let signer = null;
-        let walletConnected = false;
-        const peerCache = {}; // Cache peer EIDs per chain
-        let currentBroadcastData = null; // Store broadcast data for modal
+        // Format address
+        function formatAddress(addr) {
+            return `${addr.slice(0, 12)}...${addr.slice(-5)}`;
+        }
 
-        async function init() {
+        // Get explorer link
+        function explorerLink(chain, addr) {
+            const base = EXPLORERS[chain] || 'https://blockscan.com/address/';
+            return `<a href="${base}${addr}" target="_blank">${formatAddress(addr)}</a>`;
+        }
+
+        // Calculate time ago
+        function timeAgo(blockNum) {
+            if (!mainnetBlock || blockNum <= 0) return '';
+            const diff = mainnetBlock - blockNum;
+            const seconds = diff * 12;
+            if (seconds < 60) return `${seconds}s ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            return `${days}d${hours}h ago`;
+        }
+
+        // Sort table rows
+        function sortTable() {
+            const tbody = document.getElementById('oracle-tbody');
+            const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+            rows.sort((a, b) => {
+                const aName = a.cells[0].textContent;
+                const bName = b.cells[0].textContent;
+                const aData = window.chainData[aName];
+                const bData = window.chainData[bName];
+
+                if (!aData || !bData) return 0;
+
+                // First sort by read-enabled (true first)
+                if (aData.readEnabled !== bData.readEnabled) {
+                    return aData.readEnabled ? -1 : 1;
+                }
+
+                // Then by block freshness (higher block number first)
+                if (aData.lastBlock !== bData.lastBlock) {
+                    return bData.lastBlock - aData.lastBlock;
+                }
+
+                // Finally alphabetically
+                return aName.localeCompare(bName);
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Load everything
+        async function loadData() {
             try {
-                setStatus('Loading...');
-
-                // Load config files
-                const [depResp, chainsResp, lzResp] = await Promise.all([
+                // Fetch config files
+                const [depRes, chainsRes] = await Promise.all([
                     fetch(DEPLOYMENT_URL),
-                    fetch(CHAINS_URL),
-                    fetch('https://metadata.layerzero-api.com/v1/metadata/deployments')
+                    fetch(CHAINS_URL)
                 ]);
 
-                const depData = await depResp.json();
-                const chainsData = await chainsResp.json();
-                lzMetadata = await lzResp.json();
+                const deployments = (await depRes.json()).deployments.mainnets || {};
+                const chains = (await chainsRes.json()).mainnets || {};
 
-                deployments = depData.deployments.mainnets || {};
-                chains = chainsData.mainnets || {};
-
-                await refreshData();
-            } catch (error) {
-                console.error('Init error:', error);
-                setStatus('Failed to load', true);
-            }
-        }
-
-        async function refreshData() {
-            const btn = document.getElementById('refresh-btn');
-            btn.disabled = true;
-            setStatus('Updating...');
-
-            try {
-                // Clear and create all chain cards immediately
-                const grid = document.getElementById('chains-grid');
-                grid.innerHTML = '';
-
-                const chainList = Object.entries(deployments)
-                    .filter(([name, contracts]) => name !== 'ethereum' && contracts.BlockOracle)
-                    .sort(([a], [b]) => a.localeCompare(b));
-
-                // Create cards with loading state
-                const cards = {};
-                chainList.forEach(([chainName]) => {
-                    const card = createChainCard(chainName, { loading: true });
-                    cards[chainName] = card;
-                    grid.appendChild(card);
-                });
-
-                // Get Ethereum block first (needed for age calculation)
-                // Only fetch if we don't have it or it's been more than 1 minute
-                const now = Date.now();
-                if (chains.ethereum?.public && (!mainBlock || now - window.lastMainBlockFetch > 60000)) {
+                // Get mainnet block
+                if (chains.ethereum?.public) {
                     try {
                         const provider = new ethers.providers.JsonRpcProvider(chains.ethereum.public);
-                        mainBlock = await withTimeout(provider.getBlockNumber(), TIMEOUT);
-                        window.lastMainBlockFetch = now;
-                        document.getElementById('main-block').textContent = mainBlock.toLocaleString();
-                    } catch (error) {
-                        document.getElementById('main-block').textContent = 'Error';
+                        mainnetBlock = await provider.getBlockNumber();
+                        document.getElementById('mainnet-block').textContent = mainnetBlock.toLocaleString();
+                    } catch (e) {
+                        document.getElementById('mainnet-block').textContent = 'Error';
                     }
                 }
 
-                // Update MainnetBlockView address if available
+                // Show mainnet address
                 if (deployments.ethereum?.MainnetBlockView) {
-                    const address = deployments.ethereum.MainnetBlockView;
-                    const explorerUrl = getExplorerUrl('ethereum', address);
-                    document.getElementById('mainnet-contract-info').innerHTML =
-                        `View: <a href="${explorerUrl}" target="_blank">${formatAddress(address, true)}</a>`;
+                    document.getElementById('mainnet-address').innerHTML =
+                        `View: ${explorerLink('ethereum', deployments.ethereum.MainnetBlockView)}`;
                 }
 
-                // Fetch all chain data in parallel and update cards as results come in
-                chainList.forEach(async ([chainName, contracts]) => {
-                    try {
-                        const data = await fetchChainData(chainName, contracts);
-                        updateChainCard(cards[chainName], chainName, data);
-                    } catch (error) {
-                        updateChainCard(cards[chainName], chainName, { error: 'Failed' });
-                    }
-                });
+                // Build table rows
+                const tbody = document.getElementById('oracle-tbody');
+                tbody.innerHTML = '';
 
-                setStatus(`Updated at ${new Date().toLocaleTimeString()}`);
+                // Initialize chain data for sorting
+                window.chainData = {};
+
+                // Process each chain
+                const chainList = [];
+                for (const [chainName, contracts] of Object.entries(deployments)) {
+                    if (chainName === 'ethereum' || !contracts.BlockOracle) continue;
+                    chainList.push({ chainName, contracts });
+                }
+
+                // Initial alphabetical sort
+                chainList.sort((a, b) => a.chainName.localeCompare(b.chainName));
+
+                // Create rows
+                for (const { chainName, contracts } of chainList) {
+                    const row = document.createElement('tr');
+                    const chain = chains[chainName] || {};
+
+                    // Chain name
+                    const chainCell = document.createElement('td');
+                    chainCell.textContent = chainName;
+                    row.appendChild(chainCell);
+
+                    // Read enabled status
+                    const readCell = document.createElement('td');
+                    readCell.id = `read-${chainName}`;
+                    readCell.innerHTML = '<span class="loading">...</span>';
+                    row.appendChild(readCell);
+
+                    // Block number
+                    const blockCell = document.createElement('td');
+                    blockCell.innerHTML = '<span class="loading">...</span>';
+                    row.appendChild(blockCell);
+
+                    // Header block
+                    const headerCell = document.createElement('td');
+                    headerCell.innerHTML = '<span class="loading">...</span>';
+                    row.appendChild(headerCell);
+
+                    // Contract links
+                    const contractCell = document.createElement('td');
+                    const links = [];
+                    if (contracts.BlockOracle) links.push(explorerLink(chainName, contracts.BlockOracle));
+                    if (contracts.LZBlockRelay) links.push(explorerLink(chainName, contracts.LZBlockRelay));
+                    if (contracts.HeaderVerifier) links.push(explorerLink(chainName, contracts.HeaderVerifier));
+                    contractCell.innerHTML = links.join(' | ');
+                    row.appendChild(contractCell);
+
+                    // Actions (always show buttons, but disabled with tooltip)
+                    const actionCell = document.createElement('td');
+                    actionCell.style.textAlign = 'right';
+                    actionCell.setAttribute('data-chain', chainName);
+
+                    // Always create header button
+                    const headerBtn = document.createElement('button');
+                    headerBtn.className = 'tiny-btn';
+                    headerBtn.textContent = 'Header';
+                    headerBtn.disabled = true;
+                    headerBtn.title = 'Submit header is disabled on GitHub Pages';
+                    actionCell.appendChild(headerBtn);
+
+                    row.appendChild(actionCell);
+
+                    tbody.appendChild(row);
+
+                    // Initialize chain data
+                    window.chainData[chainName] = {
+                        readEnabled: false,
+                        lastBlock: 0,
+                        loaded: false
+                    };
+
+                    // Fetch chain data async
+                    if (chain.public) {
+                        fetchChainData(chainName, chain.public, contracts, blockCell, headerCell, readCell);
+                    } else {
+                        readCell.innerHTML = '<span class="error">-</span>';
+                        blockCell.innerHTML = '<span class="error">No RPC</span>';
+                        headerCell.innerHTML = '<span class="error">No RPC</span>';
+                    }
+                }
             } catch (error) {
-                console.error('Refresh error:', error);
-                setStatus('Update failed', true);
-            } finally {
-                btn.disabled = false;
+                console.error('Failed to load:', error);
+                document.getElementById('oracle-tbody').innerHTML =
+                    '<tr><td colspan="6" class="error">Failed to load data</td></tr>';
             }
         }
 
-        async function fetchChainData(chainName, contracts) {
-            const chainConfig = chains[chainName];
-            if (!chainConfig?.public) {
-                return { error: 'No RPC' };
-            }
-
+        // Fetch data for a single chain
+        async function fetchChainData(chainName, rpc, contracts, blockCell, headerCell, readCell) {
             try {
-                const provider = new ethers.providers.JsonRpcProvider(chainConfig.public);
+                const provider = new ethers.providers.JsonRpcProvider(rpc);
                 const oracle = new ethers.Contract(contracts.BlockOracle, ORACLE_ABI, provider);
 
-                const lastBlockNum = await withTimeout(oracle.last_confirmed_block_number(), TIMEOUT);
+                // Get last block
+                const lastBlockNum = await oracle.last_confirmed_block_number();
                 const lastBlock = lastBlockNum.toNumber();
+                blockCell.innerHTML = `${lastBlock.toLocaleString()} <small>(${timeAgo(lastBlock)})</small>`;
 
+                // Get last header
                 let lastHeaderBlock = 0;
                 let readEnabled = false;
 
-                // Get last confirmed header directly from the contract
                 try {
-                    const lastHeader = await withTimeout(oracle.last_confirmed_header(), 5000);
-                    // The function returns a tuple: (hash, parentHash, stateRoot, receiptsRoot, blockNumber, timestamp)
-                    // Block number is at index 4
+                    const lastHeader = await oracle.last_confirmed_header();
                     if (lastHeader && lastHeader[4]) {
                         lastHeaderBlock = lastHeader[4].toNumber();
                     }
-                } catch (error) {
-                    console.log(`Error getting last header for ${chainName}:`, error);
-                    // Fallback: check if latest block has header
-                    try {
-                        const header = await withTimeout(oracle.block_header(lastBlock), 2000);
-                        if (header[1] !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-                            lastHeaderBlock = lastBlock;
-                        }
-                    } catch {}
+                } catch (e) {
+                    // No header
                 }
 
                 // Check if read enabled
                 if (contracts.LZBlockRelay) {
                     try {
                         const relay = new ethers.Contract(contracts.LZBlockRelay, RELAY_ABI, provider);
-                        readEnabled = await withTimeout(relay.read_enabled(), 2000);
+                        readEnabled = await relay.read_enabled();
                     } catch {}
                 }
 
-                return { lastBlock, lastHeaderBlock, readEnabled };
+                if (lastHeaderBlock > 0) {
+                    const isOutdated = lastHeaderBlock < lastBlock;
+                    headerCell.innerHTML =
+                        `<span class="${isOutdated ? 'outdated' : ''}">${lastHeaderBlock.toLocaleString()}</span> ` +
+                        `<small>(${timeAgo(lastHeaderBlock)})</small>`;
+                } else {
+                    headerCell.innerHTML = '<span class="error">None</span>';
+                }
+
+                // Update read enabled cell
+                if (readCell) {
+                    readCell.innerHTML = readEnabled ? '✓' : '-';
+                    readCell.style.color = readEnabled ? '#10b981' : '#666';
+                    readCell.style.textAlign = 'center';
+                }
+
+                // Store chain data for sorting
+                window.chainData[chainName] = {
+                    readEnabled: readEnabled,
+                    lastBlock: lastBlock,
+                    loaded: true
+                };
+
+                // Re-sort table when data loads
+                sortTable();
+
+                // Update button states
+                const actionCell = document.querySelector(`td[data-chain="${chainName}"]`);
+                if (actionCell) {
+                    // Add broadcast button if read enabled
+                    if (readEnabled && contracts.LZBlockRelay && !document.getElementById(`broadcast-${chainName}`)) {
+                        const broadcastBtn = document.createElement('button');
+                        broadcastBtn.className = 'tiny-btn';
+                        broadcastBtn.id = 'broadcast-' + chainName;
+                        broadcastBtn.textContent = 'Broadcast';
+                        broadcastBtn.disabled = true;
+                        broadcastBtn.title = 'Broadcast is disabled on GitHub Pages';
+                        // Insert before header button
+                        actionCell.insertBefore(broadcastBtn, actionCell.firstChild);
+                    }
+                }
             } catch (error) {
-                if (error.message === 'Timeout') {
-                    return { error: 'Timeout' };
-                }
-                return { error: 'Error' };
+                blockCell.innerHTML = '<span class="error">Error</span>';
+                headerCell.innerHTML = '<span class="error">Error</span>';
             }
         }
 
-        function createChainCard(chainName, data) {
-            const card = document.createElement('div');
-            card.className = 'chain';
-            card.id = `chain-${chainName}`;
-
-            let blockHtml = '<span class="loading">Loading...</span>';
-            let headerHtml = '<span class="loading">Loading...</span>';
-
-            if (data && !data.loading) {
-                if (data.error) {
-                    blockHtml = `<span class="error">${data.error}</span>`;
-                    headerHtml = `<span class="error">${data.error}</span>`;
-                } else {
-                    if (data.lastBlock) {
-                        const blockAge = calculateAge(data.lastBlock);
-                        blockHtml = `${data.lastBlock.toLocaleString()} <span class="time">(${blockAge})</span>`;
-                    }
-
-                    if (data.lastHeaderBlock) {
-                        const headerAge = calculateAge(data.lastHeaderBlock);
-                        const isOutdated = data.lastHeaderBlock < data.lastBlock;
-                        headerHtml = `<span class="${isOutdated ? 'outdated' : ''}">${data.lastHeaderBlock.toLocaleString()}</span> <span class="time">(${headerAge})</span>`;
-                    } else {
-                        headerHtml = '<span class="error">None</span>';
-                    }
-                }
-            }
-
-            // Get contract links
-            const contracts = deployments[chainName] || {};
-            const contractLinks = [];
-            if (contracts.BlockOracle) {
-                const url = getExplorerUrl(chainName, contracts.BlockOracle);
-                contractLinks.push(`<a href="${url}" target="_blank">Oracle</a>`);
-            }
-            if (contracts.LZBlockRelay) {
-                const url = getExplorerUrl(chainName, contracts.LZBlockRelay);
-                contractLinks.push(`<a href="${url}" target="_blank">LZRelay</a>`);
-            }
-            if (contracts.HeaderVerifier) {
-                const url = getExplorerUrl(chainName, contracts.HeaderVerifier);
-                contractLinks.push(`<a href="${url}" target="_blank">Verifier</a>`);
-            }
-
-            // GitHub Pages version - no action buttons
-            card.innerHTML = `
-                <div class="chain-header">
-                    <div>
-                        <div class="chain-name">${chainName}</div>
-                        <div class="contract-links">${contractLinks.join(' ')}</div>
-                    </div>
-                    <div class="action-buttons"></div>
-                </div>
-                <div class="info-row">
-                    <span class="label">Hash:</span>
-                    <span class="value" id="${chainName}-block">${blockHtml}</span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Header:</span>
-                    <span class="value" id="${chainName}-header">${headerHtml}</span>
-                </div>
-            `;
-
-            return card;
-        }
-
-        function updateChainCard(card, chainName, data) {
-            let blockHtml = '<span class="loading">Loading...</span>';
-            let headerHtml = '<span class="loading">Loading...</span>';
-
-            if (data.error) {
-                blockHtml = `<span class="error">${data.error}</span>`;
-                headerHtml = `<span class="error">${data.error}</span>`;
-            } else {
-                if (data.lastBlock) {
-                    const blockAge = calculateAge(data.lastBlock);
-                    blockHtml = `${data.lastBlock.toLocaleString()} <span class="time">(${blockAge})</span>`;
-                }
-
-                if (data.lastHeaderBlock) {
-                    const headerAge = calculateAge(data.lastHeaderBlock);
-                    const isOutdated = data.lastHeaderBlock < data.lastBlock;
-                    headerHtml = `<span class="${isOutdated ? 'outdated' : ''}">${data.lastHeaderBlock.toLocaleString()}</span> <span class="time">(${headerAge})</span>`;
-                } else {
-                    headerHtml = '<span class="error">None</span>';
-                }
-            }
-
-            document.getElementById(`${chainName}-block`).innerHTML = blockHtml;
-            document.getElementById(`${chainName}-header`).innerHTML = headerHtml;
-        }
-
-        function calculateAge(blockNumber) {
-            if (!mainBlock || blockNumber <= 0) return '';
-
-            const blocksBehind = mainBlock - blockNumber;
-            const seconds = blocksBehind * 12;
-
-            if (seconds < 60) return `${Math.round(seconds)}s ago`;
-            if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-            if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
-
-            const days = Math.floor(seconds / 86400);
-            const hours = Math.round((seconds % 86400) / 3600);
-            return `${days}d${hours}h ago`;
-        }
-
-        function withTimeout(promise, ms) {
-            return Promise.race([
-                promise,
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
-            ]);
-        }
-
-        function getExplorerUrl(chainName, address) {
-            const baseUrl = EXPLORER_URLS[chainName] || 'https://blockscan.com/address/';
-            return baseUrl + address;
-        }
-
-        function formatAddress(address, extended = false) {
-            if (extended) {
-                return `${address.slice(0, 10)}...${address.slice(-5)}`;
-            }
-            return `${address.slice(0, 6)}...${address.slice(-4)}`;
-        }
-
-        function setStatus(text, isError = false) {
-            const status = document.getElementById('status');
-            status.textContent = text;
-            status.style.color = isError ? '#ef4444' : '#888';
-        }
-
-        // Connect wallet (disabled for GitHub Pages)
-        async function connectWallet() {
-            alert('Wallet connection is disabled in the GitHub Pages version. Please run locally for write functionality.');
-        }
-
-        // Start on load
-        document.addEventListener('DOMContentLoaded', init);
+        // Load on start
+        loadData();
     </script>
 </body>
 </html>
