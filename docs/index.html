@@ -25,7 +25,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             padding: 15px 20px;
             background: #1a1a1a;
             border-radius: 8px;
@@ -50,151 +50,149 @@
 
         button:hover { background: #5558e3; }
         button:disabled { background: #444; cursor: not-allowed; }
-        button.yellow { background: #f59e0b; }
-        button.yellow:hover { background: #d97706; }
 
-        .notice {
-            background: #f59e0b20;
-            border: 1px solid #f59e0b;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
+        .broadcast-btn {
+            background: #10b981;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .broadcast-btn:hover { background: #0ea968; }
+        .broadcast-btn:disabled { background: #444; }
+
+        .main-block {
             text-align: center;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
         }
 
-        .chains-grid {
+        .main-block .number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #6366f1;
+        }
+
+        .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 8px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
         }
 
-        .chain-card {
+        .chain {
             background: #1a1a1a;
             border: 1px solid #333;
-            border-radius: 8px;
-            padding: 12px 16px;
-            transition: all 0.2s;
-            animation: fadeIn 0.3s ease-out;
+            border-radius: 6px;
+            padding: 12px 15px;
+            transition: transform 0.2s, border-color 0.2s;
         }
 
-        .chain-card:hover {
-            border-color: #555;
+        .chain:hover {
             transform: translateY(-1px);
+            border-color: #444;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .chain-name {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            text-transform: capitalize;
         }
 
         .chain-header {
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
-        }
-
-        .chain-name {
-            font-size: 18px;
-            font-weight: 500;
-            display: flex;
             align-items: center;
-            gap: 10px;
+            margin-bottom: 8px;
         }
 
-        .chain-id {
-            font-size: 14px;
-            color: #888;
+        .action-buttons {
+            display: flex;
+            gap: 4px;
         }
 
-        .chain-info {
-            display: grid;
-            gap: 6px;
-            font-size: 14px;
+        .action-btn {
+            background: #10b981;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
         }
+
+        .action-btn:hover { background: #0ea968; }
+        .action-btn:disabled { background: #444; }
+
+        .submit-header-btn {
+            background: #3b82f6;
+        }
+
+        .submit-header-btn:hover { background: #2563eb; }
 
         .info-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            margin: 4px 0;
+            font-size: 13px;
+            align-items: baseline;
         }
 
-        .info-label {
-            color: #888;
-        }
+        .label { color: #888; font-size: 12px; }
+        .value { font-family: monospace; font-size: 12px; text-align: right; }
+        .time { color: #f59e0b; font-size: 11px; }
+        .error { color: #ef4444; font-size: 12px; }
+        .loading { color: #888; font-style: italic; font-size: 12px; }
+        .outdated { color: #f59e0b; }
 
-        .info-value {
-            font-family: monospace;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .block-number {
-            background: #333;
-            padding: 2px 8px;
-            border-radius: 4px;
-        }
-
-        .time-ago {
-            font-size: 12px;
-            color: #888;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 100px 20px;
-            color: #888;
-        }
-
-        .error {
-            background: #ef444420;
-            border: 1px solid #ef4444;
-            padding: 15px;
+        .wallet-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
             border-radius: 6px;
-            margin: 20px 0;
+            font-size: 14px;
+            display: none;
         }
 
-        .actions {
-            display: flex;
-            gap: 8px;
-        }
+        .wallet-info.connected { display: block; }
 
-        .actions button {
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-
-        .yellow-text {
-            color: #f59e0b !important;
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            font-size: 14px;
         }
 
         .modal {
             display: none;
             position: fixed;
-            top: 0;
+            z-index: 1000;
             left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            align-items: center;
+            background-color: rgba(0,0,0,0.8);
             justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
+            align-items: center;
         }
 
         .modal-content {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 12px;
+            background-color: #1a1a1a;
             padding: 20px;
-            max-width: 600px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            max-width: 500px;
             width: 90%;
-            max-height: 80vh;
+            max-height: 85vh;
             overflow-y: auto;
         }
 
@@ -205,67 +203,98 @@
             margin-bottom: 15px;
         }
 
-        .modal-close {
-            background: none;
-            border: none;
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .close {
             color: #888;
-            font-size: 24px;
+            font-size: 28px;
+            font-weight: bold;
             cursor: pointer;
-            padding: 0;
-            width: 30px;
-            height: 30px;
+            line-height: 20px;
         }
 
-        .destination-list {
-            margin: 15px 0;
+        .close:hover { color: #fff; }
+
+        .peer-list {
+            margin: 10px 0;
         }
 
-        .destination-item {
+        .peer-controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+
+        .flip-all-btn {
+            background: #444;
+            padding: 5px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            color: white;
+        }
+
+        .flip-all-btn:hover { background: #555; }
+
+        .peer-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 12px;
-            margin: 4px 0;
-            background: #2a2a2a;
-            border-radius: 6px;
-            font-size: 13px;
+            padding: 6px 10px;
+            margin: 3px 0;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
         }
 
-        .destination-item label {
+        .peer-info {
             display: flex;
             align-items: center;
             gap: 8px;
-            cursor: pointer;
-            flex: 1;
+            font-size: 13px;
         }
 
-        .destination-cost {
-            color: #888;
+        .peer-cost {
+            color: #10b981;
             font-family: monospace;
             font-size: 12px;
         }
 
-        .modal-footer {
+        .total-cost {
             margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #333;
+            padding: 12px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .total-cost {
             font-size: 14px;
-            color: #fff;
         }
 
-        .modal-actions {
+        .modal-buttons {
             display: flex;
             gap: 10px;
+            margin-top: 15px;
+            justify-content: flex-end;
         }
 
-        input[type="checkbox"] {
-            cursor: pointer;
+        .modal-buttons button {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .notice {
+            background: #f59e0b20;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            text-align: center;
         }
     </style>
 </head>
@@ -273,280 +302,322 @@
     <div class="container">
         <header>
             <h1>Blockhash Oracle Status</h1>
-            <button id="connectWallet" onclick="connectWallet()">Connect Wallet</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+                <button id="refresh-btn" onclick="refreshData()">Refresh</button>
+            </div>
         </header>
 
         <div class="notice">
-            <p>⚠️ This is a read-only GitHub Pages version. Write functionality requires running locally with proper CORS headers.</p>
-            <p>For full functionality, clone the repository and run <code>python -m http.server</code> from the project root.</p>
+            <p>⚠️ This is a read-only GitHub Pages version. Write functionality is disabled.</p>
+            <p>For full functionality, clone the repository and run locally.</p>
         </div>
 
-        <div id="content">
-            <div class="loading">Loading deployment data...</div>
+        <div class="main-block">
+            <div>Ethereum Mainnet</div>
+            <div class="number" id="main-block">-</div>
         </div>
+
+        <div class="grid" id="chains-grid"></div>
     </div>
 
-    <div id="broadcastModal" class="modal">
+    <div class="status" id="status"></div>
+    <div class="wallet-info" id="wallet-info"></div>
+
+    <div class="modal" id="peerModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Select Broadcast Destinations</h3>
-                <button class="modal-close" onclick="closeBroadcastModal()">&times;</button>
+                <h2>Select Broadcast Destinations</h2>
+                <span class="close" onclick="closePeerModal()">&times;</span>
             </div>
-            <div id="modalBody"></div>
+            <div class="peer-list" id="peerList"></div>
+            <div class="total-cost">
+                <span>Total Cost:</span>
+                <span id="totalCost" class="peer-cost">0 ETH</span>
+            </div>
+            <div class="modal-buttons">
+                <button onclick="closePeerModal()">Cancel</button>
+                <button id="confirmBroadcast" onclick="proceedWithBroadcast()">Confirm Broadcast</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // GitHub raw content base URL
+        // GitHub Pages URLs
         const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/curvefi/blockhash-oracle/main';
-
-        // Override deployment URLs for GitHub
         const DEPLOYMENT_URL = `${GITHUB_RAW_BASE}/scripts/deployment/deployment_state.json`;
         const CHAINS_URL = `${GITHUB_RAW_BASE}/scripts/chain-parse/chains.json`;
+        const TIMEOUT = 10000;
 
+        const ORACLE_ABI = [
+            "function last_confirmed_block_number() view returns (uint256)",
+            "function block_header(uint256) view returns (bytes32, bytes32, bytes32, bytes32, uint256, uint256)",
+            "function last_confirmed_header() view returns (bytes32, bytes32, bytes32, bytes32, uint256, uint256)"
+        ];
+
+        const RELAY_ABI = [
+            "function quote_read_fee(uint128 gas, uint128 value) view returns (uint256)",
+            "function quote_broadcast_fees(uint32[] eids, uint128 gas) view returns (uint256[])",
+            "function request_block_hash(uint32[] receive_eids, uint256[] amounts, uint128 gas, uint128 read_gas) payable",
+            "function peers(uint32) view returns (bytes32)",
+            "function read_enabled() view returns (bool)",
+            "function mainnet_eid() view returns (uint32)"
+        ];
+
+        const HEADER_VERIFIER_ABI = [
+            "function submit_block_header(address oracle, bytes header) returns (bool)"
+        ];
+
+        let deployments = null;
+        let chains = null;
+        let lzMetadata = null;
+        let mainBlock = 0;
         let provider = null;
         let signer = null;
-        let deployments = {};
-        let chainData = {};
-        let lzMetadata = {};
-        let peerEidsCache = {};
-        let mainnetBlockCache = { number: null, timestamp: null };
+        let walletConnected = false;
+        const peerCache = {}; // Cache peer EIDs per chain
+        let currentBroadcastData = null; // Store broadcast data for modal
 
-        async function loadDeployments() {
+        async function init() {
             try {
-                const [deploymentsRes, chainsRes] = await Promise.all([
+                setStatus('Loading...');
+
+                // Load config files
+                const [depResp, chainsResp, lzResp] = await Promise.all([
                     fetch(DEPLOYMENT_URL),
-                    fetch(CHAINS_URL)
+                    fetch(CHAINS_URL),
+                    fetch('https://metadata.layerzero-api.com/v1/metadata/deployments')
                 ]);
 
-                if (!deploymentsRes.ok || !chainsRes.ok) {
-                    throw new Error('Failed to load deployment data');
-                }
+                const depData = await depResp.json();
+                const chainsData = await chainsResp.json();
+                lzMetadata = await lzResp.json();
 
-                const depData = await deploymentsRes.json();
-                deployments = depData.deployments?.mainnets || depData;
+                deployments = depData.deployments.mainnets || {};
+                chains = chainsData.mainnets || {};
 
-                const chainsData = await chainsRes.json();
-                const chains = chainsData.mainnets || {};
-
-                // Convert chains to chainData by chain_id
-                chainData = {};
-                Object.entries(chains).forEach(([name, chain]) => {
-                    chainData[chain.chain_id] = {
-                        chainId: chain.chain_id,
-                        name: name.charAt(0).toUpperCase() + name.slice(1),
-                        rpc: chain.public ? [chain.public] : []
-                    };
-                });
-
-                // Try to load LZ metadata
-                try {
-                    const metadataRes = await fetch(`https://metadata.layerzero-api.com/v1/metadata/deployments`);
-                    if (metadataRes.ok) {
-                        lzMetadata = await metadataRes.json();
-                    }
-                } catch (e) {
-                    console.log('LZ metadata not available');
-                }
-
-                displayChains();
+                await refreshData();
             } catch (error) {
-                document.getElementById('content').innerHTML = `
-                    <div class="error">
-                        <h3>Error loading deployment data</h3>
-                        <p>${error.message}</p>
-                        <p>This viewer requires deployment data to be available in the repository.</p>
-                    </div>
-                `;
+                console.error('Init error:', error);
+                setStatus('Failed to load', true);
             }
         }
 
-        function displayChains() {
-            const chainCards = Object.entries(deployments)
-                .filter(([chainId, data]) => data.oracle_address && chainId !== '1')
-                .map(([chainId]) => {
-                    const chain = chainData[chainId] || { chainId, name: `Chain ${chainId}` };
-                    return `
-                        <div class="chain-card" data-chain-id="${chainId}">
-                            <div class="chain-header">
-                                <div class="chain-name">
-                                    <span>${chain.name}</span>
-                                    <span class="chain-id">(${chainId})</span>
-                                </div>
-                                <div class="actions" id="actions-${chainId}">
-                                    <button onclick="refreshChain('${chainId}')" title="Refresh">↻</button>
-                                </div>
-                            </div>
-                            <div class="chain-info" id="info-${chainId}">
-                                <div class="loading">Loading...</div>
-                            </div>
-                        </div>
-                    `;
-                })
-                .join('');
+        async function refreshData() {
+            const btn = document.getElementById('refresh-btn');
+            btn.disabled = true;
+            setStatus('Updating...');
 
-            document.getElementById('content').innerHTML = `
-                <div class="chains-grid">${chainCards}</div>
+            try {
+                // Clear and create all chain cards immediately
+                const grid = document.getElementById('chains-grid');
+                grid.innerHTML = '';
+
+                const chainList = Object.entries(deployments)
+                    .filter(([name, contracts]) => name !== 'ethereum' && contracts.BlockOracle)
+                    .sort(([a], [b]) => a.localeCompare(b));
+
+                // Create cards with loading state
+                const cards = {};
+                chainList.forEach(([chainName]) => {
+                    const card = createChainCard(chainName, { loading: true });
+                    cards[chainName] = card;
+                    grid.appendChild(card);
+                });
+
+                // Get Ethereum block first (needed for age calculation)
+                // Only fetch if we don't have it or it's been more than 1 minute
+                const now = Date.now();
+                if (chains.ethereum?.public && (!mainBlock || now - window.lastMainBlockFetch > 60000)) {
+                    try {
+                        const provider = new ethers.providers.JsonRpcProvider(chains.ethereum.public);
+                        mainBlock = await withTimeout(provider.getBlockNumber(), TIMEOUT);
+                        window.lastMainBlockFetch = now;
+                        document.getElementById('main-block').textContent = mainBlock.toLocaleString();
+                    } catch (error) {
+                        document.getElementById('main-block').textContent = 'Error';
+                    }
+                }
+
+                // Fetch all chain data in parallel and update cards as results come in
+                chainList.forEach(async ([chainName, contracts]) => {
+                    try {
+                        const data = await fetchChainData(chainName, contracts);
+                        updateChainCard(cards[chainName], chainName, data);
+                    } catch (error) {
+                        updateChainCard(cards[chainName], chainName, { error: 'Failed' });
+                    }
+                });
+
+                setStatus(`Updated at ${new Date().toLocaleTimeString()}`);
+            } catch (error) {
+                console.error('Refresh error:', error);
+                setStatus('Update failed', true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function fetchChainData(chainName, contracts) {
+            const chainConfig = chains[chainName];
+            if (!chainConfig?.public) {
+                return { error: 'No RPC' };
+            }
+
+            try {
+                const provider = new ethers.providers.JsonRpcProvider(chainConfig.public);
+                const oracle = new ethers.Contract(contracts.BlockOracle, ORACLE_ABI, provider);
+
+                const lastBlockNum = await withTimeout(oracle.last_confirmed_block_number(), TIMEOUT);
+                const lastBlock = lastBlockNum.toNumber();
+
+                let lastHeaderBlock = 0;
+                let readEnabled = false;
+
+                // Get last confirmed header directly from the contract
+                try {
+                    const lastHeader = await withTimeout(oracle.last_confirmed_header(), 5000);
+                    // The function returns a tuple: (hash, parentHash, stateRoot, receiptsRoot, blockNumber, timestamp)
+                    // Block number is at index 4
+                    if (lastHeader && lastHeader[4]) {
+                        lastHeaderBlock = lastHeader[4].toNumber();
+                    }
+                } catch (error) {
+                    console.log(`Error getting last header for ${chainName}:`, error);
+                    // Fallback: check if latest block has header
+                    try {
+                        const header = await withTimeout(oracle.block_header(lastBlock), 2000);
+                        if (header[1] !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                            lastHeaderBlock = lastBlock;
+                        }
+                    } catch {}
+                }
+
+                // Check if read enabled
+                if (contracts.LZBlockRelay) {
+                    try {
+                        const relay = new ethers.Contract(contracts.LZBlockRelay, RELAY_ABI, provider);
+                        readEnabled = await withTimeout(relay.read_enabled(), 2000);
+                    } catch {}
+                }
+
+                return { lastBlock, lastHeaderBlock, readEnabled };
+            } catch (error) {
+                if (error.message === 'Timeout') {
+                    return { error: 'Timeout' };
+                }
+                return { error: 'Error' };
+            }
+        }
+
+        function createChainCard(chainName, data) {
+            const card = document.createElement('div');
+            card.className = 'chain';
+            card.id = `chain-${chainName}`;
+
+            let blockHtml = '<span class="loading">Loading...</span>';
+            let headerHtml = '<span class="loading">Loading...</span>';
+
+            if (data && !data.loading) {
+                if (data.error) {
+                    blockHtml = `<span class="error">${data.error}</span>`;
+                    headerHtml = `<span class="error">${data.error}</span>`;
+                } else {
+                    if (data.lastBlock) {
+                        const blockAge = calculateAge(data.lastBlock);
+                        blockHtml = `${data.lastBlock.toLocaleString()} <span class="time">(${blockAge})</span>`;
+                    }
+
+                    if (data.lastHeaderBlock) {
+                        const headerAge = calculateAge(data.lastHeaderBlock);
+                        const isOutdated = data.lastHeaderBlock < data.lastBlock;
+                        headerHtml = `<span class="${isOutdated ? 'outdated' : ''}">${data.lastHeaderBlock.toLocaleString()}</span> <span class="time">(${headerAge})</span>`;
+                    } else {
+                        headerHtml = '<span class="error">None</span>';
+                    }
+                }
+            }
+
+            // GitHub Pages version - no action buttons
+            card.innerHTML = `
+                <div class="chain-header">
+                    <div class="chain-name">${chainName}</div>
+                    <div class="action-buttons"></div>
+                </div>
+                <div class="info-row">
+                    <span class="label">Hash:</span>
+                    <span class="value" id="${chainName}-block">${blockHtml}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Header:</span>
+                    <span class="value" id="${chainName}-header">${headerHtml}</span>
+                </div>
             `;
 
-            // Load data for all chains in parallel
-            Object.keys(deployments).forEach(chainId => {
-                if (deployments[chainId].oracle_address && chainId !== '1') {
-                    loadChainData(chainId);
-                }
-            });
+            return card;
         }
 
-        async function loadChainData(chainId) {
-            const deployment = deployments[chainId];
-            const chain = chainData[chainId] || { chainId, rpc: [] };
-
-            if (!chain.rpc || chain.rpc.length === 0) {
-                updateChainInfo(chainId, { error: 'No RPC endpoint available' });
-                return;
-            }
-
-            try {
-                // Show initial state
-                updateChainInfo(chainId, {
-                    oracle: deployment.oracle_address,
-                    loading: true
-                });
-
-                const rpcUrl = chain.rpc[0];
-                const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
-
-                // Simplified read-only display
-                const oracle = new ethers.Contract(deployment.oracle_address, [
-                    'function last_confirmed_block() view returns (uint256)',
-                    'function last_confirmed_header() view returns (bytes32, bytes32, bytes32, bytes32, uint256, uint256)'
-                ], provider);
-
-                const [lastBlock, lastHeader] = await Promise.all([
-                    oracle.last_confirmed_block(),
-                    oracle.last_confirmed_header().catch(() => null)
-                ]);
-
-                const lastBlockNumber = lastBlock.toNumber();
-                let lastHeaderBlock = 0;
-
-                if (lastHeader && lastHeader[4]) {
-                    lastHeaderBlock = lastHeader[4].toNumber();
-                }
-
-                updateChainInfo(chainId, {
-                    oracle: deployment.oracle_address,
-                    lastBlock: lastBlockNumber,
-                    lastHeader: lastHeaderBlock,
-                    loading: false
-                });
-
-            } catch (error) {
-                console.error(`Error loading chain ${chainId}:`, error);
-                updateChainInfo(chainId, {
-                    oracle: deployment.oracle_address,
-                    error: error.message
-                });
-            }
-        }
-
-        function updateChainInfo(chainId, data) {
-            const infoDiv = document.getElementById(`info-${chainId}`);
-            if (!infoDiv) return;
-
-            if (data.loading) {
-                infoDiv.innerHTML = '<div class="loading">Loading...</div>';
-                return;
-            }
+        function updateChainCard(card, chainName, data) {
+            let blockHtml = '<span class="loading">Loading...</span>';
+            let headerHtml = '<span class="loading">Loading...</span>';
 
             if (data.error) {
-                infoDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
-                return;
+                blockHtml = `<span class="error">${data.error}</span>`;
+                headerHtml = `<span class="error">${data.error}</span>`;
+            } else {
+                if (data.lastBlock) {
+                    const blockAge = calculateAge(data.lastBlock);
+                    blockHtml = `${data.lastBlock.toLocaleString()} <span class="time">(${blockAge})</span>`;
+                }
+
+                if (data.lastHeaderBlock) {
+                    const headerAge = calculateAge(data.lastHeaderBlock);
+                    const isOutdated = data.lastHeaderBlock < data.lastBlock;
+                    headerHtml = `<span class="${isOutdated ? 'outdated' : ''}">${data.lastHeaderBlock.toLocaleString()}</span> <span class="time">(${headerAge})</span>`;
+                } else {
+                    headerHtml = '<span class="error">None</span>';
+                }
             }
 
-            const isHeaderOutdated = data.lastHeader < data.lastBlock;
-
-            infoDiv.innerHTML = `
-                <div class="info-row">
-                    <span class="info-label">Oracle:</span>
-                    <span class="info-value">${data.oracle.slice(0, 6)}...${data.oracle.slice(-4)}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Block:</span>
-                    <span class="info-value">
-                        <span class="block-number">${data.lastBlock.toLocaleString()}</span>
-                        <span class="time-ago">${calculateTimeAgo(data.lastBlock)}</span>
-                    </span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Header:</span>
-                    <span class="info-value">
-                        <span class="block-number ${isHeaderOutdated ? 'yellow-text' : ''}">${data.lastHeader.toLocaleString()}</span>
-                        <span class="time-ago">${calculateTimeAgo(data.lastHeader)}</span>
-                    </span>
-                </div>
-            `;
+            document.getElementById(`${chainName}-block`).innerHTML = blockHtml;
+            document.getElementById(`${chainName}-header`).innerHTML = headerHtml;
         }
 
-        function calculateTimeAgo(blockNumber) {
-            if (!mainnetBlockCache.number) return '';
+        function calculateAge(blockNumber) {
+            if (!mainBlock || blockNumber <= 0) return '';
 
-            const blockDiff = mainnetBlockCache.number - blockNumber;
-            const secondsAgo = blockDiff * 12;
+            const blocksBehind = mainBlock - blockNumber;
+            const seconds = blocksBehind * 12;
 
-            if (secondsAgo < 60) return `${Math.floor(secondsAgo)}s ago`;
-            if (secondsAgo < 3600) return `${Math.floor(secondsAgo / 60)}m ago`;
-            if (secondsAgo < 86400) return `${Math.floor(secondsAgo / 3600)}h ago`;
+            if (seconds < 60) return `${Math.round(seconds)}s ago`;
+            if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
 
-            const days = Math.floor(secondsAgo / 86400);
-            const hours = Math.floor((secondsAgo % 86400) / 3600);
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.round((seconds % 86400) / 3600);
             return `${days}d${hours}h ago`;
         }
 
-        async function refreshChain(chainId) {
-            const btn = document.querySelector(`#actions-${chainId} button`);
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '⟳';
-            }
-
-            await loadChainData(chainId);
-
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = '↻';
-            }
+        function withTimeout(promise, ms) {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+            ]);
         }
 
+        function setStatus(text, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.style.color = isError ? '#ef4444' : '#888';
+        }
+
+        // Connect wallet (disabled for GitHub Pages)
         async function connectWallet() {
-            // Just show connected state for demo
-            document.getElementById('connectWallet').textContent = 'Connected (Read Only)';
-            document.getElementById('connectWallet').disabled = true;
+            alert('Wallet connection is disabled in the GitHub Pages version. Please run locally for write functionality.');
         }
 
-        function closeBroadcastModal() {
-            document.getElementById('broadcastModal').classList.remove('active');
-        }
-
-        // Get mainnet block on load for time calculations
-        async function getMainnetBlock() {
-            try {
-                const response = await fetch('https://api.etherscan.io/api?module=proxy&action=eth_blockNumber');
-                const data = await response.json();
-                if (data.result) {
-                    mainnetBlockCache.number = parseInt(data.result, 16);
-                    mainnetBlockCache.timestamp = Date.now();
-                }
-            } catch (e) {
-                // Use a reasonable default
-                mainnetBlockCache.number = 18500000;
-                mainnetBlockCache.timestamp = Date.now();
-            }
-        }
-
-        // Initialize
-        getMainnetBlock();
-        loadDeployments();
+        // Start on load
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
