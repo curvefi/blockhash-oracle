@@ -117,7 +117,8 @@
     </style>
 </head>
 <body>
-    <h1>Curve Block Oracle Status</h1>
+    <h1>Blockhash Oracle Status</h1>
+    <p>Minimal dashboard with wallet support. Just HTML + ethers.js.</p>
 
     <div>
         <button id="wallet-btn" onclick="connectWallet()">Connect Wallet</button>
@@ -169,12 +170,14 @@
     </div>
 
     <hr>
+    <p><small>Minimal HTML dashboard. Transaction support via GitHub Pages.</small></p>
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script>
-        // Configuration
-        const DEPLOYMENTS_URL = '../scripts/deployment/deployment_state.json';
-        const CHAINS_URL = '../scripts/chain-parse/chains.json';
+        // GitHub Pages URLs
+        const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/curvefi/blockhash-oracle/main';
+        const DEPLOYMENT_URL = `${GITHUB_RAW_BASE}/scripts/deployment/deployment_state.json`;
+        const CHAINS_URL = `${GITHUB_RAW_BASE}/scripts/chain-parse/chains.json`;
         const LZ_METADATA_URL = 'https://metadata.layerzero-api.com/v1/metadata/deployments';
 
         // Explorer URLs
@@ -263,7 +266,7 @@
         async function connectWallet() {
             try {
                 if (typeof window.ethereum === 'undefined') {
-                    alert('Please install MetaMask');
+                    alert('Please install MetaMask or Rabby wallet');
                     return;
                 }
 
@@ -471,7 +474,7 @@
                 if (!block) {
                     alert('Block not found on mainnet');
                     btn.disabled = false;
-                    btn.textContent = 'Submit';
+                    btn.textContent = 'Header';
                     return;
                 }
 
@@ -496,7 +499,7 @@
                             alert(`Please switch to ${chainName} network`);
                         }
                         btn.disabled = false;
-                        btn.textContent = 'Submit';
+                        btn.textContent = 'Header';
                         return;
                     }
                 }
@@ -523,7 +526,7 @@
                 console.error('Submit error:', error);
                 alert('Failed: ' + error.message);
                 btn.disabled = false;
-                btn.textContent = 'Submit';
+                btn.textContent = 'Header';
             }
         }
 
@@ -757,7 +760,7 @@
             try {
                 // Fetch config files
                 const [depRes, chainsRes, lzRes] = await Promise.all([
-                    fetch(DEPLOYMENTS_URL),
+                    fetch(DEPLOYMENT_URL),
                     fetch(CHAINS_URL),
                     fetch(LZ_METADATA_URL)
                 ]);
