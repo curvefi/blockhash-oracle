@@ -323,13 +323,20 @@
                     throw new Error('Failed to load deployment data');
                 }
 
-                deployments = await deploymentsRes.json();
-                const chainsArray = await chainsRes.json();
+                const depData = await deploymentsRes.json();
+                deployments = depData.deployments?.mainnets || depData;
 
-                // Convert chains array to object by chainId
+                const chainsData = await chainsRes.json();
+                const chains = chainsData.mainnets || {};
+
+                // Convert chains to chainData by chain_id
                 chainData = {};
-                chainsArray.forEach(chain => {
-                    chainData[chain.chainId] = chain;
+                Object.entries(chains).forEach(([name, chain]) => {
+                    chainData[chain.chain_id] = {
+                        chainId: chain.chain_id,
+                        name: name.charAt(0).toUpperCase() + name.slice(1),
+                        rpc: chain.public ? [chain.public] : []
+                    };
                 });
 
                 // Try to load LZ metadata
