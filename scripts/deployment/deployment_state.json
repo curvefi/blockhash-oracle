@@ -138,6 +138,11 @@
         "BlockOracle": "0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8",
         "HeaderVerifier": "0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385",
         "LZBlockRelay": "0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752"
+      },
+      "etherlink": {
+        "BlockOracle": "0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8",
+        "HeaderVerifier": "0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385",
+        "LZBlockRelay": "0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752"
       }
     }
   },
@@ -643,6 +648,27 @@
       "timestamp": "2025-06-25T11:59:02.295036+00:00",
       "network_type": "mainnets",
       "chain": "hyperliquid",
+      "contract_type": "LZBlockRelay",
+      "address": "0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752"
+    },
+    {
+      "timestamp": "2025-07-29T15:26:40.826364+00:00",
+      "network_type": "mainnets",
+      "chain": "etherlink",
+      "contract_type": "BlockOracle",
+      "address": "0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8"
+    },
+    {
+      "timestamp": "2025-07-29T15:26:43.509658+00:00",
+      "network_type": "mainnets",
+      "chain": "etherlink",
+      "contract_type": "HeaderVerifier",
+      "address": "0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385"
+    },
+    {
+      "timestamp": "2025-07-29T15:26:53.571270+00:00",
+      "network_type": "mainnets",
+      "chain": "etherlink",
       "contract_type": "LZBlockRelay",
       "address": "0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752"
     }

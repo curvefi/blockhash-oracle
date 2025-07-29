@@ -127,7 +127,7 @@
       "explorer": "https://api.etherscan.io/v2/api",
       "ankr": "https://rpc.ankr.com/base/{}",
       "drpc": "https://lb.drpc.org/ogrpc?network=base&dkey={}",
-      "public": "https://base.llamarpc.com"
+      "public": "https://developer-access-mainnet.base.org"
     },
     "arbitrum": {
       "chain_id": 42161,
@@ -192,7 +192,16 @@
       "ankr": null,
       "drpc": "https://lb.drpc.org/ogrpc?network=aurora&dkey={}",
       "public": "https://mainnet.aurora.dev"
+    },
+    "etherlink": {
+      "chain_id": 42793,
+      "evm_version": "paris",
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": "https://rpc.ankr.com/etherlink_mainnet/{}",
+      "drpc": null,
+      "public": "https://node.mainnet.etherlink.com"
     }
+
   },
   "testnets": {
     "sepolia": {
