@@ -1,5 +1,6 @@
 # pragma version 0.4.3
 # pragma optimize gas
+# pragma nonreentrancy on
 
 """
 @title LayerZero Block Relay
