@@ -479,8 +479,12 @@ def broadcast_latest_block(
 
     # Prepare broadcast targets
     broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    sum_target_fees: uint256 = 0
     for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
+        sum_target_fees += _target_fees[i]
+
+    assert sum_target_fees <= msg.value, "Insufficient message value"
 
     self._broadcast_block(
         block_number,

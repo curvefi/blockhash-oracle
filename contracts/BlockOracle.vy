@@ -271,7 +271,7 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
     @param _block_number The block number to apply
     @param _block_hash The block hash to apply
     """
-
+    assert self.threshold > 0, "Threshold not set"
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
     assert (
         self.commitment_count[_block_number][_block_hash] >= self.threshold
