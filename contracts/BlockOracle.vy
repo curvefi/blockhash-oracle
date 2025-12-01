@@ -261,25 +261,6 @@ def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = Tr
     return False
 
 
-################################################################
-#                 PERMISSIONLESS FUNCTIONS                     #
-################################################################
-
-@external
-def apply_block(_block_number: uint256, _block_hash: bytes32):
-    """
-    @notice Apply a block hash if it has sufficient commitments
-    @param _block_number The block number to apply
-    @param _block_hash The block hash to apply
-    """
-    assert self.threshold > 0, "Threshold not set"
-    assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
-    assert (
-        self.commitment_count[_block_number][_block_hash] >= self.threshold
-    ), "Insufficient commitments"
-    self._apply_block(_block_number, _block_hash)
-
-
 @external
 def submit_block_header(_header_data: bh_rlp.BlockHeader):
     """
@@ -305,6 +286,25 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
         block_number=_header_data.block_number,
         block_hash=_header_data.block_hash,
     )
+
+
+################################################################
+#                 PERMISSIONLESS FUNCTIONS                     #
+################################################################
+
+@external
+def apply_block(_block_number: uint256, _block_hash: bytes32):
+    """
+    @notice Apply a block hash if it has sufficient commitments
+    @param _block_number The block number to apply
+    @param _block_hash The block hash to apply
+    """
+    assert self.threshold > 0, "Threshold not set"
+    assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
+    assert (
+        self.commitment_count[_block_number][_block_hash] >= self.threshold
+    ), "Insufficient commitments"
+    self._apply_block(_block_number, _block_hash)
 
 
 ################################################################
