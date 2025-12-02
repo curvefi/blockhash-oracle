@@ -43,6 +43,7 @@ def submit_block_header(_oracle_address: address, _encoded_header: Bytes[bh_rlp.
     """
     # Decode whatever is submitted
     decoded_header: bh_rlp.BlockHeader = bh_rlp._decode_block_header(_encoded_header)
-
+    # Explicitly assert correctness (already done when decoding, double check)
+    assert keccak256(_encoded_header) == decoded_header.block_hash, "Invalid header"
     # Submit decoded header to oracle
     extcall IBlockOracle(_oracle_address).submit_block_header(decoded_header)
