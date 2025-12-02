@@ -138,13 +138,13 @@ def test_lz_receive_read_response_with_broadcast(
     test_block_number = block_data["number"]
     test_block_hash = block_data["hash"]
     message = boa.util.abi.abi_encode("(uint256,bytes32)", (test_block_number, test_block_hash))
-
+    print(f"Balance of relay before lzReceive: {boa.env.get_balance(lz_block_relay.address)}")
     # Call lzReceive directly with value to cover broadcast fees
     with boa.env.prank(LZ_ENDPOINT):
         lz_block_relay.lzReceive(
-            origin, guid, message, dev_deployer, b"", value=sum(broadcast_fees)
+            origin, guid, message, dev_deployer, b"", value=2 * sum(broadcast_fees)
         )
-
+    print(f"Balance of relay after lzReceive: {boa.env.get_balance(lz_block_relay.address)}")
     # Check that event was emitted for broadcast
     events = lz_block_relay.get_logs()
     assert any(
