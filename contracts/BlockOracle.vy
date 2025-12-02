@@ -150,7 +150,7 @@ def add_committer(_committer: address, _bump_threshold: bool = False):
         assert len(self.committers) < MAX_COMMITTERS, "Max committers reached"
         self.is_committer[_committer] = True
         self.committers.append(_committer)
-        log  AddCommitter(committer=_committer)
+        log AddCommitter(committer=_committer)
 
         if _bump_threshold:
             self.threshold += 1
@@ -174,7 +174,7 @@ def remove_committer(_committer: address):
                 new_committers.append(committer)
         self.committers = new_committers
 
-        log  RemoveCommitter(committer=_committer)
+        log RemoveCommitter(committer=_committer)
 
 
 @external
@@ -222,7 +222,7 @@ def _apply_block(_block_number: uint256, _block_hash: bytes32):
     self.block_hash[_block_number] = _block_hash
     if self.last_confirmed_block_number < _block_number:
         self.last_confirmed_block_number = _block_number
-    log  ApplyBlock(block_number=_block_number, block_hash=_block_hash)
+    log ApplyBlock(block_number=_block_number, block_hash=_block_hash)
 
 
 ################################################################
@@ -240,6 +240,7 @@ def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = Tr
     """
 
     assert self.is_committer[msg.sender], "Not authorized"
+    assert self.threshold > 0, "Threshold not set"
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
     assert _block_hash != empty(bytes32), "Invalid block hash"
 
@@ -251,32 +252,13 @@ def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = Tr
 
     self.committer_votes[msg.sender][_block_number] = _block_hash
     self.commitment_count[_block_number][_block_hash] += 1
-    log  CommitBlock(committer=msg.sender, block_number=_block_number, block_hash=_block_hash)
+    log CommitBlock(committer=msg.sender, block_number=_block_number, block_hash=_block_hash)
 
     # Optional attempt to apply block
     if _apply and self.commitment_count[_block_number][_block_hash] >= self.threshold:
         self._apply_block(_block_number, _block_hash)
         return True
     return False
-
-
-################################################################
-#                 PERMISSIONLESS FUNCTIONS                     #
-################################################################
-
-@external
-def apply_block(_block_number: uint256, _block_hash: bytes32):
-    """
-    @notice Apply a block hash if it has sufficient commitments
-    @param _block_number The block number to apply
-    @param _block_hash The block hash to apply
-    """
-
-    assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
-    assert (
-        self.commitment_count[_block_number][_block_hash] >= self.threshold
-    ), "Insufficient commitments"
-    self._apply_block(_block_number, _block_hash)
 
 
 @external
@@ -300,10 +282,29 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
     if _header_data.block_number > self.last_confirmed_header.block_number:
         self.last_confirmed_header = _header_data
 
-    log  SubmitBlockHeader(
+    log SubmitBlockHeader(
         block_number=_header_data.block_number,
         block_hash=_header_data.block_hash,
     )
+
+
+################################################################
+#                 PERMISSIONLESS FUNCTIONS                     #
+################################################################
+
+@external
+def apply_block(_block_number: uint256, _block_hash: bytes32):
+    """
+    @notice Apply a block hash if it has sufficient commitments
+    @param _block_number The block number to apply
+    @param _block_hash The block hash to apply
+    """
+    assert self.threshold > 0, "Threshold not set"
+    assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
+    assert (
+        self.commitment_count[_block_number][_block_hash] >= self.threshold
+    ), "Insufficient commitments"
+    self._apply_block(_block_number, _block_hash)
 
 
 ################################################################
