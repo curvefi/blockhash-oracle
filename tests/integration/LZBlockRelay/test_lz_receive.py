@@ -126,6 +126,7 @@ def test_lz_receive_read_response_with_broadcast(
 
     # emulate request_block_hash flow
     broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    broadcast_fees = [fee * 2 for fee in broadcast_fees]
     lz_read_gas_limit = 100_000
     read_fee = lz_block_relay.quote_read_fee(lz_read_gas_limit, sum(broadcast_fees))
     with boa.env.prank(dev_deployer):
@@ -138,13 +139,14 @@ def test_lz_receive_read_response_with_broadcast(
     test_block_number = block_data["number"]
     test_block_hash = block_data["hash"]
     message = boa.util.abi.abi_encode("(uint256,bytes32)", (test_block_number, test_block_hash))
-    print(f"Balance of relay before lzReceive: {boa.env.get_balance(lz_block_relay.address)}")
+    bal_before = boa.env.get_balance(lz_block_relay.address)
     # Call lzReceive directly with value to cover broadcast fees
     with boa.env.prank(LZ_ENDPOINT):
         lz_block_relay.lzReceive(
             origin, guid, message, dev_deployer, b"", value=2 * sum(broadcast_fees)
         )
-    print(f"Balance of relay after lzReceive: {boa.env.get_balance(lz_block_relay.address)}")
+    bal_after = boa.env.get_balance(lz_block_relay.address)
+    assert bal_after > bal_before  # must process refund happily
     # Check that event was emitted for broadcast
     events = lz_block_relay.get_logs()
     assert any(

@@ -345,6 +345,7 @@ def _broadcast_block(
 
 @external
 @payable
+@reentrant
 def __default__():
     """
     @notice Default function to receive ETH
