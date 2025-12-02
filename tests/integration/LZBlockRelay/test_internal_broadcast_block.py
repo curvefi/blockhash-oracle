@@ -33,8 +33,8 @@ def test_broadcast_block(forked_env, lz_block_relay, dev_deployer, block_data):
     with boa.env.prank(dev_deployer):
         lz_block_relay.set_peers(test_eids, test_addresses)
 
-    # Call the internal broadcast function
-    refund_address = dev_deployer
+    # # Call the internal broadcast function
+    # refund_address = dev_deployer
 
     boa.env.set_balance(dev_deployer, 10 * 10**18)  # 10 ETH
     with boa.env.prank(dev_deployer):
@@ -42,8 +42,7 @@ def test_broadcast_block(forked_env, lz_block_relay, dev_deployer, block_data):
         lz_block_relay.internal._broadcast_block(
             test_block_number,
             test_block_hash,
-            (broadcast_targets, 150_000),
-            refund_address,
+            (broadcast_targets, 150_000, dev_deployer),
             value=sum(test_fees),
         )
 

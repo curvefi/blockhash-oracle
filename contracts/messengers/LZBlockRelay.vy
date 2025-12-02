@@ -94,9 +94,10 @@ struct BroadcastTarget:
 struct BroadcastData:
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
     gas_limit: uint128
+    requester: address
 
 # Broadcast targets
-broadcast_data: HashMap[bytes32, BroadcastData]  # guid -> (targets: (eid, fee), gas_limit)
+broadcast_data: HashMap[bytes32, BroadcastData]  # guid -> (targets: (eid, fee), gas_limit, requester)
 
 # lzRead received blocks
 received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
@@ -298,6 +299,7 @@ def _request_block_hash(
     self.broadcast_data[receipt.guid] = BroadcastData(
         targets=cached_targets,
         gas_limit=_lz_receive_gas_limit,
+        requester=msg.sender
     )
 
 
@@ -306,14 +308,12 @@ def _broadcast_block(
     _block_number: uint256,
     _block_hash: bytes32,
     _broadcast_data: BroadcastData,
-    _refund_address: address,
 ):
     """
     @notice Internal function to broadcast block hash to multiple chains
     @param _block_number Block number to broadcast
     @param _block_hash Block hash to broadcast
     @param _broadcast_data Data for broadcasting
-    @param _refund_address Excess fees receiver
     """
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = abi_encode(_block_number, _block_hash)
 
@@ -330,7 +330,7 @@ def _broadcast_block(
 
         # Send message
         fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=target.fee, lzTokenFee=0)
-        OApp._lzSend(target.eid, message, options, fees, _refund_address)
+        OApp._lzSend(target.eid, message, options, fees, _broadcast_data.requester)
 
     log BlockHashBroadcast(
         block_number=_block_number,
@@ -491,8 +491,7 @@ def broadcast_latest_block(
     self._broadcast_block(
         block_number,
         block_hash,
-        BroadcastData(targets=broadcast_targets, gas_limit=_lz_receive_gas_limit),
-        msg.sender,
+        BroadcastData(targets=broadcast_targets, gas_limit=_lz_receive_gas_limit, requester=msg.sender),
     )
 
 
@@ -549,7 +548,6 @@ def lzReceive(
                 block_number,
                 block_hash,
                 broadcast_data,
-                self, # dev: refund excess fee to self
             )
     else:
         # Regular message - decode and commit block hash
