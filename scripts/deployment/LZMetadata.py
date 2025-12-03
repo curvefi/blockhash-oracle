@@ -64,7 +64,8 @@ class LZMetadata:
         for _, network_data in self.metadata.items():
             if network_data.get("chainKey") != chain_key:
                 continue
-
+            if network_data.get("deployments") is None:
+                continue
             # Find v2 deployment
             v2_deployment = next(
                 (d for d in network_data["deployments"] if d.get("version") == 2), None
