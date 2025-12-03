@@ -188,9 +188,10 @@ def set_threshold(_new_threshold: uint256):
     assert _new_threshold <= len(
         self.committers
     ), "Threshold cannot be greater than number of committers"
+    assert _new_threshold > 0, "Threshold must be greater than 0"
     self.threshold = _new_threshold
 
-    log  SetThreshold(new_threshold=_new_threshold)
+    log SetThreshold(new_threshold=_new_threshold)
 
 
 @external

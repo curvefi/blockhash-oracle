@@ -126,12 +126,12 @@ def test_lz_receive_read_response_with_broadcast(
 
     # emulate request_block_hash flow
     broadcast_fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
-    broadcast_fees = [fee * 2 for fee in broadcast_fees]
+    broadcast_fees_doubled = [fee * 2 for fee in broadcast_fees]
     lz_read_gas_limit = 100_000
-    read_fee = lz_block_relay.quote_read_fee(lz_read_gas_limit, sum(broadcast_fees))
+    read_fee = lz_block_relay.quote_read_fee(lz_read_gas_limit, sum(broadcast_fees_doubled))
     with boa.env.prank(dev_deployer):
         lz_block_relay.request_block_hash(
-            test_eids, broadcast_fees, 150_000, lz_read_gas_limit, 0, value=read_fee
+            test_eids, broadcast_fees_doubled, 150_000, lz_read_gas_limit, 0, value=read_fee
         )
     guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
 
@@ -139,14 +139,20 @@ def test_lz_receive_read_response_with_broadcast(
     test_block_number = block_data["number"]
     test_block_hash = block_data["hash"]
     message = boa.util.abi.abi_encode("(uint256,bytes32)", (test_block_number, test_block_hash))
-    bal_before = boa.env.get_balance(lz_block_relay.address)
+    relay_bal_before = boa.env.get_balance(lz_block_relay.address)
+    deployer_bal_before = boa.env.get_balance(dev_deployer)
     # Call lzReceive directly with value to cover broadcast fees
     with boa.env.prank(LZ_ENDPOINT):
         lz_block_relay.lzReceive(
-            origin, guid, message, dev_deployer, b"", value=2 * sum(broadcast_fees)
+            origin, guid, message, dev_deployer, b"", value=sum(broadcast_fees_doubled)
         )
-    bal_after = boa.env.get_balance(lz_block_relay.address)
-    assert bal_after > bal_before  # must process refund happily
+    relay_bal_after = boa.env.get_balance(lz_block_relay.address)
+    deployer_bal_after = boa.env.get_balance(dev_deployer)
+    assert relay_bal_after == relay_bal_before  # no refund to relay
+    assert deployer_bal_after > deployer_bal_before  # refund to deployer
+    refund_amount = deployer_bal_after - deployer_bal_before
+    fee_overpaid = sum(broadcast_fees_doubled) - sum(broadcast_fees)
+    assert refund_amount == fee_overpaid
     # Check that event was emitted for broadcast
     events = lz_block_relay.get_logs()
     assert any(
