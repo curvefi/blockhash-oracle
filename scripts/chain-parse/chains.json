@@ -97,6 +97,27 @@
       "drpc": "https://lb.drpc.org/ogrpc?network=hyperliquid&dkey={}",
       "public": "https://rpc.hyperliquid.xyz/evm"
     },
+    "monad": {
+      "chain_id": 143,
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": "https://rpc.ankr.com/monad_mainnet/{}",
+      "drpc": "https://lb.drpc.org/ogrpc?network=monad_mainnet&dkey={}",
+      "public": "https://rpc-mainnet.monadinfra.com"
+    },
+    "plasma": {
+      "chain_id": 9745,
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": null,
+      "drpc": "https://lb.drpc.org/ogrpc?network=plasma&dkey={}",
+      "public": "https://rpc.plasma.to"
+    },
+    "unichain": {
+      "chain_id": 130,
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": null,
+      "drpc": "https://lb.drpc.org/ogrpc?network=unichain&dkey={}",
+      "public": "https://mainnet.unichain.org"
+    },
     "moonbeam": {
       "chain_id": 1284,
       "evm_version": "cancun",
@@ -206,7 +227,7 @@
   "testnets": {
     "sepolia": {
       "chain_id": 11155111,
-      "rpc": "https://eth-sepolia.public.blastapi.io",
+      "rpc": "https://0xrpc.io/sep",
       "evm_version": "paris",
       "explorer": "https://api.etherscan.io/v2/api",
       "is_main_chain": true
