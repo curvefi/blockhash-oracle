@@ -152,7 +152,8 @@
         "LZBlockRelay": "0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2"
       },
       "ethereum": {
-        "MainnetBlockView": "0xb10cface00696B1390875DB2a0113B3ab99752a4"
+        "MainnetBlockView": "0xb10cface00696B1390875DB2a0113B3ab99752a4",
+        "LZBlockRelay": "0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2"
       }
     }
   },
@@ -749,6 +750,13 @@
       "timestamp": "2025-12-08T12:38:00.862777+00:00",
       "network_type": "mainnets",
       "chain": "hyperliquid",
+      "contract_type": "LZBlockRelay",
+      "address": "0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2"
+    },
+    {
+      "timestamp": "2025-12-08T16:55:01.570067+00:00",
+      "network_type": "mainnets",
+      "chain": "ethereum",
       "contract_type": "LZBlockRelay",
       "address": "0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2"
     }
