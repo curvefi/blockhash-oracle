@@ -22,25 +22,25 @@ The system is designed to be highly reliable and secure, leveraging a multi-comm
 The Curve Block Oracle consists of four main smart contracts:
 
 1.  **`MainnetBlockView`** (Ethereum only):
-    -   **Address**: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
+    -   **Address**: `0xb10cface00696B1390875DB2a0113B3ab99752a4`
     -   Provides access to historical block hashes on the Ethereum mainnet.
     -   To prevent reorg-related issues, it only returns hashes for blocks that are at least 65 blocks old.
     -   This contract is called off-chain via LayerZero's `lzRead` functionality.
 
 2.  **`BlockOracle`** (All supported chains):
-    -   **Address**: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
+    -   **Address**: `0xb10cface698eBbEeda6Fd1aC3e1687a8a3f5c5Df`
     -   Stores confirmed block hashes and decoded block headers.
     -   Uses a threshold-based consensus mechanism to validate block data. Currently, the threshold is set to 1, with `LZBlockRelay` as the sole committer.
     -   Once a block hash is confirmed, it is immutable.
 
 3.  **`LZBlockRelay`** (All supported chains):
-    -   **Address**: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
+    -   **Address**: `0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2`
     -   Handles cross-chain messaging via LayerZero.
     -   Commits block hashes to the `BlockOracle`.
     -   Supports read-enabled chains for direct queries to Ethereum.
 
 4.  **`HeaderVerifier`** (All supported chains):
-    -   **Address**: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
+    -   **Address**: `0xb10CdEc0dE69a227307053bEbBFd80864B71ec27`
     -   Decodes RLP-encoded Ethereum block headers.
     -   Extracts key information, such as the state root, parent hash, and other fields.
 
@@ -104,13 +104,13 @@ verifier.submit_block_header(oracle_address, encoded_header)
 
 ### Ethereum Mainnet
 
--   **`MainnetBlockView`**: `0xb10CfacE69cc0B7F1AE0Dc8E6aD186914f6e7EEA`
+-   **`MainnetBlockView`**: `0xb10cface00696B1390875DB2a0113B3ab99752a4`
 
 ### All Other Chains
 
--   **`BlockOracle`**: `0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8`
--   **`LZBlockRelay`**: `0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752`
--   **`HeaderVerifier`**: `0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385`
+-   **`BlockOracle`**: `0xb10cface698eBbEeda6Fd1aC3e1687a8a3f5c5Df`
+-   **`LZBlockRelay`**: `0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2`
+-   **`HeaderVerifier`**: `0xb10CdEc0dE69a227307053bEbBFd80864B71ec27`
 
 ### Supported Chains
 

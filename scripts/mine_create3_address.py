@@ -14,11 +14,11 @@ def get_contract_bytecode(contract_path: str, args: bytes = None) -> bytes:
 def prepare_mining_command(deployer: str, pattern: str = None) -> str:
     """Prepare command for createXcrunch miner"""
     # Build command
+    repo = "https://github.com/HrikB/createXcrunch.git"
     cmd = f"""# Clone and build the miner:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-git clone https://github.com/heswithme/createXcrunch.git
+git clone {repo}
 cd createXcrunch
-git checkout feature/checksum-addresses
 cargo build --release
 
 # Run the miner:
@@ -67,14 +67,19 @@ def main(salt_file: str = "scripts/vanity_salt.txt"):
     # contract_path = "contracts/MainnetBlockView.vy"
     deployer = "0xb101b2b0aa02b7167D238B98dc1B0b0404a760E8"  # main
     # deployer = "0x73241E98090042A718f7eb1AF07FAD27ff09A3F3" # test
-
+    # deployer = "0xaaaa4f0A93C0616d5862341FDE19Ed685AebcB98"
     # Optional: Specify desired address pattern
 
     # contract_path = "contracts/MainnetBlockView.vy"
-    # pattern = "b10cfaceXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-    # contract_path = "contracts/BlockOracle.vy"
     pattern = "b10cfaceXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    pattern = "b10cdec0deXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    pattern = "facefeedXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # contract_path = "contracts/BlockOracle.vy"
+    # pattern = "feebabeXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # "BlockOracle": "0xb10cface69821Ff7b245Cf5f28f3e714fDbd86b8",
+    # "HeaderVerifier": "0xB10CDEC0DE69c88a47c280a97A5AEcA8b0b83385",
+    # "LZBlockRelay": "0xFacEFeeD696BFC0ebe7EaD3FFBb9a56290d31752"
+
     # args_encoded = boa.util.abi.abi_encode("(address)", (deployer,))
 
     # contract_path = "contracts/messengers/LZBlockRelay.vy"
