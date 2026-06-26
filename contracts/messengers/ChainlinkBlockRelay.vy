@@ -54,6 +54,10 @@ exports: (
     CREReceiver.set_expected_author,
     CREReceiver.set_expected_workflow_name,
     CREReceiver.set_expected_workflow_id,
+    CREReceiver.forwarder_address,
+    CREReceiver.expected_author,
+    CREReceiver.expected_workflow_name,
+    CREReceiver.expected_workflow_id,
 )
 # exports: CREReceiver.__interface__
 
