@@ -1,0 +1,21 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "blockhash-relay-staging"
+    deployment-registry: "onchain:ethereum-mainnet"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "blockhash-relay-production"
+    deployment-registry: "onchain:ethereum-mainnet"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""
