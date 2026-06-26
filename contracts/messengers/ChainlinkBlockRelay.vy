@@ -46,7 +46,7 @@ exports: (
 )
 
 # Import CREReceiver module for cross-chain messaging
-from ..modules.chainlink import CREReceiver 
+from ..modules.chainlink import CREReceiver
 
 initializes: CREReceiver[ownable := ownable]
 exports: (
@@ -90,9 +90,6 @@ struct BroadcastData:
     gas_limit: uint256
     requester: address
 
-# Broadcast targets
-broadcast_data: HashMap[bytes32, BroadcastData]  # guid -> (targets: (eid, fee), gas_limit, requester)
-
 # onReport received blocks
 received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 
@@ -121,9 +118,9 @@ def __init__(
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
-    
+
     # CREReceiver.__init__(_forwarder_address)
-    
+
     CCIP.__init__(_ccip_router)
 
 
@@ -210,6 +207,7 @@ def _broadcast_block(
     """
     data: Bytes[64] = abi_encode(_block_number, _block_hash)
     extra_args: Bytes[68] = CCIP.build_extra_args(_broadcast_data.gas_limit)
+    successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
 
     for target: BroadcastTarget in _broadcast_data.targets:
         # Skip if peer is not set
@@ -220,11 +218,12 @@ def _broadcast_block(
         # Send message
         message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
         CCIP._transmit(target.chain_selector, message, target.fee)
+        successful_targets.append(target)
 
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,
-        targets=_broadcast_data.targets,
+        targets=successful_targets,
     )
 
 
@@ -302,7 +301,7 @@ def broadcast_latest_block(
     block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(block_number)
     assert block_hash != empty(bytes32), "No confirmed blocks"
 
-    # Only broadcast if this block was received via lzRead
+    # Only broadcast if this block was received via onReport
     assert self.received_blocks[block_number] == block_hash, "Unknown source"
 
     # Prepare broadcast targets
@@ -324,7 +323,7 @@ def broadcast_latest_block(
 @external
 @payable
 def onReport(
-    _metadata: Bytes[CREReceiver.MAX_METADATA_SIZE], 
+    _metadata: Bytes[CREReceiver.MAX_METADATA_SIZE],
     _report: Bytes[CREReceiver.MAX_REPORT_SIZE]
 ):
     """
@@ -341,7 +340,7 @@ def onReport(
     target_fees: DynArray[uint256, MAX_N_BROADCAST] = []
     ccip_receive_gas_limit: uint256 = 0
 
-    block_number, block_hash, target_chain_selectors, target_fees, ccip_receive_gas_limit = abi_decode(_report, 
+    block_number, block_hash, target_chain_selectors, target_fees, ccip_receive_gas_limit = abi_decode(_report,
         (uint256, bytes32, DynArray[uint64, MAX_N_BROADCAST], DynArray[uint256, MAX_N_BROADCAST], uint256)
     )
     if block_hash == empty(bytes32):
@@ -363,12 +362,12 @@ def onReport(
         for i: uint256 in range(len(target_chain_selectors), bound=MAX_N_BROADCAST):
             cached_targets.append(
                 BroadcastTarget(
-                    chain_selector=target_chain_selectors[i], 
+                    chain_selector=target_chain_selectors[i],
                     fee=target_fees[i]
                 )
             )
             total_fee += target_fees[i]
-        assert self.balance + msg.value >= total_fee, "Insufficient value"
+        assert self.balance >= total_fee, "Insufficient value"
         broadcast_data: BroadcastData = BroadcastData(
             targets=cached_targets,
             gas_limit=ccip_receive_gas_limit,

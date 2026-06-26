@@ -22,7 +22,7 @@ Additional permission fields can be configured using setter functions.
 #                           INTERFACES                         #
 ################################################################
 
-from ethereum.ercs import IERC165 
+from ethereum.ercs import IERC165
 
 implements: IERC165
 
@@ -80,7 +80,7 @@ event ForwarderAddressUpdated:
 event ExpectedAuthorUpdated:
     previous_author: indexed(address)
     new_author: indexed(address)
-    
+
 event ExpectedWorkflowNameUpdated:
     previous_name: indexed(bytes10)
     new_name: indexed(bytes10)
@@ -91,29 +91,6 @@ event ExpectedWorkflowIdUpdated:
 
 event SecurityWarning:
     message: String[MAX_MESSAGE_SIZE]
-
-
-################################################################
-#                          CONSTRUCTOR                         #
-################################################################
-
-# @deploy
-# def __init__(
-#     _forwarder_address: address,
-# ):
-#     """
-#     @notice Constructor configures the forwarder address
-#     @dev The forwarder address is required for security - it ensures only verified reports are processed
-#     @param _forwarder_address The address of the Chainlink Forwarder contract (cannot be address(0))
-#     """
-
-#     # assert _forwarder_address != empty(address), "Invalid forwarder address"
-#     self.forwarder_address = _forwarder_address
-
-#     log ForwarderAddressUpdated(
-#         previous_forwarder=empty(address),
-#         new_forwarder=self.forwarder_address,
-#     )
 
 
 ################################################################
@@ -132,15 +109,15 @@ def set_forwarder_address(
          Only use address(0) if you fully understand the security implications.
     """
     ownable._check_owner()
-    
+
     previous_forwarder: address = self.forwarder_address
 
     # Emit warning if disabling forwarder check
-    
-    # if _forwarder_address == empty(address):
-    #     log SecurityWarning(
-    #         message="Forwarder address set to zero - contract is now INSECURE"
-    #     )
+
+    if _forwarder_address == empty(address):
+        log SecurityWarning(
+            message="CRE onReport is disabled"
+        )
 
     self.forwarder_address = _forwarder_address
     log ForwarderAddressUpdated(
@@ -185,11 +162,11 @@ def set_expected_workflow_name(
     ownable._check_owner()
 
     previous_workflow_name: bytes10 = self.expected_workflow_name
-    
+
     if _expected_workflow_name == empty(String[MAX_WORKFLOW_NAME_SIZE]):
         self.expected_workflow_name = empty(bytes10)
         log ExpectedWorkflowNameUpdated(
-            previous_name=previous_workflow_name, 
+            previous_name=previous_workflow_name,
             new_name = self.expected_workflow_name
         )
         return
@@ -200,9 +177,9 @@ def set_expected_workflow_name(
     hex_string: String[10]  = self._bytes_to_hex_string(slice(abi_encode(name_hash), 0, 5))
     first_10: bytes10 = convert(convert(hex_string, Bytes[10]), bytes10)
     self.expected_workflow_name = first_10
-    
+
     log ExpectedWorkflowNameUpdated(
-        previous_name=previous_workflow_name, 
+        previous_name=previous_workflow_name,
         new_name = self.expected_workflow_name
     )
 
@@ -226,7 +203,7 @@ def set_expected_workflow_id(
     )
 
 # @internal
-# @pure  
+# @pure
 # def _bytes_to_hex_string(
 #     data: Bytes[32]
 # ) -> Bytes[64]:
@@ -279,13 +256,13 @@ def _on_report(metadata: Bytes[MAX_METADATA_SIZE], report: Bytes[MAX_REPORT_SIZE
     """
     @dev Performs optional validation checks based on which permission fields are set
     """
-    
+
     # Security Check 1: Verify caller is the trusted Chainlink Forwarder
     assert msg.sender == self.forwarder_address, "Invalid sender"
 
     # Security Checks 2-4: Verify workflow identity - ID, owner, and/or name (if any are configured)
     if self.expected_workflow_id != empty(bytes32) or self.expected_author != empty(address) or self.expected_workflow_name != empty(bytes10):
-        
+
         workflow_id: bytes32 = empty(bytes32)
         workflow_name: bytes10 = empty(bytes10)
         workflow_owner: address = empty(address)
@@ -309,7 +286,7 @@ def _on_report(metadata: Bytes[MAX_METADATA_SIZE], report: Bytes[MAX_REPORT_SIZE
 
             # Validate workflow name matches (author already validated above)
             assert workflow_name == self.expected_workflow_name, "Invalid workflow name"
-    
+
 
 @internal
 @pure

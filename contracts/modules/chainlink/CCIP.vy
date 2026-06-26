@@ -86,7 +86,7 @@ def __init__(_ccip_router: address):
 @payable
 @internal
 def _transmit(
-    _destination_chain_selector: uint64, 
+    _destination_chain_selector: uint64,
     _message: EVM2AnyMessage,
     _fee: uint256
     ):
@@ -109,7 +109,7 @@ def _quote(_destination_chain_selector: uint64, message: EVM2AnyMessage) -> uint
 @pure
 def build_extra_args(gas_limit: uint256) -> Bytes[68]:
     extra_args: Bytes[68] = abi_encode(
-        GenericExtraArgsV2(gas_limit=gas_limit, allow_out_of_order_execution=True), 
+        GenericExtraArgsV2(gas_limit=gas_limit, allow_out_of_order_execution=True),
         method_id=GENERIC_EXTRA_ARGS_V2_TAG
     )
     return extra_args
@@ -127,19 +127,6 @@ def build_simple_message(receiver: address, data: Bytes[MAX_DATA_SIZE], extra_ar
             extra_args=extra_args
         )
     return message
-
-
-# @view
-# @external
-# def quote(_destination_chain_selector: uint64, gas_limit: uint256) -> uint256:
-#     extra_args: Bytes[68] = self.build_extra_args(gas_limit)
-#     receiver: address = self.selector_to_receiver[_destination_chain_selector]
-#     data: Bytes[64] = abi_encode(block.number, max_value(uint256))
-#     message: EVM2AnyMessage = self.build_simple_message(receiver, data, extra_args)
-#     return staticcall Router(self.router).getFee(
-#         _destination_chain_selector,
-#         message
-#     )
 
 
 @internal
