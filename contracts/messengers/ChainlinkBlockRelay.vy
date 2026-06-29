@@ -114,13 +114,17 @@ event BlockHashBroadcast:
 @deploy
 def __init__(
     _ccip_router: address,
+    _forwarder_address: address,
 ):
     """
     @notice Initialize contract with core settings
     @dev Can only be called once, assumes caller is owner, sets as delegate
+    @dev Set _forwarder_address empty to disable CRE
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+
+    CREReceiver.__init__(_forwarder_address)
 
     CCIP.__init__(_ccip_router)
 

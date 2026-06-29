@@ -94,6 +94,30 @@ event SecurityWarning:
 
 
 ################################################################
+#                          CONSTRUCTOR                         #
+################################################################
+
+@deploy
+def __init__(
+    _forwarder_address: address,
+):
+    """
+    @notice Initialize contract with core settings
+    """
+
+    if _forwarder_address == empty(address):
+        log SecurityWarning(
+            message="CRE onReport is disabled"
+        )
+
+    self.forwarder_address = _forwarder_address
+    log ForwarderAddressUpdated(
+        previous_forwarder=empty(address),
+        new_forwarder=self.forwarder_address,
+    )
+
+
+################################################################
 #                      OWNER FUNCTIONS                         #
 ################################################################
 
