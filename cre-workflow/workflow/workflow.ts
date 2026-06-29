@@ -9,6 +9,7 @@ import {
 } from '@chainlink/cre-sdk'
 import {
 	type Address,
+	isAddress,
 	encodeAbiParameters,
 	parseAbiParameters,
 } from 'viem'
@@ -20,10 +21,15 @@ import {
 import { IReceiver } from '../contracts/evm/ts/generated/IReceiver'
 
 // ─── Config Schema ──────────────────────────────────────────
+export const evmAddressSchema = z.custom<Address>(
+  (val) => typeof val === "string" && isAddress(val),
+  { message: "Invalid EVM address. Must be a valid 42-character hex string." }
+);
+
 export const configSchema = z.object({
-	authorizedEVMAddress: z.string(),
+	authorizedEVMAddress: evmAddressSchema,
 	blockViewChainSelectorName: z.string(),
-	blockViewContractAddress: z.string(),
+	blockViewContractAddress: evmAddressSchema,
 })
 type Config = z.infer<typeof configSchema>
 
@@ -31,7 +37,7 @@ type Config = z.infer<typeof configSchema>
 export function broadcast(
 	runtime: Runtime<Config>,
 	blockNumber: bigint,
-	blockhash: string,
+	blockhash: `0x${string}`,
 	broadcastPayload: BroadcastPayload
 ): BroadcastResult {
 	const result: BroadcastResult = {
