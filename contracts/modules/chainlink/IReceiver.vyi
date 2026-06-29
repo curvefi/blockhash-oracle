@@ -18,10 +18,10 @@ MAX_REPORT_SIZE: constant(uint256) = 8192
 
 @external
 @payable
-def onReport(metadata: Bytes[64], report: Bytes[1024]):
+def onReport(metadata: Bytes[MAX_METADATA_SIZE], report: Bytes[MAX_REPORT_SIZE]):
     """
     @notice Handles incoming keystone reports.
-    @dev If this function call reverts, it can be retried with a higher gas 
+    @dev If this function call reverts, it can be retried with a higher gas
     limit. The receiver is responsible for discarding stale reports.
     @param metadata Report's metadata.
     @param report Workflow report.

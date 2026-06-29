@@ -104,9 +104,7 @@ def set_forwarder_address(
     """
     @notice Updates the forwarder address that is allowed to call onReport
     @param _forwarder_address The new forwarder address
-    @dev WARNING: Setting to address(0) disables forwarder validation.
-         This makes your contract INSECURE - anyone can call onReport() with arbitrary data.
-         Only use address(0) if you fully understand the security implications.
+    @dev WARNING: Setting to address(0) disables onReport().
     """
     ownable._check_owner()
 
@@ -202,30 +200,6 @@ def set_expected_workflow_id(
         new_id=self.expected_workflow_id,
     )
 
-# @internal
-# @pure
-# def _bytes_to_hex_string(
-#     data: Bytes[32]
-# ) -> Bytes[64]:
-#     """
-#     @notice  Helper function to convert bytes to hex string
-#     @param data The bytes to convert
-#     @return The hex string representation
-#     """
-
-#     hex_string: Bytes[64] = b""
-
-#     for i: uint256 in range(len(data), bound=32):
-#         byte_val: uint256 = convert(slice(data, i, 1), uint256)
-
-#         char_high: Bytes[1] = convert(slice(HEX_CHARS, byte_val >> 4, 1), Bytes[1])
-#         char_low: Bytes[1] = convert(slice(HEX_CHARS, byte_val & 15, 1), Bytes[1])
-
-#         size: uint256 = (i+1)*2
-#         assert size <= 64
-#         hex_string = slice(concat(hex_string, char_high, char_low), 0, size)
-
-#     return hex_string
 
 @internal
 @pure
