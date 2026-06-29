@@ -16,6 +16,12 @@ ARBITRUM_CHAIN_SELECTOR = 4949039107694359620  # Arbitrum One mainnet
 CCIP_RECEIVE_GAS_LIMIT = 150_000
 
 
+@pytest.fixture(scope="session")
+def rpc_url(drpc_api_key):
+    """Override parent conftest's rpc_url: always fork Ethereum mainnet."""
+    return f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
+
+
 @pytest.fixture()
 def chainlink_block_relay(forked_env, dev_deployer):
     with boa.env.prank(dev_deployer):
