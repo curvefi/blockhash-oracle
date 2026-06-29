@@ -182,7 +182,7 @@ def _ccipReceive(_message: Any2EVMMessage):
     assert msg.sender == self.router, "Only router"
     # Verify that the message comes from a trusted peer
     peer: address = self.selector_to_sender[_message.source_chain_selector]
-    assert peer == abi_decode(_message.sender, address), "Invalid sender"
+    assert peer != empty(address) and peer == abi_decode(_message.sender, address), "Invalid sender"
 
 
 @view
