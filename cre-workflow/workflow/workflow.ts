@@ -13,7 +13,7 @@ import {
 	parseAbiParameters,
 } from 'viem'
 import { z } from 'zod'
-import type {BroadcastPayload, RequestPayload} from "./types/types";
+import type {BroadcastPayload, BroadcastResult, RequestPayload, ResultPayload} from "./types/types";
 import {
 	MainnetBlockView
 } from '../contracts/evm/ts/generated/MainnetBlockView'
@@ -28,12 +28,26 @@ export const configSchema = z.object({
 type Config = z.infer<typeof configSchema>
 
 // ─── Broadcast ───────────────────────────────────────────────
-export function broadcast(runtime: Runtime<Config>, blockNumber: bigint, blockhash: string, broadcastPayload: BroadcastPayload) {
+export function broadcast(
+	runtime: Runtime<Config>,
+	blockNumber: bigint,
+	blockhash: string,
+	broadcastPayload: BroadcastPayload
+): BroadcastResult {
+	const result: BroadcastResult = {
+		relayChainSelectorName: broadcastPayload.relay.chainSelectorName,
+		targetChainSelectors: [],
+		txHash: '',
+		success: false,
+		message: undefined
+	}
+
 	const targetChainSelectors: bigint[] = [];
 	const targetFees: bigint[] = [];
-	for (var chain of broadcastPayload.targetChains) {
+	for (const chain of broadcastPayload.targetChains) {
 		targetChainSelectors.push(BigInt(chain.selector));
 		targetFees.push(BigInt(chain.fees));
+		result.targetChainSelectors.push(chain.selector);
 	}
 	const ccipReceiveGasLimit: bigint = BigInt(broadcastPayload.ccipReceiveGasLimit);
 	runtime.log(`
@@ -70,13 +84,18 @@ export function broadcast(runtime: Runtime<Config>, blockNumber: bigint, blockha
     })
 
 	const txHash = bytesToHex(writeResult.txHash || new Uint8Array(32))
+	result.txHash = txHash;
 	if (writeResult.txStatus !== TxStatus.SUCCESS ||
 		writeResult.receiverContractExecutionStatus != 0 ) { // TODO use constant when possible
-		// throw new Error(`TX ${txHash} failed: ${writeResult.errorMessage || writeResult.txStatus}`)
-		runtime.log(`TX ${txHash} failed: ${writeResult.errorMessage || writeResult.txStatus}`)
+		const message = `TX ${txHash} failed: ${writeResult.errorMessage || writeResult.txStatus}`
+		runtime.log(message)
+		result.message = message
 	} else {
 		runtime.log(`Blockhash committed! TX: ${txHash}`)
+		result.success = true
 	}
+
+	return result;
 }
 
 // ─── New Blockhash Callback ──────────────────────────────────
@@ -105,13 +124,29 @@ export const onNewBlock = (
 		[blockNumber, blockhash] = mainnetBlockView.getBlockhash(runtime)
 	}
 
-	runtime.log(`Block number: ${blockNumber}`)
+	if (blockhash === `0x${'0'.repeat(64)}`) throw new Error(`Blockhash is unavailable for block ${blockNumber}`)
 
-	for (var broadcastPayload of blockData.data) {
-		broadcast(runtime, blockNumber, blockhash, broadcastPayload);
+
+	runtime.log(`Block number: ${blockNumber}`)
+	const result: ResultPayload = {
+		anySuccess: false,
+		blockNumber: blockNumber.toString(),
+		data: []
 	}
 
-	return `Committed block number: ${blockNumber}`
+	for (const broadcastPayload of blockData.data) {
+		const broadcastResult = broadcast(runtime, blockNumber, blockhash, broadcastPayload);
+		if (broadcastResult.success) {
+			result.anySuccess = true;
+		}
+		result.data.push(broadcastResult);
+	}
+
+	if (!result.anySuccess) {
+		throw new Error(`Broadcast error(s): ${JSON.stringify(result.data)}`)
+	}
+
+	return JSON.stringify(result)
 }
 
 // ─── Workflow Init ──────────────────────────────────────────
