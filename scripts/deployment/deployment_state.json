@@ -5,16 +5,16 @@
         "MainnetBlockView": "0x9a28d62Ca6a5F53BA5aA4bcb2eDF7819A585e835"
       },
       "base-sepolia": {
-        "BlockOracle": "0xD822449aCb1E1586264298504A906ca2E6A6a43f",
-        "HeaderVerifier": "0x0a0b3df5CfF696C527D4D6254274f2739e26618b",
-        "LZBlockRelay": "0x5bcDFaFD434c3C7E87CB67d2B5E87031e404C08C",
-        "ChainlinkBlockRelay": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
+        "ChainlinkBlockRelay": "0x189a8c5EBb35F52015aC0f7D98e4DFEC70Dd8b6E",
+        "BlockOracle": "0x71ccE8Ee9e677230b069D1290462C718b0230c95",
+        "HeaderVerifier": "0xa1580e291316a643777514Ee64A6d8C80502225E",
+        "LZBlockRelay": "0xE13ED4377eaC5a8D585f01cA97F781eE0DA816Df"
       },
       "optimism-sepolia": {
-        "BlockOracle": "0xD822449aCb1E1586264298504A906ca2E6A6a43f",
-        "HeaderVerifier": "0x0a0b3df5CfF696C527D4D6254274f2739e26618b",
-        "LZBlockRelay": "0x5bcDFaFD434c3C7E87CB67d2B5E87031e404C08C",
-        "ChainlinkBlockRelay": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
+        "ChainlinkBlockRelay": "0x189a8c5EBb35F52015aC0f7D98e4DFEC70Dd8b6E",
+        "BlockOracle": "0x71ccE8Ee9e677230b069D1290462C718b0230c95",
+        "HeaderVerifier": "0xa1580e291316a643777514Ee64A6d8C80502225E",
+        "LZBlockRelay": "0xE13ED4377eaC5a8D585f01cA97F781eE0DA816Df"
       }
     },
     "mainnets": {
@@ -160,11 +160,11 @@
   },
   "salts": {
     "testnets": {
-      "view": "73241e98090042a718f7eb1af07fad27ff09a3f30023c6f5bca54687dca5660c",
-      "oracle": "73241e98090042a718f7eb1af07fad27ff09a3f3001bcf4d04ff272fb8b5ac75",
-      "header_verifier": "73241e98090042a718f7eb1af07fad27ff09a3f3002833a3c46035192a99c710",
-      "relay": "73241e98090042a718f7eb1af07fad27ff09a3f3008adf996c18951c1dc4e7aa",
-      "chainlink_relay": "7589d6dada352b798809278e5a0f8606b6088952009b650ea953e54f7eaeb5c0"
+      "view": "7589d6dada352b798809278e5a0f8606b608895200848f496dbf9256629b79f6",
+      "oracle": "7589d6dada352b798809278e5a0f8606b608895200cd67e48c6a2f1c7f897b87",
+      "header_verifier": "7589d6dada352b798809278e5a0f8606b6088952001de68fb29861eec78979dc",
+      "relay": "7589d6dada352b798809278e5a0f8606b608895200dec2123a78e301356f20b8",
+      "chainlink_relay": "7589d6dada352b798809278e5a0f8606b60889520024ecd4d6aaac8eaed18c4e"
     },
     "mainnets": {
       "view": "0xb101b2b0aa02b7167d238b98dc1b0b0404a760e8006032387badddfa00681ca8",
@@ -775,6 +775,62 @@
       "chain": "base-sepolia",
       "contract_type": "ChainlinkBlockRelay",
       "address": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
+    },
+    {
+      "timestamp": "2026-07-02T15:14:08.103805+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "BlockOracle",
+      "address": "0x71ccE8Ee9e677230b069D1290462C718b0230c95"
+    },
+    {
+      "timestamp": "2026-07-02T15:14:18.672731+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "HeaderVerifier",
+      "address": "0xa1580e291316a643777514Ee64A6d8C80502225E"
+    },
+    {
+      "timestamp": "2026-07-02T15:14:35.624009+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "BlockOracle",
+      "address": "0x71ccE8Ee9e677230b069D1290462C718b0230c95"
+    },
+    {
+      "timestamp": "2026-07-02T15:14:50.042294+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "HeaderVerifier",
+      "address": "0xa1580e291316a643777514Ee64A6d8C80502225E"
+    },
+    {
+      "timestamp": "2026-07-02T15:20:07.999168+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "LZBlockRelay",
+      "address": "0xE13ED4377eaC5a8D585f01cA97F781eE0DA816Df"
+    },
+    {
+      "timestamp": "2026-07-02T15:20:28.497958+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "LZBlockRelay",
+      "address": "0xE13ED4377eaC5a8D585f01cA97F781eE0DA816Df"
+    },
+    {
+      "timestamp": "2026-07-02T15:20:47.728076+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "ChainlinkBlockRelay",
+      "address": "0x189a8c5EBb35F52015aC0f7D98e4DFEC70Dd8b6E"
+    },
+    {
+      "timestamp": "2026-07-02T15:21:13.387211+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "ChainlinkBlockRelay",
+      "address": "0x189a8c5EBb35F52015aC0f7D98e4DFEC70Dd8b6E"
     }
   ]
 }
