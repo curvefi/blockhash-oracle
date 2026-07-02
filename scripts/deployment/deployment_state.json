@@ -7,12 +7,14 @@
       "base-sepolia": {
         "BlockOracle": "0xD822449aCb1E1586264298504A906ca2E6A6a43f",
         "HeaderVerifier": "0x0a0b3df5CfF696C527D4D6254274f2739e26618b",
-        "LZBlockRelay": "0x5bcDFaFD434c3C7E87CB67d2B5E87031e404C08C"
+        "LZBlockRelay": "0x5bcDFaFD434c3C7E87CB67d2B5E87031e404C08C",
+        "ChainlinkBlockRelay": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
       },
       "optimism-sepolia": {
         "BlockOracle": "0xD822449aCb1E1586264298504A906ca2E6A6a43f",
         "HeaderVerifier": "0x0a0b3df5CfF696C527D4D6254274f2739e26618b",
-        "LZBlockRelay": "0x5bcDFaFD434c3C7E87CB67d2B5E87031e404C08C"
+        "LZBlockRelay": "0x5bcDFaFD434c3C7E87CB67d2B5E87031e404C08C",
+        "ChainlinkBlockRelay": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
       }
     },
     "mainnets": {
@@ -161,7 +163,8 @@
       "view": "73241e98090042a718f7eb1af07fad27ff09a3f30023c6f5bca54687dca5660c",
       "oracle": "73241e98090042a718f7eb1af07fad27ff09a3f3001bcf4d04ff272fb8b5ac75",
       "header_verifier": "73241e98090042a718f7eb1af07fad27ff09a3f3002833a3c46035192a99c710",
-      "relay": "73241e98090042a718f7eb1af07fad27ff09a3f3008adf996c18951c1dc4e7aa"
+      "relay": "73241e98090042a718f7eb1af07fad27ff09a3f3008adf996c18951c1dc4e7aa",
+      "chainlink_relay": "7589d6dada352b798809278e5a0f8606b6088952009b650ea953e54f7eaeb5c0"
     },
     "mainnets": {
       "view": "0xb101b2b0aa02b7167d238b98dc1b0b0404a760e8006032387badddfa00681ca8",
@@ -758,6 +761,20 @@
       "chain": "ethereum",
       "contract_type": "LZBlockRelay",
       "address": "0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2"
+    },
+    {
+      "timestamp": "2026-07-02T13:21:40.443641+00:00",
+      "network_type": "testnets",
+      "chain": "optimism-sepolia",
+      "contract_type": "ChainlinkBlockRelay",
+      "address": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
+    },
+    {
+      "timestamp": "2026-07-02T13:56:55.792171+00:00",
+      "network_type": "testnets",
+      "chain": "base-sepolia",
+      "contract_type": "ChainlinkBlockRelay",
+      "address": "0x1640a2D59e434772939b79ecdCD7bBf23374Daa8"
     }
   ]
 }
