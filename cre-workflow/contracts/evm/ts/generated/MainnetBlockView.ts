@@ -30,6 +30,8 @@ const encodeTopicValue = (t: Hex | Hex[] | null): string[] => {
 
 
 
+type BlockNumberOption = typeof LAST_FINALIZED_BLOCK_NUMBER
+
 export const MainnetBlockViewABI = [{"stateMutability":"view","type":"function","name":"get_blockhash","inputs":[],"outputs":[{"name":"","type":"uint256"},{"name":"","type":"bytes32"}]},{"stateMutability":"view","type":"function","name":"get_blockhash","inputs":[{"name":"_block_number","type":"uint256"}],"outputs":[{"name":"","type":"uint256"},{"name":"","type":"bytes32"}]},{"stateMutability":"view","type":"function","name":"get_blockhash","inputs":[{"name":"_block_number","type":"uint256"},{"name":"_avoid_failure","type":"bool"}],"outputs":[{"name":"","type":"uint256"},{"name":"","type":"bytes32"}]}] as const
 
 export class MainnetBlockView {
@@ -40,6 +42,7 @@ export class MainnetBlockView {
 
   getBlockhash(
     runtime: Runtime<unknown>,
+    callBlockNumber: BlockNumberOption = LAST_FINALIZED_BLOCK_NUMBER,
   ): readonly [bigint, `0x${string}`] {
     const callData = encodeFunctionData({
       abi: MainnetBlockViewABI,
@@ -49,7 +52,7 @@ export class MainnetBlockView {
     const result = this.client
       .callContract(runtime, {
         call: encodeCallMsg({ from: zeroAddress, to: this.address, data: callData }),
-        blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+        blockNumber: callBlockNumber,
       })
       .result()
 
@@ -63,6 +66,7 @@ export class MainnetBlockView {
   getBlockhash0(
     runtime: Runtime<unknown>,
     blockNumber: bigint,
+    callBlockNumber: BlockNumberOption = LAST_FINALIZED_BLOCK_NUMBER,
   ): readonly [bigint, `0x${string}`] {
     const callData = encodeFunctionData({
       abi: MainnetBlockViewABI,
@@ -73,7 +77,7 @@ export class MainnetBlockView {
     const result = this.client
       .callContract(runtime, {
         call: encodeCallMsg({ from: zeroAddress, to: this.address, data: callData }),
-        blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+        blockNumber: callBlockNumber,
       })
       .result()
 
@@ -88,6 +92,7 @@ export class MainnetBlockView {
     runtime: Runtime<unknown>,
     blockNumber: bigint,
     avoidFailure: boolean,
+    callBlockNumber: BlockNumberOption = LAST_FINALIZED_BLOCK_NUMBER,
   ): readonly [bigint, `0x${string}`] {
     const callData = encodeFunctionData({
       abi: MainnetBlockViewABI,
@@ -98,7 +103,7 @@ export class MainnetBlockView {
     const result = this.client
       .callContract(runtime, {
         call: encodeCallMsg({ from: zeroAddress, to: this.address, data: callData }),
-        blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+        blockNumber: callBlockNumber,
       })
       .result()
 

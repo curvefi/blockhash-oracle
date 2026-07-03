@@ -4,6 +4,7 @@ import {
 	decodeJson,
 	getNetwork,
 	HTTPPayload,
+	LATEST_BLOCK_NUMBER,
 	TxStatus,
 	type Runtime,
 } from '@chainlink/cre-sdk'
@@ -125,9 +126,16 @@ export const onNewBlock = (
 	const mainnetBlockView = new MainnetBlockView(evmClient, config.blockViewContractAddress as Address)
 	let blockNumber, blockhash;
 	if (blockData.blockNumber) {
-		[blockNumber, blockhash] = mainnetBlockView.getBlockhash0(runtime, BigInt(blockData.blockNumber))
+		[blockNumber, blockhash] = mainnetBlockView.getBlockhash0(
+			runtime,
+			BigInt(blockData.blockNumber),
+			LATEST_BLOCK_NUMBER
+		)
 	} else {
-		[blockNumber, blockhash] = mainnetBlockView.getBlockhash(runtime)
+		[blockNumber, blockhash] = mainnetBlockView.getBlockhash(
+			runtime,
+			LATEST_BLOCK_NUMBER
+		)
 	}
 
 	if (blockhash === `0x${'0'.repeat(64)}`) throw new Error(`Blockhash is unavailable for block ${blockNumber}`)
