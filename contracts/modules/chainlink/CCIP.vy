@@ -13,8 +13,26 @@ uses: ownable
 
 # https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol
 interface Router:
+    # @param destinationChainSelector The destination chainSelector.
+    # @param message The cross-chain CCIP message including data and/or tokens.
+    # @return fee returns execution fee for the message.
+    # delivery to destination chain, denominated in the feeToken specified in the message.
+    # @dev Reverts with appropriate reason upon invalid message.
     def getFee(_destinationChainSelector: uint64, _message: EVM2AnyMessage) -> uint256: view
+
+    # @notice Request a message to be sent to the destination chain.
+    # @param destinationChainSelector The destination chain ID.
+    # @param message The cross-chain CCIP message including data and/or tokens.
+    # @return messageId The message ID.
+    # @dev Note if msg.value is larger than the required fee (from getFee) we accept.
+    # the overpayment with no refund.
+    # @dev Reverts with appropriate reason upon invalid message.
     def ccipSend(_destinationChainSelector: uint64, _message: EVM2AnyMessage) -> bytes32: payable
+
+    # @notice Checks if the given chain ID is supported for sending/receiving.
+    # @param destChainSelector The chain to check.
+    # @return supported is true if it is supported, false if not.
+    def isChainSupported(_destinationChainSelector: uint64) -> bool: view
 
 
 event SetRouter:
@@ -99,6 +117,8 @@ def _transmit(
 @view
 @internal
 def _quote(_destination_chain_selector: uint64, message: EVM2AnyMessage) -> uint256:
+    if not staticcall Router(self.router).isChainSupported(_destination_chain_selector):
+        return 0
     return staticcall Router(self.router).getFee(
         _destination_chain_selector,
         message

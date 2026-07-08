@@ -45,6 +45,24 @@ def test_quote_fee_two_chains(ccip_module_mainnet, dev_deployer):
 
 
 @pytest.mark.mainnet
+def test_quote_fee_unsupported_chain_returns_zero(ccip_module_mainnet, dev_deployer):
+    """quote returns 0 (instead of reverting) when a peer is registered for a chain
+    selector the real router does not recognize."""
+    fake_selector = 111
+    receiver = boa.env.generate_address()
+
+    with boa.env.prank(dev_deployer):
+        ccip_module_mainnet.set_receiver(fake_selector, receiver)
+
+    data = boa.util.abi.abi_encode("(uint256,bytes32)", (12345, bytes(32)))
+    extra_args = ccip_module_mainnet.build_extra_args(CCIP_RECEIVE_GAS_LIMIT)
+    message = ccip_module_mainnet.build_simple_message(receiver, data, extra_args)
+
+    fee = ccip_module_mainnet.quote(fake_selector, message)
+    assert fee == 0
+
+
+@pytest.mark.mainnet
 def test_quote_fee_higher_gas_costs_more(ccip_module_mainnet, dev_deployer):
     """A higher ccipReceive gas limit yields an equal or higher fee from the router."""
     receiver = boa.env.generate_address()

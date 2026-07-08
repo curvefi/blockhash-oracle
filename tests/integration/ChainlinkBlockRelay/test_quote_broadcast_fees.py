@@ -51,6 +51,23 @@ def test_quote_broadcast_fees_mixed(forked_env, chainlink_block_relay, dev_deplo
 
 
 @pytest.mark.mainnet
+def test_quote_broadcast_fees_unsupported_chain_with_peer(
+    forked_env, chainlink_block_relay, dev_deployer
+):
+    """Test that fee is 0 (not a revert) for a chain with a registered peer that the
+    real CCIP router does not recognize."""
+    fake_selector = 111
+    test_address = boa.env.generate_address()
+
+    with boa.env.prank(dev_deployer):
+        chainlink_block_relay.set_peer(fake_selector, test_address)
+
+    fees = chainlink_block_relay.quote_broadcast_fees([fake_selector], CCIP_RECEIVE_GAS_LIMIT)
+
+    assert fees == [0]
+
+
+@pytest.mark.mainnet
 def test_quote_broadcast_fees_empty_list(forked_env, chainlink_block_relay):
     """Test quoting fees for an empty selector list returns an empty array."""
     fees = chainlink_block_relay.quote_broadcast_fees([], CCIP_RECEIVE_GAS_LIMIT)
