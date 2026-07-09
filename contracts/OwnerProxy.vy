@@ -27,7 +27,6 @@ interface IBlockOracleAdmin:
     def set_threshold(new_threshold: uint256): nonpayable
     def admin_apply_block(block_number: uint256, block_hash: bytes32): nonpayable
     def transfer_ownership(new_owner: address): nonpayable
-    def renounce_ownership(): nonpayable
 
 
 
