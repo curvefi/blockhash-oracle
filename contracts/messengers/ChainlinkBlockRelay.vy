@@ -67,7 +67,8 @@ exports: (
     CCIP.set_router,
     CCIP.router,
     CCIP.selector_to_receiver,
-    CCIP.selector_to_sender
+    CCIP.selector_to_sender,
+    CCIP.set_peer,
 )
 
 
@@ -135,18 +136,6 @@ def __init__(
 
 
 @external
-def set_peer(_chain_selector: uint64, _peer: address):
-    """
-    @notice Set the receiver and the sender for cross chain transactions
-    @param _chain_selector The unique CCIP destination chain selector
-    @param _peer The address on the destination chain to transmit messages to and/or receive from
-    """
-    ownable._check_owner()
-
-    CCIP._set_peer(_chain_selector, _peer)
-
-
-@external
 def set_peers(_chain_selectors: DynArray[uint64, MAX_N_BROADCAST], _peers: DynArray[address, MAX_N_BROADCAST]):
     """
     @notice Set peers for a corresponding endpoints. Batched version of OApp.setPeer that accept address (EVM only).
@@ -175,7 +164,7 @@ def set_block_oracle(_oracle: address):
 def withdraw_eth(_amount: uint256):
     """
     @notice Withdraw ETH from contract
-    @dev ETH can be accumulated from LZ refunds
+    @dev ETH can be accumulated from unused CCIP fees
     @param _amount Amount to withdraw
     """
     ownable._check_owner()
