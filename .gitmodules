@@ -2,3 +2,6 @@
 	path = contracts/modules/oapp_vyper
 	url = git@github.com:curvefi/LayerZero-v2-vyper.git
 	branch = blockhash-oracle
+[submodule "contracts/modules/chainlink"]
+	path = contracts/modules/chainlink
+	url = C:/workspace/curve/Chainlink-vyper
