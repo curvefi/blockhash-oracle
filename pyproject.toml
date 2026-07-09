@@ -10,30 +10,44 @@ dependencies = [
     "vyper==0.4.3",
     "snekmate==0.1.2",
     "titanoboa==0.2.8",
-    "web3>=7.6.0",
-    "py-evm>=0.12.0",
-    "hyperliquid-python-sdk>=0.15.0",
+    "web3>=7.15.0,<8",
+    "requests>=2.33.0,<3",
+    "py-evm>=0.12.0,<0.13",
+    "hyperliquid-python-sdk>=0.15.0,<0.16",
 ]
 
 # [tool.uv.sources]
 # titanoboa = { git = "https://github.com/vyperlang/titanoboa.git", rev = "44d35aaed62d1e2bdfc758fb2de855b85726ae64" }
 
 [tool.uv]
-dev-dependencies = [
+constraint-dependencies = [
+    "cbor2>=5.9.0,<6",
+    "filelock>=3.20.3,<4",
+    "jaraco.context>=6.1.0,<7",
+    "jinja2>=3.1.6,<4",
+    "jupyter-core>=5.8.1,<6",
+    "markdown>=3.8.1,<4",
+    "pygments>=2.20.0,<3",
+    "virtualenv>=20.36.1,<21",
+    "wheel>=0.46.2,<1",
+]
+
+[dependency-groups]
+dev = [
     "pytest-xdist>=3.6.1",
     "mamushi",
     "pre-commit==3.8.0",
     "ruff==0.6.9",
-    "pytest==8.2.2",
+    "pytest>=9.0.3,<10",
     "plyvel-ci==1.5.1",
-    "curve-dao>=1.0.0",
-    "ipykernel>=6.29.5",
-    "nbconvert>=7.17.1",
-    "python-dotenv>=1.2.2",
+    "curve-dao>=1.0.0,<2",
+    "ipykernel>=6.29.5,<7",
+    "nbconvert>=7.17.1,<8",
+    "python-dotenv>=1.2.2,<2",
     "natrix==v0.1.4",
-    "cryptography>=48.0.1",
-    "keyring",
-    "base58",
+    "cryptography>=49.0.0,<50",
+    "keyring>=25.6.0,<26",
+    "base58==2.1.1",
 ]
 
 [tool.ruff]
