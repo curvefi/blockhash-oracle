@@ -286,7 +286,7 @@ requires-dist = [
     { name = "snekmate", specifier = "==0.1.2" },
     { name = "titanoboa", specifier = "==0.2.8" },
     { name = "vyper", specifier = "==0.4.3" },
-    { name = "web3", specifier = ">=7.6.0" },
+    { name = "web3", specifier = ">=7.15.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -734,7 +734,7 @@ wheels = [
 
 [[package]]
 name = "eth-account"
-version = "0.13.4"
+version = "0.13.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bitarray" },
@@ -748,9 +748,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "rlp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/c9/38a55928f6eef30c8c7144f00400988bc1950e10b89de09991b315ff9d98/eth_account-0.13.4.tar.gz", hash = "sha256:2e1f2de240bef3d9f3d8013656135d2a79b6be6d4e7885bce9cace4334a4a376", size = 931759, upload-time = "2024-09-25T20:27:03.202Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/cf/20f76a29be97339c969fd765f1237154286a565a1d61be98e76bb7af946a/eth_account-0.13.7.tar.gz", hash = "sha256:5853ecbcbb22e65411176f121f5f24b8afeeaf13492359d254b16d8b18c77a46", size = 935998, upload-time = "2025-04-21T21:11:21.204Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/03/0b/c8e21c361b61be773e2d9a4a69ec2c72d445a1f1293e026935affe7fc7df/eth_account-0.13.4-py3-none-any.whl", hash = "sha256:a4c109e9bad3a278243fcc028b755fb72b43e25b1e6256b3f309a44f5f7d87c3", size = 581366, upload-time = "2024-09-25T20:27:01.081Z" },
+    { url = "https://files.pythonhosted.org/packages/46/18/088fb250018cbe665bc2111974301b2d59f294a565aff7564c4df6878da2/eth_account-0.13.7-py3-none-any.whl", hash = "sha256:39727de8c94d004ff61d10da7587509c04d2dc7eac71e04830135300bdfc6d24", size = 587452, upload-time = "2025-04-21T21:11:18.346Z" },
 ]
 
 [[package]]
@@ -2572,7 +2572,7 @@ wheels = [
 
 [[package]]
 name = "web3"
-version = "7.6.1"
+version = "7.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2590,9 +2590,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/2c/c8f8ac9d418e4a0ace6b1719f8d2ac30a4fcd7b9831697f8ec93acd9e904/web3-7.6.1.tar.gz", hash = "sha256:0cce0f33bef9096fc976ee00c38e71cdd10a61d4302a6b13b56ab58327764f9a", size = 2173143, upload-time = "2024-12-18T20:40:09.769Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/84/1516ee335e89e4d7d0837895d21091244ee3189d1ffe76fa435d2bd15f4e/web3-7.15.0.tar.gz", hash = "sha256:2a2bcbab8fcf120c2256ddbdc88fcc80a47c100ad758659a980e9fab66609171", size = 2211838, upload-time = "2026-04-02T18:20:40.355Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d8/04/75b4e47bddb5ff705b0b562d63e6757eb6a1e5fad55fb62a90da58614e6d/web3-7.6.1-py3-none-any.whl", hash = "sha256:8f6b315fe1da12754930c4f809d27e33091bd7e2e1613bea1328bb5710acc5e3", size = 1354638, upload-time = "2024-12-18T20:40:07.359Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/f0/ef9b82557b22b1cdb95ec7863d1d9897ed3b9e096a1af5e046fb892efdc0/web3-7.15.0-py3-none-any.whl", hash = "sha256:bbeba510aaa4eb3c99662d911db9d2a648ab40f608cf0269065f7db1d1d0b0c0", size = 1373052, upload-time = "2026-04-02T18:20:36.757Z" },
 ]
 
 [[package]]
