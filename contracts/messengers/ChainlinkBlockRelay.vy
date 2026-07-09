@@ -21,7 +21,7 @@ This contract should be deployed on multiple chains along with BlockOracle and M
 #                           INTERFACES                         #
 ################################################################
 
-from ..modules.chainlink import IReceiver
+from ..modules.chainlink.src import IReceiver
 
 implements: IReceiver
 
@@ -46,7 +46,7 @@ exports: (
 )
 
 # Import CREReceiver module for cross-chain messaging
-from ..modules.chainlink import CREReceiver
+from ..modules.chainlink.src import CREReceiver
 
 initializes: CREReceiver[ownable := ownable]
 exports: (
@@ -61,7 +61,7 @@ exports: (
 )
 # exports: CREReceiver.__interface__
 
-from ..modules.chainlink import CCIP
+from ..modules.chainlink.src import CCIP
 initializes: CCIP[ownable := ownable]
 exports: (
     CCIP.set_router,
