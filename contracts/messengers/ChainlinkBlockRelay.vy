@@ -138,7 +138,7 @@ def __init__(
 @external
 def set_peers(_chain_selectors: DynArray[uint64, MAX_N_BROADCAST], _peers: DynArray[address, MAX_N_BROADCAST]):
     """
-    @notice Set peers for a corresponding endpoints. Batched version of OApp.setPeer that accept address (EVM only).
+    @notice Set peers for corresponding chain selectors. Batched version of CCIP.set_peer (EVM only).
     @param _chain_selectors List of chain IDs
     @param _peers Addresses of the peers to be associated with the corresponding chains.
     """
@@ -231,7 +231,7 @@ def _broadcast_block(
 def __default__():
     """
     @notice Default function to receive ETH
-    @dev This is needed to receive refunds from LayerZero
+    @dev This is needed to receive unused CCIP fees
     """
     pass
 
@@ -264,7 +264,7 @@ def quote_broadcast_fees(
             fees.append(0)
             continue
 
-        # Get fee for target EID and append to array
+        # Get fee for target chain selector and append to array
         message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
         fees.append(CCIP._quote(selector, message))
 
@@ -281,12 +281,11 @@ def broadcast_latest_block(
     """
     @notice Broadcast latest confirmed block hash to specified chains
     @param _target_chain_selectors List of chain IDs to broadcast to
-    @param _target_fees List of fees per chain (must match _target_eids length)
+    @param _target_fees List of fees per chain (must match _target_chain_selectors length)
     @param _ccip_receive_gas_limit Gas limit for ccipReceive (same for all targets)
     @dev Only broadcast what was received via onReport to prevent potentially malicious hashes from other sources
     """
 
-    # assert self.read_enabled, "Can only broadcast from read-enabled chains"
     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
     assert len(_target_chain_selectors) == len(_target_fees), "Length mismatch"
 
