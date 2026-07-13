@@ -4,4 +4,4 @@
 	branch = blockhash-oracle
 [submodule "contracts/modules/chainlink"]
 	path = contracts/modules/chainlink
-	url = C:/workspace/curve/Chainlink-vyper
+	url = https://github.com/curvefi/Chainlink-vyper.git
