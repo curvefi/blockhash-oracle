@@ -424,7 +424,7 @@ def onReport(
 @external
 def ccipReceive(_message: CCIP.Any2EVMMessage):
     CCIP._ccipReceive(_message)
-    assert len(_message.token_amounts) == 0, "No tokens"
+    assert len(_message.dest_token_amounts) == 0, "No tokens"
 
     # Regular message - decode and commit block hash
     block_number: uint256 = 0

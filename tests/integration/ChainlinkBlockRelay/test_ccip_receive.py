@@ -11,14 +11,19 @@ def _abi_encode_address(addr):
 
 
 def _build_ccip_message(
-    source_selector, sender_address, block_number, block_hash, message_id=None, token_amounts=None
+    source_selector,
+    sender_address,
+    block_number,
+    block_hash,
+    message_id=None,
+    dest_token_amounts=None,
 ):
     """Build an Any2EVMMessage tuple matching CCIP.vy's struct layout."""
     message_id = message_id or bytes(32)
     sender_bytes = _abi_encode_address(sender_address)
     data = boa.util.abi.abi_encode("(uint256,bytes32)", (block_number, block_hash))
-    # (message_id, source_chain_selector, sender, data, token_amounts)
-    return (message_id, source_selector, sender_bytes, data, token_amounts or [])
+    # (message_id, source_chain_selector, sender, data, dest_token_amounts)
+    return (message_id, source_selector, sender_bytes, data, dest_token_amounts or [])
 
 
 # ─── Access control ──────────────────────────────────────────────────────────
@@ -93,7 +98,7 @@ def test_ccip_receive_rejects_token_bearing_message(
         peer,
         block_data["number"],
         block_data["hash"],
-        token_amounts=[(token, 1)],
+        dest_token_amounts=[(token, 1)],
     )
     with boa.env.prank(CCIP_ROUTER):
         with boa.reverts("No tokens"):
