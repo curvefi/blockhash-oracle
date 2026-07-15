@@ -3,9 +3,9 @@
 # pragma nonreentrancy on
 
 """
-@title Chainlink Runtime Environment Block Relay
+@title Chainlink CRE + CCIP Block Relay
 
-@notice CRE messenger for block hashes.
+@notice Block-hash messenger over Chainlink CRE (inbound reports) and CCIP (cross-chain fanout/receive).
 This contract should be deployed on multiple chains along with BlockOracle and MainnetBlockView.
 
 @license Copyright (c) Curve.Fi, 2026 - all rights reserved
@@ -110,6 +110,9 @@ event BlockHashBroadcast:
     block_hash: indexed(bytes32)
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
 
+event SetBlockOracle:
+    oracle: indexed(address)
+
 event MessageSent:
     message_id: bytes32
     chain_selector: uint64
@@ -150,7 +153,7 @@ def __init__(
 def set_peers(_chain_selectors: DynArray[uint64, MAX_N_BROADCAST], _peers: DynArray[address, MAX_N_BROADCAST]):
     """
     @notice Set peers for corresponding chain selectors. Batched version of CCIP.set_peer (EVM only).
-    @param _chain_selectors List of chain IDs
+    @param _chain_selectors List of CCIP chain selectors
     @param _peers Addresses of the peers to be associated with the corresponding chains.
     """
     ownable._check_owner()
@@ -169,6 +172,7 @@ def set_block_oracle(_oracle: address):
     ownable._check_owner()
 
     self.block_oracle = IBlockOracle(_oracle)
+    log SetBlockOracle(oracle=_oracle)
 
 
 @external
@@ -272,8 +276,8 @@ def _broadcast_block(
 @reentrant
 def __default__():
     """
-    @notice Default function to receive ETH
-    @dev This is needed to receive unused CCIP fees
+    @notice Receive ETH: treasury funding and public overpayment
+    @dev CCIP does not refund Router overpayment, so any surplus accrues here (owner-withdrawable)
     """
     pass
 
@@ -322,7 +326,7 @@ def broadcast_latest_block(
 ):
     """
     @notice Broadcast latest confirmed block hash to specified chains
-    @param _target_chain_selectors List of chain IDs to broadcast to
+    @param _target_chain_selectors List of CCIP chain selectors to broadcast to
     @param _target_fees List of fees per chain (must match _target_chain_selectors length)
     @param _ccip_receive_gas_limit Gas limit for ccipReceive (same for all targets)
     @dev Only broadcast what was received via onReport to prevent potentially malicious hashes from other sources
