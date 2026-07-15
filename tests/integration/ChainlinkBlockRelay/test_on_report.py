@@ -193,3 +193,47 @@ def test_on_report_insufficient_balance_for_broadcast(
     with boa.env.prank(cre_forwarder):
         with boa.reverts("Insufficient value"):
             configured_relay.onReport(VALID_METADATA, report)
+
+
+# ─── Idempotency / conflict (#4) ─────────────────────────────────────────────
+
+
+@pytest.mark.mainnet
+def test_on_report_duplicate_reruns_fanout_without_reverting(
+    forked_env, configured_relay, block_oracle, cre_forwarder, dev_deployer, block_data
+):
+    """A duplicate report for an already-committed block does not revert: the commit is
+    skipped (idempotent) but the fanout still runs, so re-triggering retries delivery."""
+    n, h = block_data["number"], block_data["hash"]
+
+    with boa.env.prank(cre_forwarder):
+        configured_relay.onReport(VALID_METADATA, _encode_report(n, h))
+    assert block_oracle.get_block_hash(n) == h
+
+    peer = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peer(BASE_CHAIN_SELECTOR, peer)
+    fees = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)
+    boa.env.set_balance(configured_relay.address, fees[0])
+
+    # same block again, now carrying a broadcast target
+    with boa.env.prank(cre_forwarder):
+        configured_relay.onReport(VALID_METADATA, _encode_report(n, h, [BASE_CHAIN_SELECTOR], fees))
+
+    assert block_oracle.get_block_hash(n) == h  # commit was a no-op
+    events = configured_relay.get_logs()
+    assert len([e for e in events if "BlockHashBroadcast" in str(e)]) == 1  # fanout still fired
+
+
+@pytest.mark.mainnet
+def test_on_report_conflicting_hash_reverts(
+    forked_env, configured_relay, cre_forwarder, block_data
+):
+    """A report for an already-applied block with a different hash reverts."""
+    n, h = block_data["number"], block_data["hash"]
+    conflicting = bytes.fromhex("bb" * 32)
+
+    with boa.env.prank(cre_forwarder):
+        configured_relay.onReport(VALID_METADATA, _encode_report(n, h))
+        with boa.reverts("Different blockhash already applied"):
+            configured_relay.onReport(VALID_METADATA, _encode_report(n, conflicting))

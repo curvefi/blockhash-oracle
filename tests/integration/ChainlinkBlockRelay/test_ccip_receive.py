@@ -131,3 +131,43 @@ def test_ccip_receive_multiple_blocks(
 
     assert block_oracle.committer_votes(configured_relay.address, block_a_number) == block_a_hash
     assert block_oracle.committer_votes(configured_relay.address, block_b_number) == block_b_hash
+
+
+# ─── Idempotency / conflict (#4) ─────────────────────────────────────────────
+
+
+@pytest.mark.mainnet
+def test_ccip_receive_duplicate_same_hash_no_revert(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A duplicate CCIP delivery of an already-committed block is a no-op, not a revert."""
+    n, h = block_data["number"], block_data["hash"]
+    source_selector = 111
+    peer = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peer(source_selector, peer)
+
+    message = _build_ccip_message(source_selector, peer, n, h)
+    with boa.env.prank(CCIP_ROUTER):
+        configured_relay.ccipReceive(message)
+        configured_relay.ccipReceive(message)  # duplicate: must not revert
+
+    assert block_oracle.get_block_hash(n) == h
+
+
+@pytest.mark.mainnet
+def test_ccip_receive_conflicting_hash_reverts(
+    forked_env, configured_relay, dev_deployer, block_data
+):
+    """A CCIP delivery of a different hash for an already-applied block reverts."""
+    n, h = block_data["number"], block_data["hash"]
+    conflicting = bytes.fromhex("ee" * 32)
+    source_selector = 111
+    peer = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peer(source_selector, peer)
+
+    with boa.env.prank(CCIP_ROUTER):
+        configured_relay.ccipReceive(_build_ccip_message(source_selector, peer, n, h))
+        with boa.reverts("Different blockhash already applied"):
+            configured_relay.ccipReceive(_build_ccip_message(source_selector, peer, n, conflicting))

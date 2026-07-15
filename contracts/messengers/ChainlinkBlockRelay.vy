@@ -192,6 +192,11 @@ def _commit_block(_block_number: uint256, _block_hash: bytes32):
     @notice Commit block hash to oracle
     """
     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    # Skip if block already applied with the same hash
+    applied_blockhash: bytes32 = staticcall self.block_oracle.get_block_hash(_block_number)
+    if applied_blockhash == _block_hash:
+        return
+    assert applied_blockhash == empty(bytes32), "Different blockhash already applied"
     extcall self.block_oracle.commit_block(_block_number, _block_hash)
 
 

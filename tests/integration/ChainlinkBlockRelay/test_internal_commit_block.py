@@ -38,3 +38,34 @@ def test_commit_block_oracle_not_configured(
 
         with boa.reverts("Oracle not configured"):
             chainlink_block_relay.internal._commit_block(block_data["number"], block_data["hash"])
+
+
+@pytest.mark.mainnet
+def test_commit_block_idempotent_on_same_applied_hash(
+    forked_env, chainlink_block_relay, block_oracle, dev_deployer, block_data
+):
+    """Re-committing an already-applied block with the same hash is a no-op, not a revert."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(chainlink_block_relay.address, True)
+        chainlink_block_relay.set_block_oracle(block_oracle.address)
+        chainlink_block_relay.internal._commit_block(n, h)  # applied at threshold=1
+        chainlink_block_relay.internal._commit_block(n, h)  # duplicate: must not revert
+
+    assert block_oracle.get_block_hash(n) == h
+
+
+@pytest.mark.mainnet
+def test_commit_block_reverts_on_conflicting_hash(
+    forked_env, chainlink_block_relay, block_oracle, dev_deployer, block_data
+):
+    """Committing a different hash for an already-applied block reverts."""
+    n, h = block_data["number"], block_data["hash"]
+    conflicting = bytes.fromhex("dd" * 32)
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(chainlink_block_relay.address, True)
+        chainlink_block_relay.set_block_oracle(block_oracle.address)
+        chainlink_block_relay.internal._commit_block(n, h)
+
+        with boa.reverts("Different blockhash already applied"):
+            chainlink_block_relay.internal._commit_block(n, conflicting)
