@@ -1,3 +1,5 @@
+import os
+
 import boa
 import pytest
 
@@ -18,14 +20,27 @@ CCIP_RECEIVE_GAS_LIMIT = 150_000
 
 @pytest.fixture(scope="session")
 def rpc_url(drpc_api_key):
-    """Override parent conftest's rpc_url: always fork Ethereum mainnet."""
+    """Override parent conftest's rpc_url: always fork Ethereum mainnet.
+
+    MAINNET_FORK_RPC overrides the endpoint (useful when the DRPC free tier throttles).
+    """
+    override = os.getenv("MAINNET_FORK_RPC")
+    if override:
+        return override
     return f"https://lb.drpc.org/ogrpc?network=ethereum&dkey={drpc_api_key}"
 
 
 @pytest.fixture()
+def cre_forwarder():
+    """CRE Forwarder address that configured_relay trusts for onReport."""
+    return CRE_FORWARDER
+
+
+@pytest.fixture()
 def chainlink_block_relay(forked_env, dev_deployer):
+    """Base relay deployed with CRE disabled; forwarder enabled later (see configured_relay)."""
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/messengers/ChainlinkBlockRelay.vy", CCIP_ROUTER, CRE_FORWARDER)
+        return boa.load("contracts/messengers/ChainlinkBlockRelay.vy", CCIP_ROUTER, EMPTY_ADDRESS)
 
 
 @pytest.fixture()
@@ -33,5 +48,6 @@ def configured_relay(chainlink_block_relay, block_oracle, dev_deployer):
     """Relay with oracle, committer, and CRE forwarder fully configured."""
     with boa.env.prank(dev_deployer):
         chainlink_block_relay.set_block_oracle(block_oracle.address)
+        chainlink_block_relay.set_forwarder_address(CRE_FORWARDER)
         block_oracle.add_committer(chainlink_block_relay.address, True)
     return chainlink_block_relay

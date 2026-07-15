@@ -62,7 +62,7 @@ def test_ccip_receive_rejects_unregistered_sender(
 
 @pytest.mark.mainnet
 def test_ccip_receive_rejects_unregistered_chain(forked_env, configured_relay, block_data):
-    """Test that ccipReceive rejects messages from chains with no registered peer (zero address)."""
+    """Rejects messages from a chain with no registered peer: unset selector reverts "No sender"."""
     unregistered_selector = 999
     any_sender = boa.env.generate_address()
 
@@ -71,7 +71,7 @@ def test_ccip_receive_rejects_unregistered_chain(forked_env, configured_relay, b
     )
 
     with boa.env.prank(CCIP_ROUTER):
-        with boa.reverts("Invalid sender"):
+        with boa.reverts("No sender"):
             configured_relay.ccipReceive(message)
 
 
