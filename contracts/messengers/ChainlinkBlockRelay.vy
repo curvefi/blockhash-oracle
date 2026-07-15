@@ -22,6 +22,7 @@ This contract should be deployed on multiple chains along with BlockOracle and M
 ################################################################
 
 from ..modules.chainlink.src import IReceiver
+from ethereum.ercs import IERC20
 
 implements: IReceiver
 
@@ -181,6 +182,17 @@ def withdraw_eth(_amount: uint256):
 
     assert self.balance >= _amount, "Insufficient balance"
     send(msg.sender, _amount)
+
+
+@external
+def recover_erc20(_token: address, _to: address, _amount: uint256):
+    """
+    @notice Recover ERC20 tokens sent to this contract
+    @dev Data-only relay: token-bearing CCIP messages are rejected, but a direct transfer can still land here
+    """
+    ownable._check_owner()
+
+    assert extcall IERC20(_token).transfer(_to, _amount), "Transfer failed"
 
 
 ################################################################
@@ -408,6 +420,7 @@ def onReport(
 @external
 def ccipReceive(_message: CCIP.Any2EVMMessage):
     CCIP._ccipReceive(_message)
+    assert len(_message.token_amounts) == 0, "No tokens"
 
     # Regular message - decode and commit block hash
     block_number: uint256 = 0

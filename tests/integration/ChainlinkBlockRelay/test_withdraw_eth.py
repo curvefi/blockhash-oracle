@@ -38,3 +38,43 @@ def test_withdraw_eth(forked_env, chainlink_block_relay, dev_deployer):
         chainlink_block_relay.withdraw_eth(9 * 10**17)
 
     assert boa.env.get_balance(chainlink_block_relay.address) == 0
+
+
+_MOCK_ERC20 = """# pragma version 0.4.3
+balanceOf: public(HashMap[address, uint256])
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balanceOf[_to] += _amount
+
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    self.balanceOf[msg.sender] -= _amount
+    self.balanceOf[_to] += _amount
+    return True
+"""
+
+
+@pytest.mark.mainnet
+def test_recover_erc20(forked_env, chainlink_block_relay, dev_deployer):
+    """Owner can recover ERC20 tokens accidentally sent to the relay."""
+    token = boa.loads(_MOCK_ERC20)
+    recipient = boa.env.generate_address()
+    token.mint(chainlink_block_relay.address, 1000)
+
+    with boa.env.prank(dev_deployer):
+        chainlink_block_relay.recover_erc20(token.address, recipient, 1000)
+
+    assert token.balanceOf(chainlink_block_relay.address) == 0
+    assert token.balanceOf(recipient) == 1000
+
+
+@pytest.mark.mainnet
+def test_recover_erc20_non_owner_reverts(forked_env, chainlink_block_relay):
+    """Non-owner cannot recover ERC20 tokens."""
+    token = boa.loads(_MOCK_ERC20)
+    stranger = boa.env.generate_address()
+
+    with boa.env.prank(stranger):
+        with boa.reverts("ownable: caller is not the owner"):
+            chainlink_block_relay.recover_erc20(token.address, stranger, 1)

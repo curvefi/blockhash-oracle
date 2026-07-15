@@ -10,13 +10,15 @@ def _abi_encode_address(addr):
     return boa.util.abi.abi_encode("address", addr)
 
 
-def _build_ccip_message(source_selector, sender_address, block_number, block_hash, message_id=None):
+def _build_ccip_message(
+    source_selector, sender_address, block_number, block_hash, message_id=None, token_amounts=None
+):
     """Build an Any2EVMMessage tuple matching CCIP.vy's struct layout."""
     message_id = message_id or bytes(32)
     sender_bytes = _abi_encode_address(sender_address)
     data = boa.util.abi.abi_encode("(uint256,bytes32)", (block_number, block_hash))
     # (message_id, source_chain_selector, sender, data, token_amounts)
-    return (message_id, source_selector, sender_bytes, data, [])
+    return (message_id, source_selector, sender_bytes, data, token_amounts or [])
 
 
 # ─── Access control ──────────────────────────────────────────────────────────
@@ -72,6 +74,29 @@ def test_ccip_receive_rejects_unregistered_chain(forked_env, configured_relay, b
 
     with boa.env.prank(CCIP_ROUTER):
         with boa.reverts("No sender"):
+            configured_relay.ccipReceive(message)
+
+
+@pytest.mark.mainnet
+def test_ccip_receive_rejects_token_bearing_message(
+    forked_env, configured_relay, dev_deployer, block_data
+):
+    """The relay is data-only: an authorized peer attaching tokens is rejected."""
+    source_selector = 111
+    peer = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_sender(source_selector, peer)
+
+    token = boa.env.generate_address()
+    message = _build_ccip_message(
+        source_selector,
+        peer,
+        block_data["number"],
+        block_data["hash"],
+        token_amounts=[(token, 1)],
+    )
+    with boa.env.prank(CCIP_ROUTER):
+        with boa.reverts("No tokens"):
             configured_relay.ccipReceive(message)
 
 

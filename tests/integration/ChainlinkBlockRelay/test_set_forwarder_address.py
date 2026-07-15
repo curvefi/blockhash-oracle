@@ -31,7 +31,7 @@ def test_set_forwarder_address(forked_env, chainlink_block_relay, dev_deployer):
 def test_set_forwarder_address_zero_emits_security_warning(
     forked_env, chainlink_block_relay, dev_deployer
 ):
-    """Test that setting forwarder to address(0) emits a SecurityWarning (CRE disabled)."""
+    """Test that setting forwarder to address(0) emits a CRESecurityWarning (CRE disabled)."""
     forwarder = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
@@ -41,7 +41,7 @@ def test_set_forwarder_address_zero_emits_security_warning(
     # Capture logs immediately — a subsequent view call (e.g. the getter below)
     # would reset boa's last-call log buffer.
     events = chainlink_block_relay.get_logs()
-    assert any("SecurityWarning" in str(e) for e in events)
+    assert any("CRESecurityWarning" in str(e) for e in events)
 
     assert chainlink_block_relay.forwarder_address() == EMPTY_ADDRESS
 
