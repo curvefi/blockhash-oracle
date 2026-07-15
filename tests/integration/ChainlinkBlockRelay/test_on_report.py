@@ -157,7 +157,7 @@ def test_on_report_broadcast_only_sends_to_registered_peers(
     test_address = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     fees = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)
     boa.env.set_balance(configured_relay.address, fees[0])
@@ -212,7 +212,7 @@ def test_on_report_duplicate_reruns_fanout_without_reverting(
 
     peer = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(BASE_CHAIN_SELECTOR, peer)
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, peer)
     fees = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)
     boa.env.set_balance(configured_relay.address, fees[0])
 

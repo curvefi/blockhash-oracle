@@ -149,7 +149,7 @@ def test_broadcast_latest_block_refunds_excess_max_fee(
     """max_fee above the live fee: relay sends the live fee and refunds the rest to the caller."""
     test_address = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     _seed_confirmed_block(
         configured_relay, block_oracle, dev_deployer, block_data["number"], block_data["hash"]
@@ -182,7 +182,7 @@ def test_broadcast_latest_block_reverts_when_max_fee_below_live(
     """A max_fee below the live CCIP fee reverts with "Too high fees" (never overpays)."""
     test_address = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     _seed_confirmed_block(
         configured_relay, block_oracle, dev_deployer, block_data["number"], block_data["hash"]
@@ -218,7 +218,7 @@ def test_broadcast_latest_block_only_confirmed_block_is_broadcast(
 
     test_address = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     _seed_confirmed_block(
         configured_relay, block_oracle, dev_deployer, block_number_a, block_hash_a

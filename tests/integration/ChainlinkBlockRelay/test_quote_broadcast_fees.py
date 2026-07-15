@@ -39,7 +39,7 @@ def test_quote_broadcast_fees_mixed(forked_env, chainlink_block_relay, dev_deplo
     test_address = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        chainlink_block_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        chainlink_block_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     fees = chainlink_block_relay.quote_broadcast_fees(
         [BASE_CHAIN_SELECTOR, unregistered_selector], CCIP_RECEIVE_GAS_LIMIT
@@ -60,7 +60,7 @@ def test_quote_broadcast_fees_unsupported_chain_with_peer(
     test_address = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        chainlink_block_relay.set_peer(fake_selector, test_address)
+        chainlink_block_relay.set_receiver(fake_selector, test_address)
 
     fees = chainlink_block_relay.quote_broadcast_fees([fake_selector], CCIP_RECEIVE_GAS_LIMIT)
 
@@ -82,7 +82,7 @@ def test_quote_broadcast_fees_gas_limit_affects_fee(
     test_address = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        chainlink_block_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        chainlink_block_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     fees_low_gas = chainlink_block_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], 50_000)
     fees_high_gas = chainlink_block_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], 500_000)

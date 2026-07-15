@@ -69,6 +69,8 @@ exports: (
     CCIP.selector_to_receiver,
     CCIP.selector_to_sender,
     CCIP.set_peer,
+    CCIP.set_sender,
+    CCIP.set_receiver,
 )
 
 

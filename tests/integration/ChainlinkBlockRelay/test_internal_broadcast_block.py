@@ -61,7 +61,7 @@ def test_broadcast_block_skips_unregistered_peers(
     test_address = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        chainlink_block_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+        chainlink_block_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
 
     fees = chainlink_block_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)
     boa.env.set_balance(chainlink_block_relay.address, 10**20)

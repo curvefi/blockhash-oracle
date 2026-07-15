@@ -29,7 +29,7 @@ def test_ccip_receive_only_router(forked_env, configured_relay, dev_deployer, bl
     peer = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(source_selector, peer)
+        configured_relay.set_sender(source_selector, peer)
 
     message = _build_ccip_message(source_selector, peer, block_data["number"], block_data["hash"])
     stranger = boa.env.generate_address()
@@ -49,7 +49,7 @@ def test_ccip_receive_rejects_unregistered_sender(
     impostor = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(source_selector, peer)
+        configured_relay.set_sender(source_selector, peer)
 
     message = _build_ccip_message(
         source_selector, impostor, block_data["number"], block_data["hash"]
@@ -90,7 +90,7 @@ def test_ccip_receive_valid_message(
     source_selector = 111
     peer = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(source_selector, peer)
+        configured_relay.set_sender(source_selector, peer)
 
     message = _build_ccip_message(source_selector, peer, test_block_number, test_block_hash)
     with boa.env.prank(CCIP_ROUTER):
@@ -113,7 +113,7 @@ def test_ccip_receive_multiple_blocks(
     peer = boa.env.generate_address()
 
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(source_selector, peer)
+        configured_relay.set_sender(source_selector, peer)
 
     # One real block from block_data, plus a synthetic neighbour
     block_a_number = block_data["number"]
@@ -145,7 +145,7 @@ def test_ccip_receive_duplicate_same_hash_no_revert(
     source_selector = 111
     peer = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(source_selector, peer)
+        configured_relay.set_sender(source_selector, peer)
 
     message = _build_ccip_message(source_selector, peer, n, h)
     with boa.env.prank(CCIP_ROUTER):
@@ -165,7 +165,7 @@ def test_ccip_receive_conflicting_hash_reverts(
     source_selector = 111
     peer = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
-        configured_relay.set_peer(source_selector, peer)
+        configured_relay.set_sender(source_selector, peer)
 
     with boa.env.prank(CCIP_ROUTER):
         configured_relay.ccipReceive(_build_ccip_message(source_selector, peer, n, h))
