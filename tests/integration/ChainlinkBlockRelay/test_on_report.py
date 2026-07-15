@@ -2,7 +2,12 @@
 
 import pytest
 import boa
-from conftest import BASE_CHAIN_SELECTOR, ARBITRUM_CHAIN_SELECTOR, CCIP_RECEIVE_GAS_LIMIT
+from conftest import (
+    BASE_CHAIN_SELECTOR,
+    ARBITRUM_CHAIN_SELECTOR,
+    CCIP_RECEIVE_GAS_LIMIT,
+    VALID_METADATA,
+)
 
 EMPTY_HASH = b"\x00" * 32
 
@@ -30,7 +35,25 @@ def test_on_report_rejects_non_forwarder(forked_env, configured_relay, cre_forwa
 
     with boa.env.prank(stranger):
         with boa.reverts("Invalid sender"):
-            configured_relay.onReport(b"", report)
+            configured_relay.onReport(VALID_METADATA, report)
+
+
+@pytest.mark.mainnet
+def test_on_report_reverts_without_workflow_identity(
+    forked_env, chainlink_block_relay, block_oracle, dev_deployer, cre_forwarder, block_data
+):
+    """Strict enforcement: onReport reverts if the forwarder is enabled but no workflow
+    identity (id/author/name) is configured."""
+    with boa.env.prank(dev_deployer):
+        chainlink_block_relay.set_block_oracle(block_oracle.address)
+        chainlink_block_relay.set_forwarder_address(cre_forwarder)
+        block_oracle.add_committer(chainlink_block_relay.address, True)
+        # deliberately NOT configuring expected_workflow_id / author / name
+
+    report = _encode_report(block_data["number"], block_data["hash"])
+    with boa.env.prank(cre_forwarder):
+        with boa.reverts("Workflow parameters are not set"):
+            chainlink_block_relay.onReport(VALID_METADATA, report)
 
 
 @pytest.mark.mainnet
@@ -46,7 +69,7 @@ def test_on_report_successful_delivery(
     assert configured_relay._storage.received_blocks.get() == {}
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(b"", report)
+        configured_relay.onReport(VALID_METADATA, report)
 
     # stored for later re-broadcast eligibility
     assert configured_relay._storage.received_blocks.get()[test_block_number] == test_block_hash
@@ -70,7 +93,7 @@ def test_on_report_ignores_empty_block_hash(
     report = _encode_report(block_data["number"], EMPTY_HASH)
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(b"", report)  # must not revert
+        configured_relay.onReport(VALID_METADATA, report)  # must not revert
 
     assert configured_relay._storage.received_blocks.get() == {}
 
@@ -88,7 +111,7 @@ def test_on_report_ignores_mismatched_selector_fee_arrays(
     )
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(b"", report)  # must not revert
+        configured_relay.onReport(VALID_METADATA, report)  # must not revert
 
     assert configured_relay._storage.received_blocks.get() == {}
 
@@ -113,7 +136,7 @@ def test_on_report_triggers_broadcast(
     report = _encode_report(block_data["number"], block_data["hash"], test_selectors, fees)
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(b"", report)
+        configured_relay.onReport(VALID_METADATA, report)
 
     events = configured_relay.get_logs()
     broadcast_events = [e for e in events if "BlockHashBroadcast" in str(e)]
@@ -148,7 +171,7 @@ def test_on_report_broadcast_only_sends_to_registered_peers(
     )
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(b"", report)
+        configured_relay.onReport(VALID_METADATA, report)
 
     events = configured_relay.get_logs()
     broadcast_events = [e for e in events if "BlockHashBroadcast" in str(e)]
@@ -169,4 +192,4 @@ def test_on_report_insufficient_balance_for_broadcast(
 
     with boa.env.prank(cre_forwarder):
         with boa.reverts("Insufficient value"):
-            configured_relay.onReport(b"", report)
+            configured_relay.onReport(VALID_METADATA, report)

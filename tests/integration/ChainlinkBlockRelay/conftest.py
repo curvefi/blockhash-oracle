@@ -17,6 +17,11 @@ ARBITRUM_CHAIN_SELECTOR = 4949039107694359620  # Arbitrum One mainnet
 # Default gas limit for ccipReceive on the destination chain
 CCIP_RECEIVE_GAS_LIMIT = 150_000
 
+# Workflow identity bound by configured_relay (strict onReport enforcement requires one).
+# 62-byte Keystone metadata carrying just this workflow id (name/owner zeroed).
+EXPECTED_WORKFLOW_ID = bytes.fromhex("cc" * 32)
+VALID_METADATA = EXPECTED_WORKFLOW_ID + bytes(10) + bytes(20)
+
 
 @pytest.fixture(scope="session")
 def rpc_url(drpc_api_key):
@@ -45,9 +50,13 @@ def chainlink_block_relay(forked_env, dev_deployer):
 
 @pytest.fixture()
 def configured_relay(chainlink_block_relay, block_oracle, dev_deployer):
-    """Relay with oracle, committer, and CRE forwarder fully configured."""
+    """Relay with oracle, committer, CRE forwarder, and workflow identity configured.
+
+    Identity is set before the forwarder is enabled (strict onReport requires it).
+    """
     with boa.env.prank(dev_deployer):
         chainlink_block_relay.set_block_oracle(block_oracle.address)
+        chainlink_block_relay.set_expected_workflow_id(EXPECTED_WORKFLOW_ID)
         chainlink_block_relay.set_forwarder_address(CRE_FORWARDER)
         block_oracle.add_committer(chainlink_block_relay.address, True)
     return chainlink_block_relay
