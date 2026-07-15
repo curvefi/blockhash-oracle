@@ -143,6 +143,68 @@ def test_broadcast_latest_block_insufficient_value(
 
 
 @pytest.mark.mainnet
+def test_broadcast_latest_block_refunds_excess_max_fee(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """max_fee above the live fee: relay sends the live fee and refunds the rest to the caller."""
+    test_address = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+
+    _seed_confirmed_block(
+        configured_relay, block_oracle, dev_deployer, block_data["number"], block_data["hash"]
+    )
+
+    live_fee = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[
+        0
+    ]
+    pad = 10**15
+    max_fee = live_fee + pad
+
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, max_fee)
+    relay_balance_before = boa.env.get_balance(configured_relay.address)
+
+    with boa.env.prank(user):
+        configured_relay.broadcast_latest_block(
+            [BASE_CHAIN_SELECTOR], [max_fee], CCIP_RECEIVE_GAS_LIMIT, value=max_fee
+        )
+
+    # caller refunded the unused portion; relay only spent the live fee (net balance unchanged)
+    assert boa.env.get_balance(user) == pad
+    assert boa.env.get_balance(configured_relay.address) == relay_balance_before
+
+
+@pytest.mark.mainnet
+def test_broadcast_latest_block_reverts_when_max_fee_below_live(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A max_fee below the live CCIP fee reverts with "Too high fees" (never overpays)."""
+    test_address = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peer(BASE_CHAIN_SELECTOR, test_address)
+
+    _seed_confirmed_block(
+        configured_relay, block_oracle, dev_deployer, block_data["number"], block_data["hash"]
+    )
+
+    live_fee = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[
+        0
+    ]
+
+    # value must equal sum(max_fee); set both to live_fee - 1 so the payment check
+    # passes and _transmit is what reverts (live fee exceeds the max_fee ceiling).
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, live_fee)
+
+    with boa.env.prank(user):
+        with boa.reverts("Too high fees"):
+            configured_relay.broadcast_latest_block(
+                [BASE_CHAIN_SELECTOR], [live_fee - 1], CCIP_RECEIVE_GAS_LIMIT, value=live_fee - 1
+            )
+
+
+@pytest.mark.mainnet
 def test_broadcast_latest_block_only_confirmed_block_is_broadcast(
     forked_env, configured_relay, block_oracle, dev_deployer, block_data
 ):

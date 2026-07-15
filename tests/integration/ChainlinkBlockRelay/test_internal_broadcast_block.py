@@ -40,7 +40,13 @@ def test_broadcast_block(forked_env, chainlink_block_relay, dev_deployer, block_
     assert evt.block_number == test_block_number
     assert evt.block_hash == test_block_hash
     assert [t.chain_selector for t in evt.targets] == test_selectors
-    assert [t.fee for t in evt.targets] == list(fees)
+    assert [t.max_fee for t in evt.targets] == list(fees)
+
+    # one MessageSent per target, carrying the actual fee paid
+    sent_events = [e for e in events if "MessageSent" in str(e)]
+    assert len(sent_events) == 2
+    assert sorted(e.chain_selector for e in sent_events) == sorted(test_selectors)
+    assert sum(e.fee for e in sent_events) == total_fee
 
     # fees deducted from contract balance
     assert boa.env.get_balance(chainlink_block_relay.address) == initial_balance - total_fee

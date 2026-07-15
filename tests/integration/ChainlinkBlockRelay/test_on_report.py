@@ -122,7 +122,7 @@ def test_on_report_triggers_broadcast(
     assert evt.block_number == block_data["number"]
     assert evt.block_hash == block_data["hash"]
     assert [t.chain_selector for t in evt.targets] == test_selectors
-    assert [t.fee for t in evt.targets] == list(fees)
+    assert [t.max_fee for t in evt.targets] == list(fees)
 
 
 @pytest.mark.mainnet

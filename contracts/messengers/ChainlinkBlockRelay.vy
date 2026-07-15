@@ -88,7 +88,7 @@ block_oracle: public(IBlockOracle)
 # Structs for cached broadcast info
 struct BroadcastTarget:
     chain_selector: uint64
-    fee: uint256
+    max_fee: uint256
 
 struct BroadcastData:
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
@@ -106,6 +106,14 @@ event BlockHashBroadcast:
     block_number: indexed(uint256)
     block_hash: indexed(bytes32)
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
+
+event MessageSent:
+    message_id: bytes32
+    chain_selector: uint64
+    receiver: address
+    block_number: indexed(uint256)
+    block_hash: indexed(bytes32)
+    fee: uint256
 
 
 ################################################################
@@ -202,6 +210,7 @@ def _broadcast_block(
     data: Bytes[64] = abi_encode(_block_number, _block_hash)
     extra_args: Bytes[68] = CCIP.build_extra_args(_broadcast_data.gas_limit)
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    unused_fees: uint256 = 0
 
     for target: BroadcastTarget in _broadcast_data.targets:
         # Skip if peer is not set
@@ -211,9 +220,23 @@ def _broadcast_block(
 
         # Send message
         message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
-        CCIP._transmit(target.chain_selector, message, target.fee)
+        message_id: bytes32 = empty(bytes32)
+        fee: uint256 = 0
+        message_id, fee = CCIP._transmit(target.chain_selector, message, target.max_fee)
+        unused_fees += target.max_fee - fee
+        log MessageSent(
+            message_id=message_id,
+            chain_selector=target.chain_selector,
+            receiver=receiver,
+            block_number=_block_number,
+            block_hash=_block_hash,
+            fee=fee,
+        )
         successful_targets.append(target)
 
+    # Refund unused fee to a direct (public) requester; CRE path keeps it in the treasury
+    if _broadcast_data.requester != empty(address):
+        send(_broadcast_data.requester, unused_fees)
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,
@@ -266,7 +289,7 @@ def quote_broadcast_fees(
 
         # Get fee for target chain selector and append to array
         message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
-        fees.append(CCIP._quote(selector, message))
+        fees.append(CCIP._quote(selector, message, True))  # allow_unsupported
 
     return fees
 
@@ -301,10 +324,10 @@ def broadcast_latest_block(
     broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     sum_target_fees: uint256 = 0
     for i: uint256 in range(0, len(_target_chain_selectors), bound=MAX_N_BROADCAST):
-        broadcast_targets.append(BroadcastTarget(chain_selector=_target_chain_selectors[i], fee=_target_fees[i]))
+        broadcast_targets.append(BroadcastTarget(chain_selector=_target_chain_selectors[i], max_fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
 
-    assert sum_target_fees <= msg.value, "Insufficient message value"
+    assert sum_target_fees == msg.value, "Insufficient message value"
 
     self._broadcast_block(
         block_number,
@@ -356,7 +379,7 @@ def onReport(
             cached_targets.append(
                 BroadcastTarget(
                     chain_selector=target_chain_selectors[i],
-                    fee=target_fees[i]
+                    max_fee=target_fees[i]
                 )
             )
             total_fee += target_fees[i]
@@ -364,7 +387,7 @@ def onReport(
         broadcast_data: BroadcastData = BroadcastData(
             targets=cached_targets,
             gas_limit=ccip_receive_gas_limit,
-            requester=msg.sender
+            requester=empty(address)  # CRE path: no refund, unused fee stays in treasury
         )
 
         # Perform broadcast
