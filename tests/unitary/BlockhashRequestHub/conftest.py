@@ -34,7 +34,6 @@ FEE_PER_TARGET = 5 * 10**14
 FEE_MULTIPLIER_BPS = 25_000  # 250%, generous headroom by design
 BASE_ON_REPORT_GAS = 300_000
 CCIP_SEND_GAS = 150_000
-CRE_DEDUP_WINDOW = 600
 
 CCIP_RECEIVE_GAS_LIMIT = 150_000
 LZ_RECEIVE_GAS_LIMIT = 150_000
@@ -134,5 +133,4 @@ def hub(dev_deployer, oracle, mock_lz_relay, mock_cre_relay, hub_deployer):
             FEE_MULTIPLIER_BPS,
             BASE_ON_REPORT_GAS,
             CCIP_SEND_GAS,
-            CRE_DEDUP_WINDOW,
         )

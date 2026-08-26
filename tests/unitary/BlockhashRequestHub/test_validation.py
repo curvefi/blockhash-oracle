@@ -3,7 +3,6 @@ import boa
 from conftest import (
     BASE_CHAIN_SELECTOR,
     BASE_EID,
-    BLOCK_HASH,
     CCIP_ONE,
     CCIP_RECEIVE_GAS_LIMIT,
     EMPTY_ADDRESS,
@@ -37,43 +36,15 @@ def test_rejects_no_rail(hub, alice):
         _request(hub, alice, 0, LZ_ONE, [], lz_cost(1))
 
 
+def test_rejects_zero_block_number(hub, alice):
+    """Both rails must vote on the same number, so the caller has to name one."""
+    with boa.reverts("No block number"):
+        _request(hub, alice, RAIL_LZ, LZ_ONE, [], lz_cost(1), block_number=0)
+
+
 def test_rejects_empty_target_list(hub, alice):
     with boa.reverts("No targets"):
         _request(hub, alice, RAIL_LZ, [], [], lz_cost(1))
-
-
-def test_rejects_block_not_newer_than_oracle(hub, alice, oracle, dev_deployer):
-    with boa.env.prank(dev_deployer):
-        oracle.admin_apply_block(PINNED_BLOCK, BLOCK_HASH)
-
-    with boa.reverts("Not newer than oracle"):
-        _request(hub, alice, RAIL_LZ, LZ_ONE, [], lz_cost(1), block_number=PINNED_BLOCK)
-
-
-def test_accepts_block_above_oracle_height(hub, alice, oracle, dev_deployer):
-    with boa.env.prank(dev_deployer):
-        oracle.admin_apply_block(PINNED_BLOCK, BLOCK_HASH)
-
-    _request(hub, alice, RAIL_LZ, LZ_ONE, [], lz_cost(1), block_number=PINNED_BLOCK + 1)
-
-
-def test_unpinned_cre_request_needs_threshold_one(hub, alice, oracle, dev_deployer):
-    """Pinning is required above threshold 1 for either rail, not just for CRE."""
-    with boa.env.prank(dev_deployer):
-        oracle.set_threshold(2)
-
-    with boa.reverts("Pinned block required above threshold 1"):
-        _request(hub, alice, RAIL_CRE, [], CCIP_ONE, cre_cost(1), block_number=0)
-
-
-def test_unpinned_lz_request_needs_threshold_one(hub, alice, oracle, dev_deployer):
-    with boa.env.prank(dev_deployer):
-        oracle.add_committer(boa.env.generate_address(), True)
-        oracle.add_committer(boa.env.generate_address(), True)
-    assert oracle.threshold() > 1
-
-    with boa.reverts("Pinned block required above threshold 1"):
-        _request(hub, alice, RAIL_LZ, LZ_ONE, [], lz_cost(1), block_number=0)
 
 
 def test_rejects_insufficient_value(hub, alice):

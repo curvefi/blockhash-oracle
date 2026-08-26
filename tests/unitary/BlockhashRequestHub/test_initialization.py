@@ -5,7 +5,6 @@ from conftest import (
     BASE_FEE,
     BASE_ON_REPORT_GAS,
     CCIP_SEND_GAS,
-    CRE_DEDUP_WINDOW,
     EMPTY_ADDRESS,
     FEE_MULTIPLIER_BPS,
     FEE_PER_TARGET,
@@ -22,7 +21,6 @@ def _deploy(hub_deployer, oracle, lz, cre, multiplier=FEE_MULTIPLIER_BPS):
         multiplier,
         BASE_ON_REPORT_GAS,
         CCIP_SEND_GAS,
-        CRE_DEDUP_WINDOW,
     )
 
 
@@ -36,7 +34,6 @@ def test_initialization(hub, dev_deployer, oracle, mock_lz_relay, mock_cre_relay
     assert hub.fee_multiplier_bps() == FEE_MULTIPLIER_BPS
     assert hub.base_on_report_gas() == BASE_ON_REPORT_GAS
     assert hub.ccip_send_gas() == CCIP_SEND_GAS
-    assert hub.cre_dedup_window() == CRE_DEDUP_WINDOW
     assert hub.RAIL_LZ() == 1
     assert hub.RAIL_CRE() == 2
 
@@ -112,19 +109,12 @@ def test_set_gas_params(hub, dev_deployer):
     assert hub.ccip_send_gas() == 200_000
 
 
-def test_set_cre_dedup_window(hub, dev_deployer):
-    with boa.env.prank(dev_deployer):
-        hub.set_cre_dedup_window(56)
-    assert hub.cre_dedup_window() == 56
-
-
 @pytest.mark.parametrize(
     "call",
     [
         lambda h: h.set_relays(EMPTY_ADDRESS, EMPTY_ADDRESS),
         lambda h: h.set_fees(1, 1, 10_000),
         lambda h: h.set_gas_params(1, 1),
-        lambda h: h.set_cre_dedup_window(1),
         lambda h: h.withdraw_eth(0),
     ],
 )
