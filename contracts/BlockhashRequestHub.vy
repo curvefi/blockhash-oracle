@@ -80,11 +80,6 @@ fee_multiplier_bps: public(uint256)  # headroom on CCIP quotes, they drift befor
 base_on_report_gas: public(uint256)
 ccip_send_gas: public(uint256)
 
-# Duplicate suppression: keccak(block_number, selectors) of the last CRE request
-last_cre_key: public(bytes32)
-last_cre_at: public(uint256)
-cre_dedup_window: public(uint256)  # 0 disables
-
 nonce: public(uint256)
 
 
@@ -121,10 +116,6 @@ event SetGasParams:
     base_on_report_gas: uint256
     ccip_send_gas: uint256
 
-event SetCREDedupWindow:
-    cre_dedup_window: uint256
-
-
 ################################################################
 #                          CONSTRUCTOR                         #
 ################################################################
@@ -139,7 +130,6 @@ def __init__(
     _fee_multiplier_bps: uint256,
     _base_on_report_gas: uint256,
     _ccip_send_gas: uint256,
-    _cre_dedup_window: uint256,
 ):
     """
     @notice Initialize the hub
@@ -147,7 +137,6 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
-    @param _cre_dedup_window Seconds a CRE request counts as still in flight; 0 disables
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
@@ -163,13 +152,11 @@ def __init__(
     self.fee_multiplier_bps = _fee_multiplier_bps
     self.base_on_report_gas = _base_on_report_gas
     self.ccip_send_gas = _ccip_send_gas
-    self.cre_dedup_window = _cre_dedup_window
 
     log SetFees(
         base_fee=_base_fee, fee_per_target=_fee_per_target, fee_multiplier_bps=_fee_multiplier_bps
     )
     log SetGasParams(base_on_report_gas=_base_on_report_gas, ccip_send_gas=_ccip_send_gas)
-    log SetCREDedupWindow(cre_dedup_window=_cre_dedup_window)
 
 
 ################################################################
@@ -245,20 +232,6 @@ def _surcharge(_n_targets: uint256) -> uint256:
     return self.base_fee + _n_targets * self.fee_per_target
 
 
-@internal
-@view
-def _validate_block_number(_block_number: uint256, _height: uint256):
-    """
-    @dev Votes count per (block_number, hash), so committers picking different numbers never reach
-         the threshold and an unpinned request is unmatchable above 1. last_confirmed only rises,
-         so requiring the pin above it also rejects an already-confirmed block.
-    """
-    if _block_number == 0:
-        assert staticcall self.block_oracle.threshold() <= 1, "Pinned block required above threshold 1"
-    else:
-        assert _block_number > _height, "Not newer than oracle"
-
-
 ################################################################
 #                       ADMIN FUNCTIONS                        #
 ################################################################
@@ -300,18 +273,6 @@ def set_gas_params(_base_on_report_gas: uint256, _ccip_send_gas: uint256):
     self.base_on_report_gas = _base_on_report_gas
     self.ccip_send_gas = _ccip_send_gas
     log SetGasParams(base_on_report_gas=_base_on_report_gas, ccip_send_gas=_ccip_send_gas)
-
-
-@external
-def set_cre_dedup_window(_cre_dedup_window: uint256):
-    """
-    @notice Seconds a CRE request counts as still in flight; 0 disables
-    @dev Measure against the worst-case trigger-to-report latency; too long blocks a real retry
-    """
-    ownable._check_owner()
-
-    self.cre_dedup_window = _cre_dedup_window
-    log SetCREDedupWindow(cre_dedup_window=_cre_dedup_window)
 
 
 @external
@@ -400,18 +361,18 @@ def request(
     @param _rails Bitfield of RAIL_LZ and RAIL_CRE; at least one must be set
     @param _target_eids LayerZero endpoint ids, used only by the LayerZero rail
     @param _target_selectors CCIP chain selectors, used only by the Chainlink rail
-    @param _block_number Block to fetch, and the value both rails vote with. MainnetBlockView serves
-                         [head - 8192, head - 64] and both rails resolve later than this call, which
-                         only makes the block older; head - 100 is comfortable.
+    @param _block_number Block to fetch, and the value both rails vote with. Unchecked beyond being
+                         non-zero: MainnetBlockView serves [head - 8192, head - 64] and both rails
+                         resolve later than this call, which only makes the block older, so pick with
+                         room to spare - head - 100 is comfortable.
     @param _ccip_gas Gas limit for ccipReceive on each CCIP target
     @param _lz_gas Gas limit for lzReceive on each LayerZero target
     @param _read_gas Gas limit for the lzRead return message
     @return Request id, for correlating the emitted logs with delivery
     """
     assert _rails & (RAIL_LZ | RAIL_CRE) != 0, "No rail selected"
-
-    height: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
-    self._validate_block_number(_block_number, height)
+    # Pinned, so both rails vote on the same number; the oracle counts votes per (number, hash)
+    assert _block_number != 0, "No block number"
 
     nonce: uint256 = self.nonce + 1
     self.nonce = nonce
@@ -445,13 +406,6 @@ def request(
     # ── Chainlink CRE: fund the relay, then emit the workflow's trigger ──
     if _rails & RAIL_CRE != 0:
         assert self.cre_relay.address != empty(address), "CRE rail disabled"
-
-        # Reject an identical request while the first is plausibly still in flight
-        key: bytes32 = keccak256(abi_encode(_block_number, _target_selectors))
-        if block.timestamp < self.last_cre_at + self.cre_dedup_window:
-            assert key != self.last_cre_key, "Duplicate request pending"
-        self.last_cre_key = key
-        self.last_cre_at = block.timestamp
 
         max_fees: DynArray[uint256, MAX_N_BROADCAST] = self._ccip_max_fees(
             _target_selectors, _ccip_gas
