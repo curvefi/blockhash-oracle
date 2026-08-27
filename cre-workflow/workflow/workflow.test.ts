@@ -23,18 +23,21 @@ const makeConfig = () => ({
 	authorizedEVMAddress: AUTHORIZED_KEY,
 	blockViewChainSelectorName: 'ethereum-testnet-sepolia',
 	blockViewContractAddress: BLOCK_VIEW_ADDRESS,
+	requestHubs: [] as { chainSelectorName: string; address: Address; relayAddress: Address }[],
 })
 
-const makeHubConfig = () => ({
+const makeHubConfig = (hubs = [HUB_ADDRESS]) => ({
 	...makeConfig(),
-	requestHubChainSelectorName: 'ethereum-testnet-sepolia',
-	requestHubAddress: HUB_ADDRESS,
-	requestHubRelayAddress: RELAY_ADDRESS,
+	requestHubs: hubs.map((address) => ({
+		chainSelectorName: 'ethereum-testnet-sepolia',
+		address,
+		relayAddress: RELAY_ADDRESS,
+	})),
 })
 
-const makeHubRuntime = () => {
+const makeHubRuntime = (hubs = [HUB_ADDRESS]) => {
 	const runtime = newTestRuntime()
-	;(runtime as any).config = makeHubConfig()
+	;(runtime as any).config = makeHubConfig(hubs)
 	return runtime as unknown as Runtime<ReturnType<typeof makeHubConfig>>
 }
 
@@ -43,8 +46,9 @@ const makeRequestLog = (
 	blockNumber = BLOCK_NUMBER,
 	selectors: bigint[] = [5009297550715157269n],
 	fees: bigint[] = [1000000000000000n],
+	emitter: Address = HUB_ADDRESS,
 ) => ({
-	address: new Uint8Array(20),
+	address: hexToBytes(emitter),
 	topics: [new Uint8Array(32), new Uint8Array(32), new Uint8Array(32)],
 	data: hexToBytes(
 		encodeAbiParameters(
@@ -232,9 +236,26 @@ describe('onBlockhashRequested', () => {
 			.toThrow('Broadcast error(s)')
 	})
 
-	test('unconfigured hub: refuses rather than writing somewhere unintended', () => {
+	test('log from an unknown hub: refuses rather than writing somewhere unintended', () => {
 		expect(() => onBlockhashRequested(makeRuntime() as any, makeRequestLog() as any))
-			.toThrow('Request hub is not configured')
+			.toThrow('unknown request hub')
+	})
+
+	test('several hubs: the emitting address picks which one answers', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
+		evmMock.writeReport = () => txSuccess()
+
+		const second = '0x0000000000000000000000000000000000000009' as Address
+		const runtime = makeHubRuntime([HUB_ADDRESS, second])
+
+		// a log from either registered hub is served
+		for (const emitter of [HUB_ADDRESS, second]) {
+			const log = makeRequestLog(BLOCK_NUMBER, [1n], [10n], emitter)
+			const result = JSON.parse(onBlockhashRequested(runtime as any, log as any)) as ResultPayload
+			expect(result.anySuccess).toBe(true)
+		}
 	})
 })
 
@@ -250,6 +271,14 @@ describe('initWorkflow', () => {
 		expect(handlers).toHaveLength(2)
 		expect(handlers[0].fn).toBe(onNewBlock)
 		expect(handlers[1].fn).toBe(onBlockhashRequested)
+	})
+
+	test('one log trigger per hub, all sharing the same handler', () => {
+		const second = '0x0000000000000000000000000000000000000009' as Address
+		const handlers = initWorkflow(makeHubConfig([HUB_ADDRESS, second]))
+		expect(handlers).toHaveLength(3)
+		expect(handlers[1].fn).toBe(onBlockhashRequested)
+		expect(handlers[2].fn).toBe(onBlockhashRequested)
 	})
 
 	test('event signature matches the topic the hub emits', () => {
