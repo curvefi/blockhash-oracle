@@ -1,5 +1,12 @@
 {
   "authorizedEVMAddress": "0x7589D6DADA352B798809278e5A0F8606b6088952",
   "blockViewChainSelectorName": "ethereum-testnet-sepolia",
-  "blockViewContractAddress": "0x9a28d62Ca6a5F53BA5aA4bcb2eDF7819A585e835"
+  "blockViewContractAddress": "0x9a28d62Ca6a5F53BA5aA4bcb2eDF7819A585e835",
+  "requestHubs": [
+    {
+      "chainSelectorName": "ethereum-testnet-sepolia-base-1",
+      "address": "0xeff25b702e27ab011CC4AF3F0A96D1477E300AF0",
+      "relayAddress": "0x189a8c5EBb35F52015aC0f7D98e4DFEC70Dd8b6E"
+    }
+  ]
 }

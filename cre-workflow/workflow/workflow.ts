@@ -31,14 +31,18 @@ export const evmAddressSchema = z.custom<Address>(
   { message: "Invalid EVM address. Must be a valid 42-character hex string." }
 );
 
+export const requestHubSchema = z.object({
+	chainSelectorName: z.string(),
+	address: evmAddressSchema, // emits CREBlockhashRequested
+	relayAddress: evmAddressSchema, // ChainlinkBlockRelay the report is written to
+})
+
 export const configSchema = z.object({
 	authorizedEVMAddress: evmAddressSchema,
 	blockViewChainSelectorName: z.string(),
 	blockViewContractAddress: evmAddressSchema,
-	// Request hub: omit all three and only the HTTP trigger is registered
-	requestHubChainSelectorName: z.string().optional(),
-	requestHubAddress: evmAddressSchema.optional(),
-	requestHubRelayAddress: evmAddressSchema.optional(),
+	// One log trigger per hub; CRE caps a workflow at 5 monitored log addresses
+	requestHubs: z.array(requestHubSchema).default([]),
 })
 type Config = z.infer<typeof configSchema>
 
@@ -140,32 +144,27 @@ export function fetchBlockhash(
 	return [number, hash]
 }
 
-// ─── New Blockhash Callback ──────────────────────────────────
-export const onNewBlock = (
+// ─── Delivery ────────────────────────────────────────────────
+// Both triggers do the same work once their payload is decoded: read the pinned blockhash from
+// mainnet, then broadcast it to every relay the request names.
+function deliver(
 	runtime: Runtime<Config>,
-	payload: HTTPPayload,
-): string => {
-	// Read HTTP payload
-	const blockData = decodeJson(payload.input) as RequestPayload;
-
-	const [blockNumber, blockhash] = fetchBlockhash(
-		runtime,
-		blockData.blockNumber ? BigInt(blockData.blockNumber) : undefined,
-	)
-
+	requestedBlock: bigint | undefined,
+	payloads: BroadcastPayload[],
+): string {
+	const [blockNumber, blockhash] = fetchBlockhash(runtime, requestedBlock)
 	runtime.log(`Block number: ${blockNumber}`)
+
 	const result: ResultPayload = {
 		anySuccess: false,
 		blockNumber: blockNumber.toString(),
-		data: []
+		data: [],
 	}
 
-	for (const broadcastPayload of blockData.data) {
-		const broadcastResult = broadcast(runtime, blockNumber, blockhash, broadcastPayload);
-		if (broadcastResult.success) {
-			result.anySuccess = true;
-		}
-		result.data.push(broadcastResult);
+	for (const payload of payloads) {
+		const broadcastResult = broadcast(runtime, blockNumber, blockhash, payload)
+		if (broadcastResult.success) result.anySuccess = true
+		result.data.push(broadcastResult)
 	}
 
 	if (!result.anySuccess) {
@@ -173,6 +172,17 @@ export const onNewBlock = (
 	}
 
 	return JSON.stringify(result)
+}
+
+// ─── HTTP Callback ───────────────────────────────────────────
+export const onNewBlock = (runtime: Runtime<Config>, payload: HTTPPayload): string => {
+	const blockData = decodeJson(payload.input) as RequestPayload
+
+	return deliver(
+		runtime,
+		blockData.blockNumber ? BigInt(blockData.blockNumber) : undefined,
+		blockData.data,
+	)
 }
 
 // ─── Request Log Callback ───────────────────────────────────
@@ -185,95 +195,65 @@ const REQUESTED_DATA_PARAMS = parseAbiParameters(
 	'uint256 blockNumber, uint64[] chainSelectors, uint256[] maxFees, uint256 ccipReceiveGasLimit, uint256 onReportGasLimit'
 )
 
-export const onBlockhashRequested = (
-	runtime: Runtime<Config>,
-	log: EVM_PB.Log,
-): string => {
-	const config = runtime.config
-	if (!config.requestHubChainSelectorName || !config.requestHubRelayAddress) {
-		throw new Error('Request hub is not configured')
-	}
+export const onBlockhashRequested = (runtime: Runtime<Config>, log: EVM_PB.Log): string => {
+	// Every hub shares this handler, so the emitting address decides which relay to answer on
+	const emitter = bytesToHex(log.address).toLowerCase()
+	const hub = runtime.config.requestHubs.find((h) => h.address.toLowerCase() === emitter)
+	if (!hub) throw new Error(`Log from unknown request hub ${emitter}`)
 
-	const [
-		requestedBlock,
-		chainSelectors,
-		maxFees,
-		ccipReceiveGasLimit,
-		onReportGasLimit,
-	] = decodeAbiParameters(REQUESTED_DATA_PARAMS, bytesToHex(log.data))
+	const [requestedBlock, chainSelectors, maxFees, ccipReceiveGasLimit, onReportGasLimit] =
+		decodeAbiParameters(REQUESTED_DATA_PARAMS, bytesToHex(log.data))
 
 	// The hub pins the block so both rails vote on the same number; the hash itself is read from
 	// mainnet here, never taken from the log
-	const [blockNumber, blockhash] = fetchBlockhash(
-		runtime,
-		requestedBlock === 0n ? undefined : requestedBlock,
-	)
-
-	const broadcastPayload: BroadcastPayload = {
-		relay: {
-			chainSelectorName: config.requestHubChainSelectorName,
-			contractAddress: config.requestHubRelayAddress,
+	return deliver(runtime, requestedBlock === 0n ? undefined : requestedBlock, [
+		{
+			relay: { chainSelectorName: hub.chainSelectorName, contractAddress: hub.relayAddress },
+			targetChains: chainSelectors.map((selector, i) => ({
+				selector: selector.toString(),
+				fees: maxFees[i].toString(),
+			})),
+			ccipReceiveGasLimit: ccipReceiveGasLimit.toString(),
+			onReportGasLimit: onReportGasLimit.toString(),
 		},
-		targetChains: chainSelectors.map((selector, i) => ({
-			selector: selector.toString(),
-			fees: maxFees[i].toString(),
-		})),
-		ccipReceiveGasLimit: ccipReceiveGasLimit.toString(),
-		onReportGasLimit: onReportGasLimit.toString(),
-	}
-
-	const result: ResultPayload = {
-		anySuccess: false,
-		blockNumber: blockNumber.toString(),
-		data: [broadcast(runtime, blockNumber, blockhash, broadcastPayload)],
-	}
-	result.anySuccess = result.data[0].success
-
-	if (!result.anySuccess) {
-		throw new Error(`Broadcast error(s): ${JSON.stringify(result.data)}`)
-	}
-
-	return JSON.stringify(result)
+	])
 }
 
 // ─── Workflow Init ──────────────────────────────────────────
 export function initWorkflow(config: Config) {
-  	const http = new cre.capabilities.HTTPCapability();
+	const http = new cre.capabilities.HTTPCapability()
 
 	const httpHandler = cre.handler(
-			http.trigger({
-				authorizedKeys: [
-					{
-						type: "KEY_TYPE_ECDSA_EVM",
-						publicKey: config.authorizedEVMAddress,
-					},
-        		],}),
+		http.trigger({
+			authorizedKeys: [
+				{
+					type: 'KEY_TYPE_ECDSA_EVM',
+					publicKey: config.authorizedEVMAddress,
+				},
+			],
+		}),
 		onNewBlock,
 	)
 
-	// The log trigger is only registered once a hub is deployed and configured
-	if (!config.requestHubChainSelectorName || !config.requestHubAddress) return [httpHandler]
+	// One trigger per hub: the config pins a single (chain, address) pair each
+	const logHandlers = config.requestHubs.map((hub) => {
+		const network = getNetwork({ chainFamily: 'evm', chainSelectorName: hub.chainSelectorName })
+		if (!network) throw new Error(`Network not found: ${hub.chainSelectorName}`)
 
-	const hubNetwork = getNetwork({
-		chainFamily: 'evm',
-		chainSelectorName: config.requestHubChainSelectorName,
-	})
-	if (!hubNetwork) throw new Error(`Network not found: ${config.requestHubChainSelectorName}`)
+		const client = new cre.capabilities.EVMClient(network.chainSelector.selector)
 
-	const hubClient = new cre.capabilities.EVMClient(hubNetwork.chainSelector.selector)
-
-	return [
-		httpHandler,
-		cre.handler(
-			hubClient.logTrigger({
+		return cre.handler(
+			client.logTrigger({
 				// Deployed triggers need base64 addresses and topics; the simulator takes hex
-				addresses: [hexToBase64(config.requestHubAddress)],
+				addresses: [hexToBase64(hub.address)],
 				topics: [{ values: [hexToBase64(toEventSelector(REQUESTED_EVENT_SIGNATURE))] }],
 				// The log is only a signal - the hash is read fresh from mainnet - so a reorged
 				// request costs one wasted execution and never a wrong hash
 				confidence: 'CONFIDENCE_LEVEL_LATEST',
 			}),
 			onBlockhashRequested,
-		),
-	]
+		)
+	})
+
+	return [httpHandler, ...logHandlers]
 }
