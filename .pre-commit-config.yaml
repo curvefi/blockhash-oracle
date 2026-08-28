@@ -4,7 +4,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: '\.br\.b64$'
       - id: end-of-file-fixer
+        exclude: '\.br\.b64$'
       - id: check-toml
       - id: check-yaml
       - id: check-ast
