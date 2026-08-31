@@ -25,12 +25,12 @@ def test_set_header_verifier(block_oracle, block_headers_decoder):
         # First set - from empty address to block_headers_decoder
         block_oracle.set_header_verifier(block_headers_decoder.address)
         assert block_oracle.header_verifier() == block_headers_decoder.address
-        
+
         # Change to another address - from block_headers_decoder to new_verifier
         new_verifier = boa.env.generate_address()
         block_oracle.set_header_verifier(new_verifier)
         assert block_oracle.header_verifier() == new_verifier
-        
+
         # Note: Event emission is tested implicitly - if the event is emitted correctly,
         # the contract will compile and execute without errors. The actual event
         # verification would require mocking or integration testing framework support.
