@@ -367,22 +367,27 @@ def onReport(
     """
     @notice Called by the CRE Forwarder; authenticates the report via CREReceiver (strict mode)
             before decoding it
-    @param _report The encoded message payload containing block number and hash
+    @param _report ABI-encoded (relay, chain id, block number, block hash, target selectors,
+           target fees, ccip receive gas limit)
     """
     # Strict mode (default): reverts until a workflow id or author is configured.
     # Never pass strict_mode=False in production, it accepts any workflow on the forwarder.
     CREReceiver._on_report(_metadata, _report)
 
     # Decode block hash and number from response
+    relay: address = empty(address)
+    chain_id: uint256 = 0
     block_number: uint256 = 0
     block_hash: bytes32 = empty(bytes32)
     target_chain_selectors: DynArray[uint64, MAX_N_BROADCAST] = []
     target_fees: DynArray[uint256, MAX_N_BROADCAST] = []
     ccip_receive_gas_limit: uint256 = 0
 
-    block_number, block_hash, target_chain_selectors, target_fees, ccip_receive_gas_limit = abi_decode(_report,
-        (uint256, bytes32, DynArray[uint64, MAX_N_BROADCAST], DynArray[uint256, MAX_N_BROADCAST], uint256)
+    relay, chain_id, block_number, block_hash, target_chain_selectors, target_fees, ccip_receive_gas_limit = abi_decode(_report,
+        (address, uint256, uint256, bytes32, DynArray[uint64, MAX_N_BROADCAST], DynArray[uint256, MAX_N_BROADCAST], uint256)
     )
+    # The forwarder does not sign the receiver, so the report names its own destination
+    assert relay == self and chain_id == chain.id, "Wrong destination"
     if block_hash == empty(bytes32):
         return  # Invalid response
     if len(target_chain_selectors) != len(target_fees):

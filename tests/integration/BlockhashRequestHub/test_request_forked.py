@@ -57,8 +57,10 @@ def _requested_event(hub):
 def _deliver_report(relay, block_number, block_hash, event):
     """Play the CRE workflow: turn the trigger log into the report it would have written."""
     report = boa.util.abi.abi_encode(
-        "(uint256,bytes32,uint64[],uint256[],uint256)",
+        "(address,uint256,uint256,bytes32,uint64[],uint256[],uint256)",
         (
+            relay.address,
+            boa.env.evm.chain.chain_id,
             block_number,
             block_hash,
             list(event.chain_selectors),

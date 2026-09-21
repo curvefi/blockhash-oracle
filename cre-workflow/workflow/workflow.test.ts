@@ -1,12 +1,31 @@
 import { describe, expect } from 'bun:test'
 import { hexToBytes, TxStatus, type Runtime } from '@chainlink/cre-sdk'
 import { EvmMock, newTestRuntime, test } from '@chainlink/cre-sdk/test'
-import { encodeAbiParameters, parseAbiParameters, toEventSelector, type Address } from 'viem'
+import {
+	bytesToHex,
+	decodeAbiParameters,
+	encodeAbiParameters,
+	parseAbiParameters,
+	toEventSelector,
+	type Address,
+} from 'viem'
 import { type MainnetBlockViewMock, newMainnetBlockViewMock } from '../contracts/evm/ts/generated/MainnetBlockView_mock'
-import { initWorkflow, onBlockhashRequested, onNewBlock, REQUESTED_EVENT_SIGNATURE } from './workflow'
+import {
+	encodeReport,
+	initWorkflow,
+	onBlockhashRequested,
+	onNewBlock,
+	REPORT_PARAMS,
+	REQUESTED_EVENT_SIGNATURE,
+} from './workflow'
+import vector from '../../tests/fixtures/cre_report_vector.json'
 import type { ResultPayload } from './types/types'
 
 const CHAIN_SELECTOR = 16015286601757825753n // ethereum-testnet-sepolia
+const CHAIN_ID = 11155111n // ethereum-testnet-sepolia
+
+// The test runtime prefixes each signed report with a fixed-length metadata header
+const REPORT_METADATA_HEADER_LENGTH = 109
 
 const BLOCK_VIEW_ADDRESS = '0x0000000000000000000000000000000000000001' as Address
 const RELAY_ADDRESS = '0x0000000000000000000000000000000000000002' as Address
@@ -287,5 +306,44 @@ describe('initWorkflow', () => {
 				'CREBlockhashRequested(bytes32,address,uint256,uint64[],uint256[],uint256,uint256)',
 			),
 		)
+	})
+})
+
+describe('report', () => {
+	test('encoder reproduces the golden vector the relay decodes', () => {
+		const encoded = encodeReport(
+			vector.relay as Address,
+			BigInt(vector.chainId),
+			BigInt(vector.blockNumber),
+			vector.blockhash as `0x${string}`,
+			vector.targetChainSelectors.map(BigInt),
+			vector.targetFees.map(BigInt),
+			BigInt(vector.ccipReceiveGasLimit),
+		)
+		expect(encoded).toBe(vector.report as `0x${string}`)
+	})
+
+	test('broadcast signs the relay and its chain id, the forwarder does not sign the receiver', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+
+		let rawReport: Uint8Array | undefined
+		evmMock.writeReport = (input) => {
+			rawReport = input.report?.rawReport
+			return txSuccess()
+		}
+
+		onNewBlock(makeRuntime(), makeHTTPPayload() as any)
+
+		expect(rawReport).toBeDefined()
+		const [relay, chainId, blockNumber, blockhash] = decodeAbiParameters(
+			REPORT_PARAMS,
+			bytesToHex(rawReport!.slice(REPORT_METADATA_HEADER_LENGTH)),
+		)
+		expect(relay.toLowerCase()).toBe(RELAY_ADDRESS.toLowerCase())
+		expect(chainId).toBe(CHAIN_ID)
+		expect(blockNumber).toBe(BLOCK_NUMBER)
+		expect(blockhash).toBe(REAL_BLOCKHASH)
 	})
 })

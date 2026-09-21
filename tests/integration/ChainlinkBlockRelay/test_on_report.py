@@ -10,17 +10,27 @@ from conftest import (
 )
 
 EMPTY_HASH = b"\x00" * 32
+MAINNET_CHAIN_ID = 1  # the fork's chain.id
 
 
 def _encode_report(
-    block_number, block_hash, selectors=None, fees=None, gas_limit=CCIP_RECEIVE_GAS_LIMIT
+    relay,
+    block_number,
+    block_hash,
+    selectors=None,
+    fees=None,
+    gas_limit=CCIP_RECEIVE_GAS_LIMIT,
+    chain_id=MAINNET_CHAIN_ID,
 ):
-    """ABI-encode the onReport payload matching ChainlinkBlockRelay's abi_decode call."""
+    """ABI-encode the onReport payload matching ChainlinkBlockRelay's abi_decode call.
+
+    The payload leads with its destination (relay, chain id), which the relay checks.
+    """
     selectors = selectors or []
     fees = fees or []
     return boa.util.abi.abi_encode(
-        "(uint256,bytes32,uint64[],uint256[],uint256)",
-        (block_number, block_hash, selectors, fees, gas_limit),
+        "(address,uint256,uint256,bytes32,uint64[],uint256[],uint256)",
+        (relay.address, chain_id, block_number, block_hash, selectors, fees, gas_limit),
     )
 
 
@@ -30,7 +40,7 @@ def _encode_report(
 @pytest.mark.mainnet
 def test_on_report_rejects_non_forwarder(forked_env, configured_relay, cre_forwarder, block_data):
     """Test that onReport rejects calls from addresses other than the forwarder."""
-    report = _encode_report(block_data["number"], block_data["hash"])
+    report = _encode_report(configured_relay, block_data["number"], block_data["hash"])
     stranger = boa.env.generate_address()
 
     with boa.env.prank(stranger):
@@ -50,7 +60,7 @@ def test_on_report_reverts_without_workflow_identity(
         block_oracle.add_committer(chainlink_block_relay.address, True)
         # deliberately NOT configuring expected_workflow_id / author / name
 
-    report = _encode_report(block_data["number"], block_data["hash"])
+    report = _encode_report(chainlink_block_relay, block_data["number"], block_data["hash"])
     with boa.env.prank(cre_forwarder):
         with boa.reverts("Workflow parameters are not set"):
             chainlink_block_relay.onReport(VALID_METADATA, report)
@@ -64,7 +74,7 @@ def test_on_report_successful_delivery(
     in received_blocks and commits it to the oracle (and does not revert)."""
     test_block_number = block_data["number"]
     test_block_hash = block_data["hash"]
-    report = _encode_report(test_block_number, test_block_hash)
+    report = _encode_report(configured_relay, test_block_number, test_block_hash)
 
     assert configured_relay._storage.received_blocks.get() == {}
 
@@ -82,6 +92,41 @@ def test_on_report_successful_delivery(
     assert len([e for e in events if "BlockHashBroadcast" in str(e)]) == 0
 
 
+# ─── Destination binding ─────────────────────────────────────────────────────
+
+
+@pytest.mark.mainnet
+def test_on_report_rejects_report_for_another_relay(
+    forked_env, configured_relay, cre_forwarder, block_data
+):
+    """A report signed for another relay reverts: the forwarder does not sign the receiver,
+    so a copied report must not be able to spend this relay's balance."""
+    other_relay = boa.env.generate_address()
+    report = boa.util.abi.abi_encode(
+        "(address,uint256,uint256,bytes32,uint64[],uint256[],uint256)",
+        (other_relay, MAINNET_CHAIN_ID, block_data["number"], block_data["hash"], [], [], 0),
+    )
+
+    with boa.env.prank(cre_forwarder):
+        with boa.reverts("Wrong destination"):
+            configured_relay.onReport(VALID_METADATA, report)
+
+
+@pytest.mark.mainnet
+def test_on_report_rejects_report_for_another_chain(
+    forked_env, configured_relay, cre_forwarder, block_data
+):
+    """A report naming this relay's address on another chain reverts: CreateX deploys the
+    relay at the same address everywhere, so the address alone does not pin the destination."""
+    report = _encode_report(
+        configured_relay, block_data["number"], block_data["hash"], chain_id=8453
+    )
+
+    with boa.env.prank(cre_forwarder):
+        with boa.reverts("Wrong destination"):
+            configured_relay.onReport(VALID_METADATA, report)
+
+
 # ─── Silent-return edge cases ────────────────────────────────────────────────
 
 
@@ -90,7 +135,7 @@ def test_on_report_ignores_empty_block_hash(
     forked_env, configured_relay, cre_forwarder, block_data
 ):
     """Test that onReport silently returns when block_hash is empty(bytes32)."""
-    report = _encode_report(block_data["number"], EMPTY_HASH)
+    report = _encode_report(configured_relay, block_data["number"], EMPTY_HASH)
 
     with boa.env.prank(cre_forwarder):
         configured_relay.onReport(VALID_METADATA, report)  # must not revert
@@ -104,6 +149,7 @@ def test_on_report_ignores_mismatched_selector_fee_arrays(
 ):
     """Test that onReport silently returns when selector and fee array lengths differ."""
     report = _encode_report(
+        configured_relay,
         block_data["number"],
         block_data["hash"],
         selectors=[111, 222],
@@ -133,7 +179,9 @@ def test_on_report_triggers_broadcast(
     fees = configured_relay.quote_broadcast_fees(test_selectors, CCIP_RECEIVE_GAS_LIMIT)
     boa.env.set_balance(configured_relay.address, sum(fees))
 
-    report = _encode_report(block_data["number"], block_data["hash"], test_selectors, fees)
+    report = _encode_report(
+        configured_relay, block_data["number"], block_data["hash"], test_selectors, fees
+    )
 
     with boa.env.prank(cre_forwarder):
         configured_relay.onReport(VALID_METADATA, report)
@@ -164,6 +212,7 @@ def test_on_report_broadcast_only_sends_to_registered_peers(
 
     # unregistered selector fee = 0, will be skipped by _broadcast_block
     report = _encode_report(
+        configured_relay,
         block_data["number"],
         block_data["hash"],
         [BASE_CHAIN_SELECTOR, unregistered_selector],
@@ -188,7 +237,9 @@ def test_on_report_insufficient_balance_for_broadcast(
     boa.env.set_balance(configured_relay.address, 0)
 
     # Any fee > 0 with balance = 0 triggers "Insufficient value" before ccipSend is reached
-    report = _encode_report(block_data["number"], block_data["hash"], [111], [10**14])
+    report = _encode_report(
+        configured_relay, block_data["number"], block_data["hash"], [111], [10**14]
+    )
 
     with boa.env.prank(cre_forwarder):
         with boa.reverts("Insufficient value"):
@@ -207,7 +258,7 @@ def test_on_report_duplicate_reruns_fanout_without_reverting(
     n, h = block_data["number"], block_data["hash"]
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(VALID_METADATA, _encode_report(n, h))
+        configured_relay.onReport(VALID_METADATA, _encode_report(configured_relay, n, h))
     assert block_oracle.get_block_hash(n) == h
 
     peer = boa.env.generate_address()
@@ -218,7 +269,9 @@ def test_on_report_duplicate_reruns_fanout_without_reverting(
 
     # same block again, now carrying a broadcast target
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(VALID_METADATA, _encode_report(n, h, [BASE_CHAIN_SELECTOR], fees))
+        configured_relay.onReport(
+            VALID_METADATA, _encode_report(configured_relay, n, h, [BASE_CHAIN_SELECTOR], fees)
+        )
 
     assert block_oracle.get_block_hash(n) == h  # commit was a no-op
     events = configured_relay.get_logs()
@@ -234,6 +287,8 @@ def test_on_report_conflicting_hash_reverts(
     conflicting = bytes.fromhex("bb" * 32)
 
     with boa.env.prank(cre_forwarder):
-        configured_relay.onReport(VALID_METADATA, _encode_report(n, h))
+        configured_relay.onReport(VALID_METADATA, _encode_report(configured_relay, n, h))
         with boa.reverts("Different blockhash already applied"):
-            configured_relay.onReport(VALID_METADATA, _encode_report(n, conflicting))
+            configured_relay.onReport(
+                VALID_METADATA, _encode_report(configured_relay, n, conflicting)
+            )

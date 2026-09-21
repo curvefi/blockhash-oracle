@@ -46,6 +46,34 @@ export const configSchema = z.object({
 })
 type Config = z.infer<typeof configSchema>
 
+// ─── Report ──────────────────────────────────────────────────
+// Must match ChainlinkBlockRelay.onReport's abi_decode. The forwarder does not sign the receiver,
+// so the relay and its chain lead the payload and the relay refuses a report naming anyone else.
+// One literal, not a concatenation: viem infers the encoded tuple's types from the literal only
+export const REPORT_PARAMS = parseAbiParameters(
+	'address relay, uint256 chainId, uint256 blockNumber, bytes32 blockhash, uint64[] targetChainSelectors, uint256[] targetFees, uint256 ccipReceiveGasLimit'
+)
+
+export function encodeReport(
+	relay: Address,
+	chainId: bigint,
+	blockNumber: bigint,
+	blockhash: `0x${string}`,
+	targetChainSelectors: bigint[],
+	targetFees: bigint[],
+	ccipReceiveGasLimit: bigint,
+): `0x${string}` {
+	return encodeAbiParameters(REPORT_PARAMS, [
+		relay,
+		chainId,
+		blockNumber,
+		blockhash,
+		targetChainSelectors,
+		targetFees,
+		ccipReceiveGasLimit,
+	])
+}
+
 // ─── Broadcast ───────────────────────────────────────────────
 export function broadcast(
 	runtime: Runtime<Config>,
@@ -88,15 +116,15 @@ export function broadcast(
 	const relay = new IReceiver(evmClient, broadcastPayload.relay.contractAddress as Address)
 
 	// Prepare and send report
-	const reportData = encodeAbiParameters(
-		parseAbiParameters(
-			'uint256 blockNumber,' +
-			'bytes32 blockhash,' +
-			'uint64[] targetChainSelectors,' +
-			'uint256[] targetFees,' +
-			'uint256 ccipReceiveGasLimit'),
-		[blockNumber, blockhash, targetChainSelectors, targetFees, ccipReceiveGasLimit],
-	);
+	const reportData = encodeReport(
+		broadcastPayload.relay.contractAddress as Address,
+		BigInt(writeNetwork.chainId),
+		blockNumber,
+		blockhash,
+		targetChainSelectors,
+		targetFees,
+		ccipReceiveGasLimit,
+	)
 
 	const writeResult = relay.writeReport(runtime, reportData, {
       gasLimit: broadcastPayload.onReportGasLimit,
