@@ -241,9 +241,10 @@ def _broadcast_block(
     unused_fees: uint256 = 0
 
     for target: BroadcastTarget in _broadcast_data.targets:
-        # Skip if peer is not set
+        # Skip if peer is not set; its fee goes back with the rest of the change
         receiver: address = CCIP.selector_to_receiver[target.chain_selector]
         if receiver == empty(address):
+            unused_fees += target.max_fee
             continue
 
         # Send message

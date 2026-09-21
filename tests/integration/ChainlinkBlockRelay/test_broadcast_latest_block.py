@@ -314,6 +314,37 @@ def test_broadcast_block_refuses_block_it_never_received(
         configured_relay.broadcast_block(n, [], [], CCIP_RECEIVE_GAS_LIMIT)
 
 
+@pytest.mark.mainnet
+def test_broadcast_refunds_fee_of_unconfigured_destination(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A destination without a receiver is skipped and its fee comes back with the change,
+    instead of staying in the relay for the owner."""
+    n, h = block_data["number"], block_data["hash"]
+    unconfigured = 999
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
+    _seed_confirmed_block(configured_relay, block_oracle, dev_deployer, n, h)
+
+    quote = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[0]
+    skipped_fee = 10**15
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, quote + skipped_fee)
+    relay_before = boa.env.get_balance(configured_relay.address)
+
+    with boa.env.prank(user):
+        configured_relay.broadcast_block(
+            n,
+            [BASE_CHAIN_SELECTOR, unconfigured],
+            [quote, skipped_fee],
+            CCIP_RECEIVE_GAS_LIMIT,
+            value=quote + skipped_fee,
+        )
+
+    assert boa.env.get_balance(user) == skipped_fee  # paid only for the destination it reached
+    assert boa.env.get_balance(configured_relay.address) == relay_before
+
+
 # ─── Contract callers ────────────────────────────────────────────────────────
 
 
