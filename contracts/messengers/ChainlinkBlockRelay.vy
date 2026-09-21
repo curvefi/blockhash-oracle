@@ -231,7 +231,7 @@ def _broadcast_block(
     @param _broadcast_data Data for broadcasting
     """
     data: Bytes[64] = abi_encode(_block_number, _block_hash)
-    extra_args: Bytes[68] = CCIP.build_extra_args(_broadcast_data.gas_limit)
+    extra_args: Bytes[68] = CCIP._build_extra_args(_broadcast_data.gas_limit)
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     unused_fees: uint256 = 0
 
@@ -242,7 +242,7 @@ def _broadcast_block(
             continue
 
         # Send message
-        message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
+        message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(target.chain_selector, data, extra_args)
         message_id: bytes32 = empty(bytes32)
         fee: uint256 = 0
         message_id, fee = CCIP._transmit(target.chain_selector, message, target.max_fee)
@@ -301,7 +301,7 @@ def quote_broadcast_fees(
     fees: DynArray[uint256, MAX_N_BROADCAST] = []
 
     # Prepare options (same for all targets)
-    extra_args: Bytes[68] = CCIP.build_extra_args(_ccip_receive_gas_limit)
+    extra_args: Bytes[68] = CCIP._build_extra_args(_ccip_receive_gas_limit)
 
     # Cycle through targets
     for selector: uint64 in _target_chain_selectors:
@@ -311,7 +311,7 @@ def quote_broadcast_fees(
             continue
 
         # Get fee for target chain selector and append to array
-        message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
+        message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(selector, data, extra_args)
         fees.append(CCIP._quote(selector, message, True))  # allow_unsupported
 
     return fees
@@ -360,16 +360,17 @@ def broadcast_latest_block(
 
 
 @external
-@payable
 def onReport(
     _metadata: Bytes[CREReceiver.MAX_METADATA_SIZE],
     _report: Bytes[CREReceiver.MAX_REPORT_SIZE]
 ):
     """
-    @notice Called by CRE Forwarder via CREReceiver after metadata validation
+    @notice Called by the CRE Forwarder; authenticates the report via CREReceiver (strict mode)
+            before decoding it
     @param _report The encoded message payload containing block number and hash
     """
-    # Verify message source
+    # Strict mode (default): reverts until a workflow id or author is configured.
+    # Never pass strict_mode=False in production, it accepts any workflow on the forwarder.
     CREReceiver._on_report(_metadata, _report)
 
     # Decode block hash and number from response
