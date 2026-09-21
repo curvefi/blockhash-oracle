@@ -36,13 +36,24 @@ export const requestHubSchema = z.object({
 	address: evmAddressSchema, // emits CREBlockhashRequested
 	relayAddress: evmAddressSchema, // ChainlinkBlockRelay the report is written to
 })
+type RequestHub = z.infer<typeof requestHubSchema>
 
 export const configSchema = z.object({
 	authorizedEVMAddress: evmAddressSchema,
 	blockViewChainSelectorName: z.string(),
 	blockViewContractAddress: evmAddressSchema,
-	// One log trigger per hub; CRE caps a workflow at 5 monitored log addresses
-	requestHubs: z.array(requestHubSchema).default([]),
+	// One log trigger per hub; CRE caps a workflow at 5 monitored log addresses.
+	// The same address may repeat across chains (CreateX), but a repeated (chain, address)
+	// would register two triggers and deliver every request twice.
+	requestHubs: z
+		.array(requestHubSchema)
+		.default([])
+		.refine(
+			(hubs) =>
+				new Set(hubs.map((h) => `${h.chainSelectorName}:${h.address.toLowerCase()}`)).size ===
+				hubs.length,
+			{ message: 'Duplicate request hub (chain, address)' },
+		),
 })
 type Config = z.infer<typeof configSchema>
 
@@ -223,12 +234,13 @@ const REQUESTED_DATA_PARAMS = parseAbiParameters(
 	'uint256 blockNumber, uint64[] chainSelectors, uint256[] maxFees, uint256 ccipReceiveGasLimit, uint256 onReportGasLimit'
 )
 
-export const onBlockhashRequested = (runtime: Runtime<Config>, log: EVM_PB.Log): string => {
-	// Every hub shares this handler, so the emitting address decides which relay to answer on
-	const emitter = bytesToHex(log.address).toLowerCase()
-	const hub = runtime.config.requestHubs.find((h) => h.address.toLowerCase() === emitter)
-	if (!hub) throw new Error(`Log from unknown request hub ${emitter}`)
-
+// The hub comes from the trigger that fired, not from log.address: the log carries no chain, so
+// hubs sharing an address across chains cannot be told apart from the log alone
+export const onBlockhashRequested = (
+	runtime: Runtime<Config>,
+	log: EVM_PB.Log,
+	hub: RequestHub,
+): string => {
 	const [requestedBlock, chainSelectors, maxFees, ccipReceiveGasLimit, onReportGasLimit] =
 		decodeAbiParameters(REQUESTED_DATA_PARAMS, bytesToHex(log.data))
 
@@ -263,7 +275,7 @@ export function initWorkflow(config: Config) {
 		onNewBlock,
 	)
 
-	// One trigger per hub: the config pins a single (chain, address) pair each
+	// One trigger per hub, each with its hub bound in: the config pins a single (chain, address) pair each
 	const logHandlers = config.requestHubs.map((hub) => {
 		const network = getNetwork({ chainFamily: 'evm', chainSelectorName: hub.chainSelectorName })
 		if (!network) throw new Error(`Network not found: ${hub.chainSelectorName}`)
@@ -279,7 +291,7 @@ export function initWorkflow(config: Config) {
 				// request costs one wasted execution and never a wrong hash
 				confidence: 'CONFIDENCE_LEVEL_LATEST',
 			}),
-			onBlockhashRequested,
+			(runtime: Runtime<Config>, log: EVM_PB.Log) => onBlockhashRequested(runtime, log, hub),
 		)
 	})
 

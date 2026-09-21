@@ -11,6 +11,7 @@ import {
 } from 'viem'
 import { type MainnetBlockViewMock, newMainnetBlockViewMock } from '../contracts/evm/ts/generated/MainnetBlockView_mock'
 import {
+	configSchema,
 	encodeReport,
 	initWorkflow,
 	onBlockhashRequested,
@@ -23,6 +24,7 @@ import type { ResultPayload } from './types/types'
 
 const CHAIN_SELECTOR = 16015286601757825753n // ethereum-testnet-sepolia
 const CHAIN_ID = 11155111n // ethereum-testnet-sepolia
+const BASE_SEPOLIA_SELECTOR = 10344971235874465080n // ethereum-testnet-sepolia-base-1
 
 // The test runtime prefixes each signed report with a fixed-length metadata header
 const REPORT_METADATA_HEADER_LENGTH = 109
@@ -31,6 +33,7 @@ const BLOCK_VIEW_ADDRESS = '0x0000000000000000000000000000000000000001' as Addre
 const RELAY_ADDRESS = '0x0000000000000000000000000000000000000002' as Address
 const AUTHORIZED_KEY = '0x0000000000000000000000000000000000000003' as Address
 const HUB_ADDRESS = '0x0000000000000000000000000000000000000004' as Address
+const BASE_RELAY_ADDRESS = '0x0000000000000000000000000000000000000005' as Address
 
 const BLOCK_NUMBER = 21000000n
 const REAL_BLOCKHASH = `0x${'ab'.repeat(32)}` as `0x${string}`
@@ -59,6 +62,21 @@ const makeHubRuntime = (hubs = [HUB_ADDRESS]) => {
 	;(runtime as any).config = makeHubConfig(hubs)
 	return runtime as unknown as Runtime<ReturnType<typeof makeHubConfig>>
 }
+
+const HUB = makeHubConfig().requestHubs[0]
+
+// CreateX puts a hub at the same address on every chain; each chain has its own relay
+const makeSameAddressHubConfig = () => ({
+	...makeConfig(),
+	requestHubs: [
+		{ chainSelectorName: 'ethereum-testnet-sepolia', address: HUB_ADDRESS, relayAddress: RELAY_ADDRESS },
+		{
+			chainSelectorName: 'ethereum-testnet-sepolia-base-1',
+			address: HUB_ADDRESS,
+			relayAddress: BASE_RELAY_ADDRESS,
+		},
+	],
+})
 
 // Only the non-indexed fields land in log.data; request_id and requester are topics
 const makeRequestLog = (
@@ -211,7 +229,7 @@ describe('onBlockhashRequested', () => {
 		evmMock.writeReport = () => txSuccess()
 
 		const result = JSON.parse(
-			onBlockhashRequested(makeHubRuntime() as any, makeRequestLog() as any),
+			onBlockhashRequested(makeHubRuntime() as any, makeRequestLog() as any, HUB),
 		) as ResultPayload
 
 		expect(result.anySuccess).toBe(true)
@@ -228,7 +246,7 @@ describe('onBlockhashRequested', () => {
 
 		const log = makeRequestLog(BLOCK_NUMBER, [1n, 2n, 3n], [10n, 20n, 30n])
 		const result = JSON.parse(
-			onBlockhashRequested(makeHubRuntime() as any, log as any),
+			onBlockhashRequested(makeHubRuntime() as any, log as any, HUB),
 		) as ResultPayload
 
 		expect(result.data[0].targetChainSelectors).toEqual(['1', '2', '3'])
@@ -240,7 +258,7 @@ describe('onBlockhashRequested', () => {
 
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, ZERO_BLOCKHASH])
 
-		expect(() => onBlockhashRequested(makeHubRuntime() as any, makeRequestLog() as any))
+		expect(() => onBlockhashRequested(makeHubRuntime() as any, makeRequestLog() as any, HUB))
 			.toThrow('unavailable')
 	})
 
@@ -251,30 +269,39 @@ describe('onBlockhashRequested', () => {
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txFail('out of gas')
 
-		expect(() => onBlockhashRequested(makeHubRuntime() as any, makeRequestLog() as any))
+		expect(() => onBlockhashRequested(makeHubRuntime() as any, makeRequestLog() as any, HUB))
 			.toThrow('Broadcast error(s)')
 	})
 
-	test('log from an unknown hub: refuses rather than writing somewhere unintended', () => {
-		expect(() => onBlockhashRequested(makeRuntime() as any, makeRequestLog() as any))
-			.toThrow('unknown request hub')
-	})
-
-	test('several hubs: the emitting address picks which one answers', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+	test('same hub address on two chains: each trigger answers on its own relay', () => {
+		const sepoliaMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const baseMock = EvmMock.testInstance(BASE_SEPOLIA_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, sepoliaMock)
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
-		evmMock.writeReport = () => txSuccess()
 
-		const second = '0x0000000000000000000000000000000000000009' as Address
-		const runtime = makeHubRuntime([HUB_ADDRESS, second])
-
-		// a log from either registered hub is served
-		for (const emitter of [HUB_ADDRESS, second]) {
-			const log = makeRequestLog(BLOCK_NUMBER, [1n], [10n], emitter)
-			const result = JSON.parse(onBlockhashRequested(runtime as any, log as any)) as ResultPayload
-			expect(result.anySuccess).toBe(true)
+		const writes: { chain: string; receiver: string }[] = []
+		sepoliaMock.writeReport = (input) => {
+			writes.push({ chain: 'sepolia', receiver: bytesToHex(input.receiver) })
+			return txSuccess()
 		}
+		baseMock.writeReport = (input) => {
+			writes.push({ chain: 'base', receiver: bytesToHex(input.receiver) })
+			return txSuccess()
+		}
+
+		const config = makeSameAddressHubConfig()
+		const runtime = newTestRuntime()
+		;(runtime as any).config = config
+		const [, sepoliaTrigger, baseTrigger] = initWorkflow(config)
+
+		// The two logs are indistinguishable: same emitter, same data, and no chain on the log
+		sepoliaTrigger.fn(runtime as any, makeRequestLog() as any)
+		baseTrigger.fn(runtime as any, makeRequestLog() as any)
+
+		expect(writes).toEqual([
+			{ chain: 'sepolia', receiver: RELAY_ADDRESS.toLowerCase() },
+			{ chain: 'base', receiver: BASE_RELAY_ADDRESS.toLowerCase() },
+		])
 	})
 })
 
@@ -289,15 +316,24 @@ describe('initWorkflow', () => {
 		const handlers = initWorkflow(makeHubConfig())
 		expect(handlers).toHaveLength(2)
 		expect(handlers[0].fn).toBe(onNewBlock)
-		expect(handlers[1].fn).toBe(onBlockhashRequested)
+		expect(handlers[1].fn).not.toBe(onNewBlock)
 	})
 
-	test('one log trigger per hub, all sharing the same handler', () => {
+	test('one log trigger per hub, each with its own handler bound to that hub', () => {
 		const second = '0x0000000000000000000000000000000000000009' as Address
 		const handlers = initWorkflow(makeHubConfig([HUB_ADDRESS, second]))
 		expect(handlers).toHaveLength(3)
-		expect(handlers[1].fn).toBe(onBlockhashRequested)
-		expect(handlers[2].fn).toBe(onBlockhashRequested)
+		expect(handlers[1].fn).not.toBe(handlers[2].fn)
+	})
+
+	test('config refuses a repeated (chain, address) hub, it would deliver every request twice', () => {
+		const hub = makeHubConfig().requestHubs[0]
+		const result = configSchema.safeParse({ ...makeConfig(), requestHubs: [hub, { ...hub }] })
+		expect(result.success).toBe(false)
+	})
+
+	test('config accepts one hub address on several chains, the CreateX layout', () => {
+		expect(configSchema.safeParse(makeSameAddressHubConfig()).success).toBe(true)
 	})
 
 	test('event signature matches the topic the hub emits', () => {
