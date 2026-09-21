@@ -31,6 +31,7 @@ RELAY = to_checksum_address("0x" + "11" * 20)
 ORACLE = to_checksum_address("0x" + "22" * 20)
 METER = to_checksum_address("0x" + "33" * 20)
 PEER = to_checksum_address("0x" + "44" * 20)
+OTHER_COMMITTER = to_checksum_address("0x" + "55" * 20)  # the other rail's relay
 SRC_SELECTOR = 5009297550715157269  # ethereum-mainnet
 BLOCK_NUMBER = 21_000_000
 BLOCK_HASH = bytes.fromhex("ab" * 32)
@@ -41,9 +42,10 @@ RELAY_SENDERS_SLOT = 7
 RELAY_ORACLE_SLOT = 8
 ORACLE_BLOCK_HASH_SLOT = 1
 ORACLE_LAST_CONFIRMED_SLOT = 2
+ORACLE_COMMITTERS_SLOT = 11  # DynArray: length here, elements from the next slot
 ORACLE_IS_COMMITTER_SLOT = 44
-ORACLE_COUNT_SLOT = 45
-ORACLE_THRESHOLD_SLOT = 47
+ORACLE_VOTES_SLOT = 45
+ORACLE_THRESHOLD_SLOT = 46
 
 METER_SRC = """# pragma version 0.4.3
 @external
@@ -53,16 +55,16 @@ def measure(target: address, data: Bytes[1024]) -> (bool, uint256):
     return ok, g - msg.gas
 """
 
-# The oracle state the relay's vote lands in
+# The oracle state the relay's vote lands in; two committers, the relay and the other rail
 SCENARIOS = {
     # threshold 2, nobody voted yet: the vote is recorded, no apply
-    "first_vote": {"threshold": 2, "prior_count": 0, "applied": False},
+    "first_vote": {"threshold": 2, "other_voted": False, "applied": False},
     # threshold 2, the other rail already voted: this vote applies the block
-    "completing_vote": {"threshold": 2, "prior_count": 1, "applied": False},
+    "completing_vote": {"threshold": 2, "other_voted": True, "applied": False},
     # threshold 1: this vote alone applies the block
-    "sole_vote_applies": {"threshold": 1, "prior_count": 0, "applied": False},
+    "sole_vote_applies": {"threshold": 1, "other_voted": False, "applied": False},
     # block already applied with this hash: _commit_block returns early
-    "already_applied": {"threshold": 2, "prior_count": 0, "applied": True},
+    "already_applied": {"threshold": 2, "other_voted": False, "applied": True},
 }
 
 # chain: (drpc network name, [public fallbacks])
@@ -127,13 +129,19 @@ def storage(scenario) -> dict:
         hashmap_slot(RELAY_SENDERS_SLOT, SRC_SELECTOR): int(PEER, 16),
     }
     oracle = {
+        ORACLE_COMMITTERS_SLOT: 2,
+        ORACLE_COMMITTERS_SLOT + 1: int(RELAY, 16),
+        ORACLE_COMMITTERS_SLOT + 2: int(OTHER_COMMITTER, 16),
         hashmap_slot(ORACLE_IS_COMMITTER_SLOT, RELAY): 1,
+        hashmap_slot(ORACLE_IS_COMMITTER_SLOT, OTHER_COMMITTER): 1,
         ORACLE_THRESHOLD_SLOT: scenario["threshold"],
         # a live oracle has confirmed blocks before, so this slot is not fresh
         ORACLE_LAST_CONFIRMED_SLOT: BLOCK_NUMBER - 100,
     }
-    if scenario["prior_count"]:
-        oracle[hashmap_slot(ORACLE_COUNT_SLOT, BLOCK_NUMBER, BLOCK_HASH)] = scenario["prior_count"]
+    if scenario["other_voted"]:
+        oracle[hashmap_slot(ORACLE_VOTES_SLOT, OTHER_COMMITTER, BLOCK_NUMBER)] = int.from_bytes(
+            BLOCK_HASH, "big"
+        )
     if scenario["applied"]:
         oracle[hashmap_slot(ORACLE_BLOCK_HASH_SLOT, BLOCK_NUMBER)] = int.from_bytes(
             BLOCK_HASH, "big"

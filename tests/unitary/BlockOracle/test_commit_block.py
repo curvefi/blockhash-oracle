@@ -207,3 +207,65 @@ def test_apply_block_permissionless(block_oracle, committers):
         block_oracle.apply_block(mock_block_num, mock_hash)
     result_hash = block_oracle.get_block_hash(mock_block_num)
     assert result_hash == mock_hash
+
+
+# ─── Removed committers ──────────────────────────────────────────────────────
+
+
+def test_removed_committer_vote_stops_counting(block_oracle, committers, dev_deployer):
+    """A removed committer's vote drops out of commitment_count immediately."""
+    block_num, block_hash = 11223344, b"\x01" * 32
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_threshold(3)
+    for committer in committers[:2]:
+        with boa.env.prank(committer):
+            block_oracle.commit_block(block_num, block_hash)
+    assert block_oracle.commitment_count(block_num, block_hash) == 2
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.remove_committer(committers[0])
+
+    assert block_oracle.commitment_count(block_num, block_hash) == 1
+
+
+def test_removed_committer_cannot_confirm_after_threshold_drop(block_oracle, dev_deployer):
+    """The audit's path: a compromised committer votes a false hash, is removed, and the threshold
+    is lowered so the survivor can operate. The stale vote must not confirm the false hash."""
+    compromised, honest = boa.env.generate_address(), boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(compromised, True)
+        block_oracle.add_committer(honest, True)  # threshold 2
+    block_num = 11223344
+    false_hash, true_hash = b"\xbb" * 32, b"\x01" * 32
+
+    with boa.env.prank(compromised):
+        block_oracle.commit_block(block_num, false_hash)
+    with boa.env.prank(dev_deployer):
+        block_oracle.remove_committer(compromised)
+        block_oracle.set_threshold(1)
+
+    assert block_oracle.commitment_count(block_num, false_hash) == 0
+    with boa.reverts("Insufficient commitments"):
+        block_oracle.apply_block(block_num, false_hash)
+
+    with boa.env.prank(honest):
+        block_oracle.commit_block(block_num, true_hash)
+    assert block_oracle.get_block_hash(block_num) == true_hash
+
+
+def test_readded_committer_old_vote_counts_again(block_oracle, committers, dev_deployer):
+    """Documented behaviour: votes are keyed by address, so re-adding one revives its old votes.
+    A compromised committer is replaced with a new key, never re-added."""
+    block_num, block_hash = 11223344, b"\x01" * 32
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_threshold(3)
+    with boa.env.prank(committers[0]):
+        block_oracle.commit_block(block_num, block_hash)
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.remove_committer(committers[0])
+    assert block_oracle.commitment_count(block_num, block_hash) == 0
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(committers[0])
+    assert block_oracle.commitment_count(block_num, block_hash) == 1
