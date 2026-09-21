@@ -169,31 +169,32 @@ The Curve Block Oracle is deployed on the following chains:
 
 -   **Read Operations**: Approximately 200,000 gas is recommended.
 -   **Broadcast Receive**: Approximately 100,000 gas per chain (LayerZero `lzReceive`).
--   **CCIP Receive**: 170,000 gas on every destination, see below.
+-   **CCIP Receive**: 150,000 gas on every destination, see below.
 -   **Header Size**: Headers must be under 1024 bytes.
 
 ### CCIP receive gas limit
 
 `ChainlinkBlockRelay` sends one `ccipReceive` gas limit to every destination, and CCIP charges for
-the limit requested, not the gas used. It is set to **170,000**: the highest measured cost is
-~147k (Monad, when a single vote confirms the block), so this leaves ~15% headroom there and
-roughly 2x on standard-EVM chains.
+the limit requested, not the gas used. It is set to **150,000**: the highest measured cost is
+~127k (Monad, when a vote confirms the block), so this leaves ~18% headroom there and roughly 1.85x
+on standard-EVM chains.
 
-`ccipReceive` gas measured on each chain's own node, September 2026
-(`scripts/ccip_gas_probe.py`):
+`ccipReceive` gas measured on each chain's own node, September 2026, with two committers
+(`scripts/ccip_gas_probe.py`). The oracle counts votes over its current committers, so each
+further committer adds one cold storage read per threshold check:
 
 | Chains | First vote (threshold 2) | Completing vote (threshold 2) | Sole vote applies (threshold 1) | Already applied |
 |---|---|---|---|---|
-| Ethereum, Arbitrum, Avalanche, Base, BSC, Celo, Fraxtal, Gnosis, HyperEVM, Ink, Mantle, Optimism, Plasma, Plume, Sonic, TAC, Taiko, Unichain, XDC, X Layer | 68k | 77.5k | 94.6k | 16k |
-| Polygon | 95k | 106k | 124k | 30k |
-| Monad | 122k | 130k | 147k | 47k |
+| Ethereum, Arbitrum, Avalanche, Base, BSC, Celo, Fraxtal, Gnosis, HyperEVM, Ink, Mantle, Optimism, Plasma, Plume, Sonic, TAC, Taiko, Unichain, XDC, X Layer | 54.5k | 81k | 81k | 16k |
+| Polygon | 89k | 118k | 118k | 30k |
+| Monad | 103k | 127k | 127k | 47k |
 
 Etherlink (its RPC ignores `eth_call` state overrides) and Corn (no working RPC) were not measured.
 
 **Re-run the probe and update this table** before adding a CCIP destination, when a chain reprices
-opcodes in a hard fork, and when `ccipReceive` or `BlockOracle.commit_block` change. If a chain
-needs more than ~150k, raise the shared limit; if the spread between chains grows, per-destination
-limits (audit finding #057) become worth their cost.
+opcodes in a hard fork, when `ccipReceive` or `BlockOracle.commit_block` change, and when the number
+of committers grows. If a chain needs more than ~130k, raise the shared limit; if the spread between
+chains grows, per-destination limits (audit finding #057) become worth their cost.
 
 ### RLP Header Decoding
 
