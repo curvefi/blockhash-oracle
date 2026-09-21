@@ -94,9 +94,6 @@ last_confirmed_header: public(bh_rlp.BlockHeader)  # last confirmed header
 
 committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
-commitment_count: public(
-    HashMap[uint256, HashMap[bytes32, uint256]]
-)  # block_number => hash => count
 committer_votes: public(
     HashMap[address, HashMap[uint256, bytes32]]
 )  # committer => block_number => committed_hash
@@ -211,6 +208,21 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
 #                     INTERNAL FUNCTIONS                       #
 ################################################################
 
+@view
+@internal
+def _commitment_count(_block_number: uint256, _block_hash: bytes32) -> uint256:
+    """
+    @notice Votes for a hash from current committers only
+    @dev Counted live rather than tallied, so a removed committer's votes stop counting at once.
+         Re-adding an address revives its old votes: rotate to a new key instead.
+    """
+    count: uint256 = 0
+    for committer: address in self.committers:
+        if self.committer_votes[committer][_block_number] == _block_hash:
+            count += 1
+    return count
+
+
 @internal
 def _apply_block(_block_number: uint256, _block_hash: bytes32):
     """
@@ -245,18 +257,12 @@ def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = Tr
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
     assert _block_hash != empty(bytes32), "Invalid block hash"
 
-    previous_commitment: bytes32 = self.committer_votes[msg.sender][_block_number]
-
-    # Remove previous vote if exists, to avoid duplicate commitments
-    if previous_commitment != empty(bytes32):
-        self.commitment_count[_block_number][previous_commitment] -= 1
-
+    # A new vote replaces the committer's previous one; there is no stored tally to keep in step
     self.committer_votes[msg.sender][_block_number] = _block_hash
-    self.commitment_count[_block_number][_block_hash] += 1
     log CommitBlock(committer=msg.sender, block_number=_block_number, block_hash=_block_hash)
 
     # Optional attempt to apply block
-    if _apply and self.commitment_count[_block_number][_block_hash] >= self.threshold:
+    if _apply and self._commitment_count(_block_number, _block_hash) >= self.threshold:
         self._apply_block(_block_number, _block_hash)
         return True
     return False
@@ -303,7 +309,7 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
     assert self.threshold > 0, "Threshold not set"
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
     assert (
-        self.commitment_count[_block_number][_block_hash] >= self.threshold
+        self._commitment_count(_block_number, _block_hash) >= self.threshold
     ), "Insufficient commitments"
     self._apply_block(_block_number, _block_hash)
 
@@ -311,6 +317,18 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
 ################################################################
 #                         VIEW FUNCTIONS                       #
 ################################################################
+
+@view
+@external
+def commitment_count(_block_number: uint256, _block_hash: bytes32) -> uint256:
+    """
+    @notice Votes for a hash from current committers, the count the threshold is checked against
+    @param _block_number The block number
+    @param _block_hash The block hash
+    @return Number of current committers whose vote for this block is this hash
+    """
+    return self._commitment_count(_block_number, _block_hash)
+
 
 @view
 @external

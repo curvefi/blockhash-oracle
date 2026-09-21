@@ -387,7 +387,7 @@ def request(
                          non-zero: MainnetBlockView serves [head - 8191, head - 65] and both rails
                          resolve later than this call, which only makes the block older, so pick with
                          room to spare - head - 100 is comfortable.
-    @param _ccip_gas Gas limit for ccipReceive on each CCIP target; 170_000 covers every measured
+    @param _ccip_gas Gas limit for ccipReceive on each CCIP target; 150_000 covers every measured
                      chain (README, "CCIP receive gas limit")
     @param _lz_gas Gas limit for lzReceive on each LayerZero target; 150_000, 200_000 on Monad
     @param _read_gas Gas limit for the lzRead return message; 400_000 + 200_000 per target
