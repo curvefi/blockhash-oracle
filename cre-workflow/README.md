@@ -28,7 +28,7 @@ Failures are best-effort: a failed broadcast to one relay does not stop the othe
       "targetChains": [
         { "selector": "5009297550715157269", "fees": "1000000000000000" }
       ],
-      "ccipReceiveGasLimit": "200000",
+      "ccipReceiveGasLimit": "170000",
       "onReportGasLimit": "500000"
     }
   ]

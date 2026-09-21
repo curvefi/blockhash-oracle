@@ -476,6 +476,8 @@ def onReport(
         )
 
 
+# Every destination gets one shared gas limit for this call, sized from per-chain measurements:
+# README "CCIP receive gas limit". Re-run scripts/ccip_gas_probe.py if this path changes.
 @external
 def ccipReceive(_message: CCIP.Any2EVMMessage):
     CCIP._ccipReceive(_message)
