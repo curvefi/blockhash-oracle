@@ -197,15 +197,15 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
     @notice Apply a block hash with admin rights
     @param _block_number The block number to apply
     @param _block_hash The hash to apply
-    @dev Only callable by owner. Replacing a hash drops the header decoded from the old one, so
-         get_state_root stops serving that state and the right header can be submitted.
-         last_confirmed_header is a convenience snapshot and is left as is; proofs use
-         get_state_root per block.
+    @dev Only callable by owner. Replacing a hash drops both the header decoded from the old one
+         and the snapshot if it was that block, so neither keeps serving the replaced state.
     """
 
     ownable._check_owner()
     if self.block_header[_block_number].block_hash != _block_hash:
         self.block_header[_block_number] = empty(bh_rlp.BlockHeader)
+        if self.last_confirmed_header.block_number == _block_number:
+            self.last_confirmed_header = empty(bh_rlp.BlockHeader)
     self._apply_block(_block_number, _block_hash)
 
 
@@ -242,7 +242,8 @@ def _apply_block(_block_number: uint256, _block_hash: bytes32):
     """
 
     self.block_hash[_block_number] = _block_hash
-    if self.last_confirmed_block_number < _block_number:
+    # An empty hash clears a block rather than confirming one, so it must not move the pointer
+    if _block_hash != empty(bytes32) and self.last_confirmed_block_number < _block_number:
         self.last_confirmed_block_number = _block_number
     log ApplyBlock(block_number=_block_number, block_hash=_block_hash)
 
