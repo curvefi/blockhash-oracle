@@ -202,7 +202,10 @@ def recover_erc20(_token: address, _to: address, _amount: uint256):
     """
     ownable._check_owner()
 
-    assert extcall IERC20(_token).transfer(_to, _amount), "Transfer failed"
+    # default_return_value: tokens that return nothing on a successful transfer (USDT) are recoverable
+    assert extcall IERC20(_token).transfer(
+        _to, _amount, default_return_value=True
+    ), "Transfer failed"
 
 
 ################################################################

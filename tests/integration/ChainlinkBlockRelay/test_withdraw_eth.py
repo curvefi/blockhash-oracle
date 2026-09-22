@@ -42,6 +42,27 @@ def test_withdraw_eth(forked_env, chainlink_block_relay, dev_deployer):
     assert boa.env.get_balance(chainlink_block_relay.address) == 0
 
 
+# Returns nothing on transfer, as USDT does
+_MOCK_ERC20_NO_RETURN = """# pragma version 0.4.3
+balanceOf: public(HashMap[address, uint256])
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balanceOf[_to] += _amount
+
+@external
+def transfer(_to: address, _amount: uint256):
+    self.balanceOf[msg.sender] -= _amount
+    self.balanceOf[_to] += _amount
+"""
+
+# Reports failure the compliant way
+_MOCK_ERC20_FALSE = """# pragma version 0.4.3
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    return False
+"""
+
 _MOCK_ERC20 = """# pragma version 0.4.3
 balanceOf: public(HashMap[address, uint256])
 
@@ -96,3 +117,27 @@ def test_withdraw_eth_to_contract_owner(forked_env, chainlink_block_relay, dev_d
 
     assert caller.received() == 10**17
     assert boa.env.get_balance(chainlink_block_relay.address) == 9 * 10**17
+
+
+@pytest.mark.mainnet
+def test_recover_erc20_token_without_return_value(forked_env, chainlink_block_relay, dev_deployer):
+    """A token that returns nothing on a successful transfer (USDT) can still be recovered."""
+    token = boa.loads(_MOCK_ERC20_NO_RETURN)
+    recipient = boa.env.generate_address()
+    token.mint(chainlink_block_relay.address, 1000)
+
+    with boa.env.prank(dev_deployer):
+        chainlink_block_relay.recover_erc20(token.address, recipient, 1000)
+
+    assert token.balanceOf(recipient) == 1000
+    assert token.balanceOf(chainlink_block_relay.address) == 0
+
+
+@pytest.mark.mainnet
+def test_recover_erc20_failing_token_reverts(forked_env, chainlink_block_relay, dev_deployer):
+    """A token that reports failure still reverts."""
+    token = boa.loads(_MOCK_ERC20_FALSE)
+
+    with boa.env.prank(dev_deployer):
+        with boa.reverts("Transfer failed"):
+            chainlink_block_relay.recover_erc20(token.address, boa.env.generate_address(), 1)
