@@ -224,6 +224,19 @@ describe('onNewBlock', () => {
 })
 
 describe('onNewBlock best effort', () => {
+	test('an undefined receiver status is a failure, a write reported as success is the costly mistake', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		evmMock.writeReport = () =>
+			({ txStatus: TxStatus.SUCCESS, txHash: new Uint8Array(32) }) as unknown as ReturnType<
+				WriteReportHandler
+			>
+
+		expect(() => onNewBlock(makeRuntime(), makeHTTPPayload() as any)).toThrow('Broadcast error(s)')
+	})
+
+
 	test('a relay whose write throws is reported and the next relay is still written', () => {
 		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
 		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
@@ -307,6 +320,26 @@ describe('onNewBlock payload validation', () => {
 		const payload = makeBroadcastPayload()
 		payload.targetChains = [{ selector: '1', fees: '1e18' }]
 		expectRefusedBeforeAnyWrite([payload])
+	})
+
+	test('an unknown key is refused, a misspelled blockNumber must not deliver unpinned', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		evmMock.writeReport = () => txSuccess()
+
+		const payload = { blocknumber: '23500000', data: [makeBroadcastPayload()] }
+		expect(() => onNewBlock(makeRuntime(), { input: encode(payload) } as any)).toThrow()
+	})
+
+	test('a zero blockNumber is refused rather than delivering the default block', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		evmMock.writeReport = () => txSuccess()
+
+		const payload = { blockNumber: '0', data: [makeBroadcastPayload()] }
+		expect(() => onNewBlock(makeRuntime(), { input: encode(payload) } as any)).toThrow()
 	})
 
 	test('a request naming no relay is refused', () => {
