@@ -25,12 +25,12 @@ def test_set_header_verifier(block_oracle, block_headers_decoder):
         # First set - from empty address to block_headers_decoder
         block_oracle.set_header_verifier(block_headers_decoder.address)
         assert block_oracle.header_verifier() == block_headers_decoder.address
-        
+
         # Change to another address - from block_headers_decoder to new_verifier
         new_verifier = boa.env.generate_address()
         block_oracle.set_header_verifier(new_verifier)
         assert block_oracle.header_verifier() == new_verifier
-        
+
         # Note: Event emission is tested implicitly - if the event is emitted correctly,
         # the contract will compile and execute without errors. The actual event
         # verification would require mocking or integration testing framework support.
@@ -163,3 +163,54 @@ def test_last_confirmed_header_out_of_order(
         last_header = block_oracle_set.last_confirmed_header()
         assert last_header[4] == highest_block["number"]  # block_number
         assert last_header[0] == highest_block["hash"]  # block_hash
+
+
+# ─── Owner hash overrides ────────────────────────────────────────────────────
+
+
+def _header(block_number, block_hash, state_root):
+    # (block_hash, parent_hash, state_root, receipt_root, block_number, timestamp)
+    return (block_hash, bytes(32), state_root, bytes(32), block_number, 1_700_000_000)
+
+
+def _submit(block_oracle, verifier, header):
+    with boa.env.prank(verifier):
+        block_oracle.submit_block_header(header)
+
+
+def test_override_drops_the_old_header(block_oracle, dev_deployer):
+    """Replacing a hash drops the header decoded from the old one: get_state_root stops serving the
+    old state, and the header matching the new hash can be submitted."""
+    verifier = boa.env.generate_address()
+    n = 21_000_000
+    bad_hash, good_hash = b"\xbb" * 32, b"\x01" * 32
+    bad_root, good_root = b"\xcc" * 32, b"\x02" * 32
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_header_verifier(verifier)
+        block_oracle.admin_apply_block(n, bad_hash)
+    _submit(block_oracle, verifier, _header(n, bad_hash, bad_root))
+    assert block_oracle.get_state_root(n) == bad_root
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, good_hash)
+
+    assert block_oracle.get_block_hash(n) == good_hash
+    assert block_oracle.get_state_root(n) == bytes(32)
+
+    _submit(block_oracle, verifier, _header(n, good_hash, good_root))
+    assert block_oracle.get_state_root(n) == good_root
+
+
+def test_reapplying_the_same_hash_keeps_the_header(block_oracle, dev_deployer):
+    """Only a different hash invalidates the header; re-applying the same one leaves it in place."""
+    verifier = boa.env.generate_address()
+    n, block_hash, root = 21_000_000, b"\x01" * 32, b"\x02" * 32
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_header_verifier(verifier)
+        block_oracle.admin_apply_block(n, block_hash)
+    _submit(block_oracle, verifier, _header(n, block_hash, root))
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, block_hash)
+
+    assert block_oracle.get_state_root(n) == root
