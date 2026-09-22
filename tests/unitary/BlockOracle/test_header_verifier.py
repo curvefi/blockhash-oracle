@@ -214,3 +214,25 @@ def test_reapplying_the_same_hash_keeps_the_header(block_oracle, dev_deployer):
         block_oracle.admin_apply_block(n, block_hash)
 
     assert block_oracle.get_state_root(n) == root
+
+
+def test_override_also_repairs_the_last_header_snapshot(block_oracle, dev_deployer):
+    """The header resubmitted after an override replaces last_confirmed_header too, so the snapshot
+    cannot keep serving the replaced block's state root."""
+    verifier = boa.env.generate_address()
+    n = 21_000_000
+    bad_hash, good_hash = b"\xbb" * 32, b"\x01" * 32
+    bad_root, good_root = b"\xcc" * 32, b"\x02" * 32
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_header_verifier(verifier)
+        block_oracle.admin_apply_block(n, bad_hash)
+    _submit(block_oracle, verifier, _header(n, bad_hash, bad_root))
+    assert block_oracle.last_confirmed_header()[2] == bad_root
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, good_hash)
+    _submit(block_oracle, verifier, _header(n, good_hash, good_root))
+
+    snapshot = block_oracle.last_confirmed_header()
+    assert snapshot[0] == good_hash
+    assert snapshot[2] == good_root
