@@ -315,6 +315,22 @@ describe('onNewBlock payload validation', () => {
 })
 
 describe('onBlockhashRequested', () => {
+	test('a log with no block number is refused, the hub cannot emit one', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
+		let writes = 0
+		evmMock.writeReport = () => {
+			writes += 1
+			return txSuccess()
+		}
+
+		expect(() =>
+			onBlockhashRequested(makeHubRuntime() as any, makeRequestLog(0n) as any, HUB),
+		).toThrow('no block number')
+		expect(writes).toBe(0)
+	})
+
 	test('happy path: decodes the log and broadcasts to its targets', () => {
 		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
 		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)

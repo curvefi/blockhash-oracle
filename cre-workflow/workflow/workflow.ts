@@ -309,8 +309,11 @@ export const onBlockhashRequested = (
 		decodeAbiParameters(REQUESTED_DATA_PARAMS, bytesToHex(log.data))
 
 	// The hub pins the block so both rails vote on the same number; the hash itself is read from
-	// mainnet here, never taken from the log
-	return deliver(runtime, requestedBlock === 0n ? undefined : requestedBlock, [
+	// mainnet here, never taken from the log. A zero block cannot come from the hub
+	// (BlockhashRequestHub: "No block number") and would deliver an unpinned block to one rail
+	if (requestedBlock === 0n) throw new Error('Request log carries no block number')
+
+	return deliver(runtime, requestedBlock, [
 		{
 			relay: { chainSelectorName: hub.chainSelectorName, contractAddress: hub.relayAddress },
 			targetChains: chainSelectors.map((selector, i) => ({
