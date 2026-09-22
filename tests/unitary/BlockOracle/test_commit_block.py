@@ -284,3 +284,18 @@ def test_empty_hash_never_counts_as_a_vote(block_oracle, committers, dev_deploye
         block_oracle.apply_block(block_num, bytes(32))
 
     assert block_oracle.last_confirmed_block_number() == 0
+
+
+def test_admin_clearing_a_hash_does_not_move_the_pointer(block_oracle, committers, dev_deployer):
+    """An empty hash clears a block rather than confirming one, so it must not strand
+    last_confirmed_block_number at that number."""
+    n = 2**256 - 1
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, bytes(32))
+
+    assert block_oracle.last_confirmed_block_number() == 0
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(21_000_000, b"\x01" * 32)
+
+    assert block_oracle.last_confirmed_block_number() == 21_000_000
