@@ -269,3 +269,18 @@ def test_readded_committer_old_vote_counts_again(block_oracle, committers, dev_d
     with boa.env.prank(dev_deployer):
         block_oracle.add_committer(committers[0])
     assert block_oracle.commitment_count(block_num, block_hash) == 1
+
+
+def test_empty_hash_never_counts_as_a_vote(block_oracle, committers, dev_deployer):
+    """An unset vote reads as empty, so the empty hash must not count every committer who never
+    voted; apply_block refuses it outright."""
+    block_num = 2**256 - 1
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_threshold(2)
+
+    assert block_oracle.commitment_count(block_num, bytes(32)) == 0
+
+    with boa.reverts("Invalid block hash"):
+        block_oracle.apply_block(block_num, bytes(32))
+
+    assert block_oracle.last_confirmed_block_number() == 0
