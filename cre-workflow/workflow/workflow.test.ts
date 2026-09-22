@@ -338,6 +338,13 @@ describe('initWorkflow', () => {
 		expect(result.success).toBe(false)
 	})
 
+	test('config refuses a sixth hub, cre monitors at most 5 log addresses', () => {
+		const hubs = (n: number) =>
+			Array.from({ length: n }, (_, i) => `0x${(i + 16).toString(16).padStart(40, '0')}` as Address)
+		expect(configSchema.safeParse(makeHubConfig(hubs(5))).success).toBe(true)
+		expect(configSchema.safeParse(makeHubConfig(hubs(6))).success).toBe(false)
+	})
+
 	test('config accepts one hub address on several chains, the CreateX layout', () => {
 		expect(configSchema.safeParse(makeSameAddressHubConfig()).success).toBe(true)
 	})

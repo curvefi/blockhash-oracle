@@ -47,6 +47,7 @@ export const configSchema = z.object({
 	// would register two triggers and deliver every request twice.
 	requestHubs: z
 		.array(requestHubSchema)
+		.max(5, 'CRE monitors at most 5 log addresses per workflow')
 		.default([])
 		.refine(
 			(hubs) =>

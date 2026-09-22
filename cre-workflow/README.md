@@ -48,6 +48,29 @@ blockViewContractAddress: "0xb10cface00696B1390875DB2a0113B3ab99752a4"
 
 Staging uses `ethereum-testnet-sepolia` and the corresponding Sepolia deployment.
 
+## CRE service limits
+
+Chainlink's [service quotas](https://docs.chain.link/cre/service-quotas) bound this workflow
+independently of the contracts. Values as read on 2026-09-22; they have changed before (an earlier
+reading had HTTP at 1 per 60 s and reports at 5 KB), so re-check them before adding hubs or raising
+request volume.
+
+| Quota | Value | What it bounds here |
+|---|---|---|
+| Log trigger monitored addresses (`PerWorkflow.LogTrigger.FilterAddressLimit`) | 5 | Request hubs: one log trigger each. The config refuses a sixth. Whether the cap is per workflow or per trigger is unclear; confirm with Chainlink before relying on more |
+| Triggers per workflow | 10 | 1 HTTP trigger + one per hub |
+| Log trigger event rate | 10 per 6 s, burst 10 | Hub requests across all hubs |
+| HTTP trigger rate | 1 per 30 s, burst 1 | Operator-triggered deliveries |
+| EVM write destination chains | 10 | Relays per HTTP request |
+| Report payload | 50 KB | Far above ours: ~2.3 KB with the relay's maximum of 32 targets |
+| Gas per EVM write | 10,000,000 | `onReportGasLimit` |
+| EVM reads per execution | 15 | One read per delivery today |
+| Execution time / capability call | 5 min / 3 min | Relay writes run one after another |
+| Concurrent executions per workflow | 50 | Parallel requests |
+| Log line | 1 KB | `broadcast()`'s log of selectors and fees can be cut short with many targets; delivery is unaffected |
+
+Executions over a rate quota are queued and retried for up to 10 minutes, then dropped.
+
 ## Development
 
 Install dependencies:
