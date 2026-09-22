@@ -223,6 +223,41 @@ describe('onNewBlock', () => {
 	})
 })
 
+describe('onNewBlock best effort', () => {
+	test('a relay whose write throws is reported and the next relay is still written', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		let writes = 0
+		evmMock.writeReport = () => {
+			writes += 1
+			if (writes === 1) throw new Error('capability unavailable')
+			return txSuccess()
+		}
+
+		const result = JSON.parse(onNewBlock(makeRuntime(), makeHTTPPayload(undefined, 2) as any)) as ResultPayload
+
+		expect(writes).toBe(2)
+		expect(result.anySuccess).toBe(true)
+		expect(result.data[0].success).toBe(false)
+		expect(result.data[0].message).toContain('capability unavailable')
+		expect(result.data[1].success).toBe(true)
+	})
+
+	test('every relay throwing still fails the execution, with each error', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		evmMock.writeReport = () => {
+			throw new Error('capability unavailable')
+		}
+
+		expect(() => onNewBlock(makeRuntime(), makeHTTPPayload(undefined, 2) as any)).toThrow(
+			'capability unavailable',
+		)
+	})
+})
+
 describe('onNewBlock payload validation', () => {
 	// A request is refused whole, before the first report is written
 	const expectRefusedBeforeAnyWrite = (data: unknown[]) => {

@@ -249,7 +249,22 @@ function deliver(
 	}
 
 	for (const payload of payloads) {
-		const broadcastResult = broadcast(runtime, blockNumber, blockhash, payload)
+		let broadcastResult: BroadcastResult
+		try {
+			broadcastResult = broadcast(runtime, blockNumber, blockhash, payload)
+		} catch (e) {
+			// One relay's exception must not cost the others their delivery; a full retry would
+			// repeat the paid broadcasts that already went out
+			const message = `Broadcast to ${payload.relay.chainSelectorName} threw: ${e instanceof Error ? e.message : String(e)}`
+			runtime.log(message)
+			broadcastResult = {
+				relayChainSelectorName: payload.relay.chainSelectorName,
+				targetChainSelectors: payload.targetChains.map((t) => t.selector),
+				txHash: '',
+				success: false,
+				message,
+			}
+		}
 		if (broadcastResult.success) result.anySuccess = true
 		result.data.push(broadcastResult)
 	}
