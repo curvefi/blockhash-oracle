@@ -35,7 +35,8 @@ Failures are best-effort: a failed broadcast to one relay does not stop the othe
 }
 ```
 
-`blockNumber` is optional — omit it to use the latest finalized block.
+`blockNumber` is optional — omit it to get `MainnetBlockView`'s default, 65 blocks behind the latest
+block (not a finalized one). Production always pins it, so both rails vote on the same block.
 
 ## Config
 
