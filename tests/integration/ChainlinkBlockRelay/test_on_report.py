@@ -230,20 +230,61 @@ def test_on_report_broadcast_only_sends_to_registered_peers(
 
 
 @pytest.mark.mainnet
-def test_on_report_insufficient_balance_for_broadcast(
-    forked_env, configured_relay, cre_forwarder, block_data
+def test_on_report_unaffordable_broadcast_still_commits(
+    forked_env, configured_relay, block_oracle, cre_forwarder, dev_deployer, block_data
 ):
-    """Test that onReport reverts when the contract lacks ETH to cover broadcast fees."""
+    """A relay that cannot cover a destination's fee skips it and still commits the block: the
+    commit must not be lost to an unreachable destination."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
     boa.env.set_balance(configured_relay.address, 0)
 
-    # Any fee > 0 with balance = 0 triggers "Insufficient value" before ccipSend is reached
+    report = _encode_report(configured_relay, n, h, [BASE_CHAIN_SELECTOR], [10**18])
+
+    with boa.env.prank(cre_forwarder):
+        configured_relay.onReport(VALID_METADATA, report)  # must not revert
+
+    assert block_oracle.committer_votes(configured_relay.address, n) == h
+    events = configured_relay.get_logs()
+    skipped = [e for e in events if type(e).__name__ == "BroadcastSkipped"]
+    assert len(skipped) == 1
+    assert skipped[0].chain_selector == BASE_CHAIN_SELECTOR
+    assert not [e for e in events if type(e).__name__ == "MessageSent"]
+
+
+@pytest.mark.mainnet
+def test_on_report_unsupported_destination_does_not_undo_the_rest(
+    forked_env, configured_relay, block_oracle, cre_forwarder, dev_deployer, block_data
+):
+    """One destination the router will not serve is skipped while the others are still sent."""
+    n, h = block_data["number"], block_data["hash"]
+    unsupported = 111  # a selector the real router does not know
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peers(
+            [BASE_CHAIN_SELECTOR, unsupported],
+            [boa.env.generate_address(), boa.env.generate_address()],
+        )
+    live_fee = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[
+        0
+    ]
+    boa.env.set_balance(configured_relay.address, 2 * live_fee)
+
     report = _encode_report(
-        configured_relay, block_data["number"], block_data["hash"], [111], [10**14]
+        configured_relay, n, h, [unsupported, BASE_CHAIN_SELECTOR], [live_fee, live_fee]
     )
 
     with boa.env.prank(cre_forwarder):
-        with boa.reverts("Insufficient value"):
-            configured_relay.onReport(VALID_METADATA, report)
+        configured_relay.onReport(VALID_METADATA, report)
+
+    assert block_oracle.committer_votes(configured_relay.address, n) == h
+    events = configured_relay.get_logs()
+    assert [e.chain_selector for e in events if type(e).__name__ == "BroadcastSkipped"] == [
+        unsupported
+    ]
+    assert [e.chain_selector for e in events if type(e).__name__ == "MessageSent"] == [
+        BASE_CHAIN_SELECTOR
+    ]
 
 
 # ─── Idempotency / conflict (#4) ─────────────────────────────────────────────

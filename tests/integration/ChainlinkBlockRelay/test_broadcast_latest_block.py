@@ -181,7 +181,8 @@ def test_broadcast_latest_block_refunds_excess_max_fee(
 def test_broadcast_latest_block_reverts_when_max_fee_below_live(
     forked_env, configured_relay, block_oracle, dev_deployer, block_data
 ):
-    """A max_fee below the live CCIP fee reverts with "Too high fees" (never overpays)."""
+    """A max_fee below the live CCIP fee reverts (never overpays). The public path stays strict;
+    only the CRE path skips a destination, to protect the commit."""
     test_address = boa.env.generate_address()
     with boa.env.prank(dev_deployer):
         configured_relay.set_receiver(BASE_CHAIN_SELECTOR, test_address)
@@ -200,7 +201,7 @@ def test_broadcast_latest_block_reverts_when_max_fee_below_live(
     boa.env.set_balance(user, live_fee)
 
     with boa.env.prank(user):
-        with boa.reverts("Too high fees"):
+        with boa.reverts("Transmit failed"):
             configured_relay.broadcast_latest_block(
                 [BASE_CHAIN_SELECTOR], [live_fee - 1], CCIP_RECEIVE_GAS_LIMIT, value=live_fee - 1
             )

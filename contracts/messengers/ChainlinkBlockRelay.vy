@@ -114,6 +114,12 @@ event BlockHashBroadcast:
 event SetBlockOracle:
     oracle: indexed(address)
 
+event BroadcastSkipped:
+    chain_selector: uint64
+    block_number: indexed(uint256)
+    max_fee: uint256
+
+
 event MessageSent:
     message_id: bytes32
     chain_selector: uint64
@@ -244,6 +250,9 @@ def _broadcast_block(
     """
     data: Bytes[64] = abi_encode(_block_number, _block_hash)
     extra_args: Bytes[68] = CCIP._build_extra_args(_broadcast_data.gas_limit)
+    # Public callers pay per send and can re-quote, so a refused destination reverts for them;
+    # the CRE path skips instead: one bad lane must not undo the other sends or the commit
+    skip_refused: bool = _broadcast_data.requester == empty(address)
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     unused_fees: uint256 = 0
 
@@ -254,11 +263,20 @@ def _broadcast_block(
             unused_fees += target.max_fee
             continue
 
-        # Send message
         message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(target.chain_selector, data, extra_args)
+        sent: bool = False
         message_id: bytes32 = empty(bytes32)
         fee: uint256 = 0
-        message_id, fee = CCIP._transmit(target.chain_selector, message, target.max_fee)
+        sent, message_id, fee = CCIP._try_transmit(target.chain_selector, message, target.max_fee)
+        if not sent:
+            assert skip_refused, "Transmit failed"
+            unused_fees += target.max_fee
+            log BroadcastSkipped(
+                chain_selector=target.chain_selector,
+                block_number=_block_number,
+                max_fee=target.max_fee,
+            )
+            continue
         unused_fees += target.max_fee - fee
         log MessageSent(
             message_id=message_id,
@@ -470,8 +488,7 @@ def onReport(
     if len(target_chain_selectors) > 0:
         cached_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
 
-        # Verify that attached value covers requested broadcast fees
-        total_fee: uint256 = 0
+        # No balance check up front: an unaffordable destination is skipped, one by one
         for i: uint256 in range(len(target_chain_selectors), bound=MAX_N_BROADCAST):
             cached_targets.append(
                 BroadcastTarget(
@@ -479,8 +496,6 @@ def onReport(
                     max_fee=target_fees[i]
                 )
             )
-            total_fee += target_fees[i]
-        assert self.balance >= total_fee, "Insufficient value"
         broadcast_data: BroadcastData = BroadcastData(
             targets=cached_targets,
             gas_limit=ccip_receive_gas_limit,
