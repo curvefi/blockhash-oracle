@@ -81,28 +81,34 @@ const uintString = (max: bigint) =>
 		.regex(/^\d+$/, 'expected a decimal integer')
 		.refine((v) => BigInt(v) <= max, 'out of range')
 
-export const broadcastPayloadSchema = z.object({
-	relay: z.object({
-		chainSelectorName: z
-			.string()
-			.refine(
-				(name) => getNetwork({ chainFamily: 'evm', chainSelectorName: name }) !== undefined,
-				'unknown chain',
-			),
-		contractAddress: evmAddressSchema,
-	}),
-	targetChains: z
-		.array(z.object({ selector: uintString(UINT64_MAX), fees: uintString(UINT256_MAX) }))
-		.max(MAX_TARGETS_PER_RELAY),
-	ccipReceiveGasLimit: uintString(UINT256_MAX),
-	onReportGasLimit: uintString(UINT256_MAX),
-})
+export const broadcastPayloadSchema = z
+	.object({
+		relay: z.object({
+			chainSelectorName: z
+				.string()
+				.refine(
+					(name) => getNetwork({ chainFamily: 'evm', chainSelectorName: name }) !== undefined,
+					'unknown chain',
+				),
+			contractAddress: evmAddressSchema,
+		}),
+		targetChains: z
+			.array(z.object({ selector: uintString(UINT64_MAX), fees: uintString(UINT256_MAX) }))
+			.max(MAX_TARGETS_PER_RELAY),
+		ccipReceiveGasLimit: uintString(UINT256_MAX),
+		onReportGasLimit: uintString(UINT256_MAX),
+	})
+	.strict()
 export type BroadcastPayload = z.infer<typeof broadcastPayloadSchema>
 
-export const requestPayloadSchema = z.object({
-	blockNumber: uintString(UINT256_MAX).optional(),
-	data: z.array(broadcastPayloadSchema).min(1).max(MAX_RELAYS_PER_REQUEST),
-})
+export const requestPayloadSchema = z
+	.object({
+		// Strict, and no zero: a misspelled or zero blockNumber would silently deliver an unpinned
+		// block while the other rail votes on the pinned one
+		blockNumber: uintString(UINT256_MAX).refine((v) => v !== '0', 'must not be zero').optional(),
+		data: z.array(broadcastPayloadSchema).min(1).max(MAX_RELAYS_PER_REQUEST),
+	})
+	.strict()
 export type RequestPayload = z.infer<typeof requestPayloadSchema>
 
 // ─── Report ──────────────────────────────────────────────────
