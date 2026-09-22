@@ -13,6 +13,8 @@ import {
 import { type MainnetBlockViewMock, newMainnetBlockViewMock } from '../contracts/evm/ts/generated/MainnetBlockView_mock'
 import {
 	configSchema,
+	MAX_RELAYS_PER_REQUEST,
+	MAX_TARGETS_PER_RELAY,
 	encodeReport,
 	initWorkflow,
 	onBlockhashRequested,
@@ -218,6 +220,62 @@ describe('onNewBlock', () => {
 		expect(result.anySuccess).toBe(true)
 		expect(result.data[0].success).toBe(true)
 		expect(result.data[1].success).toBe(false)
+	})
+})
+
+describe('onNewBlock payload validation', () => {
+	// A request is refused whole, before the first report is written
+	const expectRefusedBeforeAnyWrite = (data: unknown[]) => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		let writes = 0
+		evmMock.writeReport = () => {
+			writes += 1
+			return txSuccess()
+		}
+
+		expect(() =>
+			onNewBlock(makeRuntime(), { input: encode({ blockNumber: undefined, data }) } as any),
+		).toThrow()
+		expect(writes).toBe(0)
+	}
+
+	test('a bad second relay entry fails the request before the first relay is written', () => {
+		const bad = makeBroadcastPayload()
+		bad.targetChains = [{ selector: '-1', fees: '1' }]
+		expectRefusedBeforeAnyWrite([makeBroadcastPayload(), bad])
+	})
+
+	test('more targets than the relay can decode are refused', () => {
+		const payload = makeBroadcastPayload()
+		payload.targetChains = Array.from({ length: MAX_TARGETS_PER_RELAY + 1 }, (_, i) => ({
+			selector: String(i + 1),
+			fees: '1',
+		}))
+		expectRefusedBeforeAnyWrite([payload])
+	})
+
+	test('more relays than cre writes per execution are refused', () => {
+		expectRefusedBeforeAnyWrite(
+			Array.from({ length: MAX_RELAYS_PER_REQUEST + 1 }, makeBroadcastPayload),
+		)
+	})
+
+	test('an unknown relay chain is refused', () => {
+		const payload = makeBroadcastPayload()
+		payload.relay.chainSelectorName = 'not-a-chain'
+		expectRefusedBeforeAnyWrite([payload])
+	})
+
+	test('a non-numeric fee is refused', () => {
+		const payload = makeBroadcastPayload()
+		payload.targetChains = [{ selector: '1', fees: '1e18' }]
+		expectRefusedBeforeAnyWrite([payload])
+	})
+
+	test('a request naming no relay is refused', () => {
+		expectRefusedBeforeAnyWrite([])
 	})
 })
 

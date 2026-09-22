@@ -19,11 +19,27 @@ import {
 	toEventSelector,
 } from 'viem'
 import { z } from 'zod'
-import type {BroadcastPayload, BroadcastResult, RequestPayload, ResultPayload} from "./types/types";
+import type { BroadcastResult, ResultPayload } from "./types/types";
 import {
 	MainnetBlockView
 } from '../contracts/evm/ts/generated/MainnetBlockView'
 import { IReceiver } from '../contracts/evm/ts/generated/IReceiver'
+
+// ─── Limits ──────────────────────────────────────────────────
+// ABI bounds for the decimal strings an HTTP request carries
+const UINT64_MAX = 2n ** 64n - 1n
+const UINT256_MAX = 2n ** 256n - 1n
+
+// ChainlinkBlockRelay.MAX_N_BROADCAST: the relay cannot decode a report naming more targets
+export const MAX_TARGETS_PER_RELAY = 32
+
+// CRE writes to at most 10 destination chains per execution (README, "CRE service limits"),
+// and each relay sits on its own chain
+export const MAX_RELAYS_PER_REQUEST = 10
+
+// CRE monitors at most 5 log addresses per workflow (README, "CRE service limits"), and each
+// hub has its own log trigger
+export const MAX_REQUEST_HUBS = 5
 
 // ─── Config Schema ──────────────────────────────────────────
 export const evmAddressSchema = z.custom<Address>(
@@ -42,12 +58,11 @@ export const configSchema = z.object({
 	authorizedEVMAddress: evmAddressSchema,
 	blockViewChainSelectorName: z.string(),
 	blockViewContractAddress: evmAddressSchema,
-	// One log trigger per hub; CRE caps a workflow at 5 monitored log addresses.
-	// The same address may repeat across chains (CreateX), but a repeated (chain, address)
-	// would register two triggers and deliver every request twice.
+	// One log trigger per hub. The same address may repeat across chains (CreateX), but a repeated
+	// (chain, address) would register two triggers and deliver every request twice.
 	requestHubs: z
 		.array(requestHubSchema)
-		.max(5, 'CRE monitors at most 5 log addresses per workflow')
+		.max(MAX_REQUEST_HUBS, `CRE monitors at most ${MAX_REQUEST_HUBS} log addresses per workflow`)
 		.default([])
 		.refine(
 			(hubs) =>
@@ -57,6 +72,38 @@ export const configSchema = z.object({
 		),
 })
 type Config = z.infer<typeof configSchema>
+
+// ─── HTTP Payload Schema ─────────────────────────────────────
+// Decimal strings, bounded so BigInt and ABI encoding cannot throw once delivery has started
+const uintString = (max: bigint) =>
+	z
+		.string()
+		.regex(/^\d+$/, 'expected a decimal integer')
+		.refine((v) => BigInt(v) <= max, 'out of range')
+
+export const broadcastPayloadSchema = z.object({
+	relay: z.object({
+		chainSelectorName: z
+			.string()
+			.refine(
+				(name) => getNetwork({ chainFamily: 'evm', chainSelectorName: name }) !== undefined,
+				'unknown chain',
+			),
+		contractAddress: evmAddressSchema,
+	}),
+	targetChains: z
+		.array(z.object({ selector: uintString(UINT64_MAX), fees: uintString(UINT256_MAX) }))
+		.max(MAX_TARGETS_PER_RELAY),
+	ccipReceiveGasLimit: uintString(UINT256_MAX),
+	onReportGasLimit: uintString(UINT256_MAX),
+})
+export type BroadcastPayload = z.infer<typeof broadcastPayloadSchema>
+
+export const requestPayloadSchema = z.object({
+	blockNumber: uintString(UINT256_MAX).optional(),
+	data: z.array(broadcastPayloadSchema).min(1).max(MAX_RELAYS_PER_REQUEST),
+})
+export type RequestPayload = z.infer<typeof requestPayloadSchema>
 
 // ─── Report ──────────────────────────────────────────────────
 // Must match ChainlinkBlockRelay.onReport's abi_decode. The forwarder does not sign the receiver,
@@ -216,7 +263,8 @@ function deliver(
 
 // ─── HTTP Callback ───────────────────────────────────────────
 export const onNewBlock = (runtime: Runtime<Config>, payload: HTTPPayload): string => {
-	const blockData = decodeJson(payload.input) as RequestPayload
+	// Reject a malformed request whole, before the first report is written
+	const blockData = requestPayloadSchema.parse(decodeJson(payload.input))
 
 	return deliver(
 		runtime,
