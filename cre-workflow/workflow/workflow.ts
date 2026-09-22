@@ -287,9 +287,10 @@ export function initWorkflow(config: Config) {
 				// Deployed triggers need base64 addresses and topics; the simulator takes hex
 				addresses: [hexToBase64(hub.address)],
 				topics: [{ values: [hexToBase64(toEventSelector(REQUESTED_EVENT_SIGNATURE))] }],
-				// The log is only a signal - the hash is read fresh from mainnet - so a reorged
-				// request costs one wasted execution and never a wrong hash
-				confidence: 'CONFIDENCE_LEVEL_LATEST',
+				// SAFE, not LATEST: the hub pays the relay in the request's own transaction, so a
+				// reorged request would still get a report that spends the relay's existing balance.
+				// The hash is read fresh from mainnet either way, never taken from the log
+				confidence: 'CONFIDENCE_LEVEL_SAFE',
 			}),
 			(runtime: Runtime<Config>, log: EVM_PB.Log) => onBlockhashRequested(runtime, log, hub),
 		)

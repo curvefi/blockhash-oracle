@@ -1,6 +1,7 @@
 import { describe, expect } from 'bun:test'
 import { hexToBytes, TxStatus, type Runtime } from '@chainlink/cre-sdk'
 import { EvmMock, newTestRuntime, test } from '@chainlink/cre-sdk/test'
+import { EVM_PB } from '@chainlink/cre-sdk/pb'
 import {
 	bytesToHex,
 	decodeAbiParameters,
@@ -317,6 +318,11 @@ describe('initWorkflow', () => {
 		expect(handlers).toHaveLength(2)
 		expect(handlers[0].fn).toBe(onNewBlock)
 		expect(handlers[1].fn).not.toBe(onNewBlock)
+	})
+
+	test('hub triggers wait for SAFE logs, a reorged request would spend relay funds it never paid', () => {
+		const [, hubTrigger] = initWorkflow(makeHubConfig())
+		expect((hubTrigger.trigger as any).config.confidence).toBe(EVM_PB.ConfidenceLevel.SAFE)
 	})
 
 	test('one log trigger per hub, each with its own handler bound to that hub', () => {
