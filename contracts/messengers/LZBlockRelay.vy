@@ -107,6 +107,11 @@ received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 #                            EVENTS                            #
 ################################################################
 
+event RefundFailed:
+    requester: indexed(address)
+    amount: uint256
+
+
 event BlockHashBroadcast:
     block_number: indexed(uint256)
     block_hash: indexed(bytes32)
@@ -333,19 +338,29 @@ def _broadcast_block(
         options, _broadcast_data.gas_limit, 0
     )
 
+    successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    unused_fees: uint256 = 0
+
     for target: BroadcastTarget in _broadcast_data.targets:
-        # Skip if peer is not set
+        # Skip if peer is not set; its fee goes back with the rest of the change
         if OApp.peers[target.eid] == empty(bytes32):
+            unused_fees += target.fee
             continue
 
         # Send message
         fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=target.fee, lzTokenFee=0)
         OApp._lzSend(target.eid, message, options, fees, _broadcast_data.requester)
+        successful_targets.append(target)
+
+    # Non-fatal: a caller that cannot take the change still gets its broadcast
+    if _broadcast_data.requester != empty(address) and unused_fees > 0:
+        if not raw_call(_broadcast_data.requester, b"", value=unused_fees, revert_on_failure=False):
+            log RefundFailed(requester=_broadcast_data.requester, amount=unused_fees)
 
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,
-        targets=_broadcast_data.targets,
+        targets=successful_targets,
     )
 
 

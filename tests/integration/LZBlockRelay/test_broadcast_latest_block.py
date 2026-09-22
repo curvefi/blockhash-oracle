@@ -115,3 +115,36 @@ def test_broadcast_block_after_another_source_confirms_newer(
     assert len(broadcast) == 1
     assert broadcast[0].block_number == n
     assert broadcast[0].block_hash == h
+
+
+@pytest.mark.mainnet
+def test_broadcast_refunds_and_logs_only_what_it_sent(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """A destination with no peer is skipped: its fee comes back to the caller and the event lists
+    only the targets actually sent to."""
+    sent_eid, unset_eid = 30110, 30111
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([sent_eid], [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        block_oracle.admin_apply_block(n, h)
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+
+    fee = lz_block_relay.quote_broadcast_fees([sent_eid], 150_000)[0]
+    skipped_fee = 10**16
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, fee + skipped_fee)
+    relay_before = boa.env.get_balance(lz_block_relay.address)
+
+    with boa.env.prank(user):
+        lz_block_relay.broadcast_block(
+            n, [sent_eid, unset_eid], [fee, skipped_fee], 150_000, value=fee + skipped_fee
+        )
+
+    broadcast = [e for e in lz_block_relay.get_logs() if type(e).__name__ == "BlockHashBroadcast"]
+    assert [t.eid for t in broadcast[0].targets] == [sent_eid]
+    assert boa.env.get_balance(lz_block_relay.address) == relay_before
+    assert boa.env.get_balance(user) >= skipped_fee  # the skipped destination's fee came back
