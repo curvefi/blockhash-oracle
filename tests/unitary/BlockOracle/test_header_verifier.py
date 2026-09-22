@@ -236,3 +236,21 @@ def test_override_also_repairs_the_last_header_snapshot(block_oracle, dev_deploy
     snapshot = block_oracle.last_confirmed_header()
     assert snapshot[0] == good_hash
     assert snapshot[2] == good_root
+
+
+def test_override_clears_the_snapshot_of_that_block(block_oracle, dev_deployer):
+    """The snapshot must not keep serving the replaced block's hash and state root while no new
+    header has been submitted."""
+    verifier = boa.env.generate_address()
+    n = 21_000_000
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_header_verifier(verifier)
+        block_oracle.admin_apply_block(n, b"\xbb" * 32)
+    _submit(block_oracle, verifier, _header(n, b"\xbb" * 32, b"\xcc" * 32))
+    assert block_oracle.last_confirmed_header()[2] == b"\xcc" * 32
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, b"\x01" * 32)
+
+    assert block_oracle.last_confirmed_header()[0] == bytes(32)
+    assert block_oracle.last_confirmed_header()[2] == bytes(32)
