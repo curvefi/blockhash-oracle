@@ -221,6 +221,10 @@ def _commitment_count(_block_number: uint256, _block_hash: bytes32) -> uint256:
     @dev Counted live rather than tallied, so a removed committer's votes stop counting at once.
          Re-adding an address revives its old votes: rotate to a new key instead.
     """
+    # An unset vote reads as empty, so the empty hash would count every committer who never voted
+    if _block_hash == empty(bytes32):
+        return 0
+
     count: uint256 = 0
     for committer: address in self.committers:
         if self.committer_votes[committer][_block_number] == _block_hash:
@@ -290,8 +294,9 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
     # Store decoded header
     self.block_header[_header_data.block_number] = _header_data
 
-    # Update last confirmed header if new
-    if _header_data.block_number > self.last_confirmed_header.block_number:
+    # Update last confirmed header if new, >= so a header resubmitted after an owner hash
+    # override replaces the snapshot decoded from the old hash
+    if _header_data.block_number >= self.last_confirmed_header.block_number:
         self.last_confirmed_header = _header_data
 
     log SubmitBlockHeader(
@@ -313,6 +318,7 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
     """
     assert self.threshold > 0, "Threshold not set"
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
+    assert _block_hash != empty(bytes32), "Invalid block hash"
     assert (
         self._commitment_count(_block_number, _block_hash) >= self.threshold
     ), "Insufficient commitments"
