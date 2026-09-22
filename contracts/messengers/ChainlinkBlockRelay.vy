@@ -252,7 +252,8 @@ def _broadcast_block(
     extra_args: Bytes[68] = CCIP._build_extra_args(_broadcast_data.gas_limit)
     # Public callers pay per send and can re-quote, so a refused destination reverts for them;
     # the CRE path skips instead: one bad lane must not undo the other sends or the commit
-    skip_refused: bool = _broadcast_data.requester == empty(address)
+    refunds: bool = _broadcast_data.requester != empty(address)
+    skip_refused: bool = not refunds
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     unused_fees: uint256 = 0
 
@@ -260,7 +261,8 @@ def _broadcast_block(
         # Skip if peer is not set; its fee goes back with the rest of the change
         receiver: address = CCIP.selector_to_receiver[target.chain_selector]
         if receiver == empty(address):
-            unused_fees += target.max_fee
+            if refunds:
+                unused_fees += target.max_fee
             continue
 
         message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(target.chain_selector, data, extra_args)
@@ -270,14 +272,17 @@ def _broadcast_block(
         sent, message_id, fee = CCIP._try_transmit(target.chain_selector, message, target.max_fee)
         if not sent:
             assert skip_refused, "Transmit failed"
-            unused_fees += target.max_fee
+            # No refund on the CRE path, so nothing to add up; max_fee is caller-supplied
+            if refunds:
+                unused_fees += target.max_fee
             log BroadcastSkipped(
                 chain_selector=target.chain_selector,
                 block_number=_block_number,
                 max_fee=target.max_fee,
             )
             continue
-        unused_fees += target.max_fee - fee
+        if refunds:
+            unused_fees += target.max_fee - fee
         log MessageSent(
             message_id=message_id,
             chain_selector=target.chain_selector,
