@@ -332,6 +332,16 @@ describe('onNewBlock payload validation', () => {
 		expect(() => onNewBlock(makeRuntime(), { input: encode(payload) } as any)).toThrow()
 	})
 
+	test('a zero-padded blockNumber is refused too, it is still zero', () => {
+		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
+		evmMock.writeReport = () => txSuccess()
+
+		const payload = { blockNumber: '00', data: [makeBroadcastPayload()] }
+		expect(() => onNewBlock(makeRuntime(), { input: encode(payload) } as any)).toThrow()
+	})
+
 	test('a zero blockNumber is refused rather than delivering the default block', () => {
 		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
 		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)

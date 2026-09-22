@@ -105,7 +105,9 @@ export const requestPayloadSchema = z
 	.object({
 		// Strict, and no zero: a misspelled or zero blockNumber would silently deliver an unpinned
 		// block while the other rail votes on the pinned one
-		blockNumber: uintString(UINT256_MAX).refine((v) => v !== '0', 'must not be zero').optional(),
+		blockNumber: uintString(UINT256_MAX)
+			.refine((v) => BigInt(v) !== 0n, 'must not be zero')
+			.optional(),
 		data: z.array(broadcastPayloadSchema).min(1).max(MAX_RELAYS_PER_REQUEST),
 	})
 	.strict()
@@ -232,7 +234,8 @@ export function fetchBlockhash(
 
 	// LATEST_BLOCK_NUMBER, not the finalized default: a finalized-tag eth_call sees an older head
 	// and can make a pinned block look "too recent" to MainnetBlockView
-	const [number, hash] = blockNumber
+	// undefined, not falsy: a zero block number must never read as an unpinned request
+	const [number, hash] = blockNumber !== undefined
 		? mainnetBlockView.getBlockhash0(runtime, blockNumber, LATEST_BLOCK_NUMBER)
 		: mainnetBlockView.getBlockhash(runtime, LATEST_BLOCK_NUMBER)
 
@@ -293,7 +296,7 @@ export const onNewBlock = (runtime: Runtime<Config>, payload: HTTPPayload): stri
 
 	return deliver(
 		runtime,
-		blockData.blockNumber ? BigInt(blockData.blockNumber) : undefined,
+		blockData.blockNumber !== undefined ? BigInt(blockData.blockNumber) : undefined,
 		blockData.data,
 	)
 }
