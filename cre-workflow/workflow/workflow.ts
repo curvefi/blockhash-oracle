@@ -9,7 +9,7 @@ import {
 	TxStatus,
 	type Runtime,
 } from '@chainlink/cre-sdk'
-import type { EVM_PB } from '@chainlink/cre-sdk/pb'
+import { EVM_PB } from '@chainlink/cre-sdk/pb'
 import {
 	type Address,
 	isAddress,
@@ -191,8 +191,12 @@ export function broadcast(
 
 	const txHash = bytesToHex(writeResult.txHash || new Uint8Array(32))
 	result.txHash = txHash;
-	if (writeResult.txStatus !== TxStatus.SUCCESS ||
-		writeResult.receiverContractExecutionStatus != 0 ) { // TODO use constant when possible
+	if (
+		writeResult.txStatus !== TxStatus.SUCCESS ||
+		// Undefined counts as failure: a false success hides an undelivered hash, a false failure
+		// only costs a retry
+		writeResult.receiverContractExecutionStatus !== EVM_PB.ReceiverContractExecutionStatus.SUCCESS
+	) {
 		const message = `TX ${txHash} failed: ${writeResult.errorMessage || writeResult.txStatus}`
 		runtime.log(message)
 		result.message = message
