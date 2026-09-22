@@ -44,9 +44,16 @@ block (not a finalized one). Production always pins it, so both rails vote on th
 authorizedEVMAddress: "0x..."          # ECDSA key allowed to trigger the workflow
 blockViewChainSelectorName: "ethereum-mainnet"
 blockViewContractAddress: "0xb10cface00696B1390875DB2a0113B3ab99752a4"
+requestHubs:                           # optional, one log trigger each; omit for HTTP only
+  - chainSelectorName: "ethereum-mainnet-base-1"
+    address: "0x..."                   # BlockhashRequestHub, emits CREBlockhashRequested
+    relayAddress: "0x..."              # ChainlinkBlockRelay the report is written to
 ```
 
-Staging uses `ethereum-testnet-sepolia` and the corresponding Sepolia deployment.
+Without `requestHubs` the workflow registers only the HTTP trigger, so permissionless hub requests
+are never answered. See the limits below for how many hubs a workflow can carry.
+
+Testnets use `ethereum-testnet-sepolia` and the corresponding Sepolia deployment.
 
 ## CRE service limits
 
@@ -77,7 +84,7 @@ Install dependencies:
 
 ```bash
 cd workflow && bun install
-cd contracts && bun install
+cd ../contracts && bun install
 ```
 
 Run tests:
@@ -89,5 +96,7 @@ cd workflow && bun test
 Simulate against staging:
 
 ```bash
-cre workflow simulate workflow/ --target staging-settings --non-interactive --trigger-index 0
+cre workflow simulate workflow/ --target testnets-settings --non-interactive --trigger-index 0
 ```
+
+Targets come from `project.yaml`: `testnets-settings` and `mainnets-settings`.

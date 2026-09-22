@@ -366,7 +366,7 @@ def request(
     @param _target_eids LayerZero endpoint ids, used only by the LayerZero rail
     @param _target_selectors CCIP chain selectors, used only by the Chainlink rail
     @param _block_number Block to fetch, and the value both rails vote with. Unchecked beyond being
-                         non-zero: MainnetBlockView serves [head - 8192, head - 64] and both rails
+                         non-zero: MainnetBlockView serves [head - 8191, head - 65] and both rails
                          resolve later than this call, which only makes the block older, so pick with
                          room to spare - head - 100 is comfortable.
     @param _ccip_gas Gas limit for ccipReceive on each CCIP target; 170_000 covers every measured

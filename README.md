@@ -73,9 +73,10 @@ bytes32 stateRoot = IBlockOracle(ORACLE_ADDRESS).get_state_root(blockNumber);
 On read-enabled chains (such as Optimism, Arbitrum, and Base), you can request a block hash using the following steps:
 
 ```python
-# 1. Quote the required fees
-read_fee = relay.quote_read_fee(read_gas_limit=200000, value=0)
+# 1. Quote the required fees. The read fee carries the broadcast fees back with the response,
+#    so quote it with their sum: that value is the whole payment.
 broadcast_fees = relay.quote_broadcast_fees(target_chains, gas_limit=100000)
+read_fee = relay.quote_read_fee(read_gas_limit=200000, value=sum(broadcast_fees))
 
 # 2. Request the block hash
 relay.request_block_hash(
@@ -84,7 +85,7 @@ relay.request_block_hash(
     lz_receive_gas_limit=100000,
     read_gas_limit=200000,
     block_number=0,  # 0 indicates the latest safe block
-    value=read_fee + sum(broadcast_fees)
+    value=read_fee
 )
 ```
 
