@@ -5,6 +5,8 @@ import boa
 
 from conftest import LZ_READ_CHANNEL, LZ_EID
 
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
+
 
 @pytest.mark.mainnet
 def test_broadcast_latest_block(
@@ -148,3 +150,61 @@ def test_broadcast_refunds_and_logs_only_what_it_sent(
     assert [t.eid for t in broadcast[0].targets] == [sent_eid]
     assert boa.env.get_balance(lz_block_relay.address) == relay_before
     assert boa.env.get_balance(user) >= skipped_fee  # the skipped destination's fee came back
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_refund_is_non_fatal(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """A caller that cannot take the change still gets its broadcast, and RefundFailed records it."""
+    sent_eid, unset_eid = 30110, 30111
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([sent_eid], [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        block_oracle.admin_apply_block(n, h)
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+
+    fee = lz_block_relay.quote_broadcast_fees([sent_eid], 150_000)[0]
+    skipped_fee = 10**16
+    caller = boa.load(CONTRACT_CALLER, False)  # rejects ETH
+    boa.env.set_balance(caller.address, fee + skipped_fee)
+    data = lz_block_relay.broadcast_block.prepare_calldata(
+        n, [sent_eid, unset_eid], [fee, skipped_fee], 150_000
+    )
+
+    with boa.env.prank(caller.address):
+        caller.execute(lz_block_relay.address, data, value=fee + skipped_fee)
+
+    events = caller.get_logs()
+    failed = [e for e in events if type(e).__name__ == "RefundFailed"]
+    assert len(failed) == 1
+    assert failed[0].amount == skipped_fee
+    assert [
+        t.eid for t in [e for e in events if type(e).__name__ == "BlockHashBroadcast"][0].targets
+    ] == [sent_eid]
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_refuses_overpayment(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """Value above the sum of target fees is refused rather than absorbed, as on the Chainlink relay."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([30110], [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        block_oracle.admin_apply_block(n, h)
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+
+    fee = lz_block_relay.quote_broadcast_fees([30110], 150_000)[0]
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, fee + 1)
+
+    with boa.env.prank(user):
+        with boa.reverts("Insufficient message value"):
+            lz_block_relay.broadcast_block(n, [30110], [fee], 150_000, value=fee + 1)

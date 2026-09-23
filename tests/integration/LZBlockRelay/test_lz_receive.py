@@ -249,3 +249,35 @@ def test_lz_receive_conflicting_hash_reverts(
         with boa.env.prank(LZ_ENDPOINT):
             with boa.reverts("Different blockhash already applied"):
                 lz_block_relay.lzReceive(origin, bytes(32), conflicting, dev_deployer, b"")
+
+
+@pytest.mark.mainnet
+def test_lz_receive_zero_hash_refunds_the_carried_fees(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """The executor carries the broadcast fees in with the response; a zero hash must give them
+    back instead of stranding them in the relay."""
+    _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer)
+    test_eids = [30110]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers(test_eids, [boa.env.generate_address()])
+    boa.env.set_balance(dev_deployer, 10**20)
+    boa.env.set_balance(LZ_ENDPOINT, 10**20)
+
+    fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    read_fee = lz_block_relay.quote_read_fee(100_000, sum(fees))
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.request_block_hash(test_eids, fees, 150_000, 100_000, 0, value=read_fee)
+    guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
+
+    relay_before = boa.env.get_balance(lz_block_relay.address)
+    requester_before = boa.env.get_balance(dev_deployer)
+    zero_response = boa.util.abi.abi_encode("(uint256,bytes32)", (block_data["number"], bytes(32)))
+
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(
+            _read_origin(lz_block_relay), guid, zero_response, dev_deployer, b"", value=sum(fees)
+        )
+
+    assert boa.env.get_balance(lz_block_relay.address) == relay_before
+    assert boa.env.get_balance(dev_deployer) == requester_before + sum(fees)
