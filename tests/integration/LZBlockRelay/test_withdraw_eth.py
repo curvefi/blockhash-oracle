@@ -3,6 +3,8 @@
 import pytest
 import boa
 
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
+
 
 @pytest.mark.mainnet
 def test_withdraw_eth(forked_env, lz_block_relay, dev_deployer):
@@ -34,4 +36,18 @@ def test_withdraw_eth(forked_env, lz_block_relay, dev_deployer):
     # Check owner received the ETH
     assert owner_balance_after - owner_balance_before == 10**17
     # Check contract balance decreased
+    assert boa.env.get_balance(lz_block_relay.address) == 9 * 10**17
+
+
+@pytest.mark.mainnet
+def test_withdraw_eth_to_contract_owner(forked_env, lz_block_relay, dev_deployer):
+    """A contract owner (multisig, DAO agent) needing more than send's 2300-gas stipend can withdraw."""
+    caller = boa.load(CONTRACT_CALLER, True)
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.transfer_ownership(caller.address)
+    boa.env.set_balance(lz_block_relay.address, 10**18)
+
+    caller.execute(lz_block_relay.address, lz_block_relay.withdraw_eth.prepare_calldata(10**17))
+
+    assert caller.received() == 10**17
     assert boa.env.get_balance(lz_block_relay.address) == 9 * 10**17
