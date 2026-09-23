@@ -267,6 +267,53 @@ def _broadcast_block(
     )
 
 
+@view
+@internal
+def _latest_block_number() -> uint256:
+    """
+    @notice The oracle's latest confirmed block, checking the oracle is set before calling it
+    """
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    return staticcall self.block_oracle.last_confirmed_block_number()
+
+
+@internal
+def _broadcast_confirmed(
+    _block_number: uint256,
+    _target_chain_selectors: DynArray[uint64, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _ccip_receive_gas_limit: uint256,
+    _value: uint256,
+):
+    """
+    @notice Broadcast a confirmed block this relay received itself, fees paid by the caller
+    @dev Only broadcast what was received via onReport to prevent potentially malicious hashes from other sources
+    """
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    assert len(_target_chain_selectors) == len(_target_fees), "Length mismatch"
+
+    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(_block_number)
+    assert block_hash != empty(bytes32), "Block not confirmed"
+
+    # Only broadcast if this block was received via onReport
+    assert self.received_blocks[_block_number] == block_hash, "Unknown source"
+
+    # Prepare broadcast targets
+    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    sum_target_fees: uint256 = 0
+    for i: uint256 in range(0, len(_target_chain_selectors), bound=MAX_N_BROADCAST):
+        broadcast_targets.append(BroadcastTarget(chain_selector=_target_chain_selectors[i], max_fee=_target_fees[i]))
+        sum_target_fees += _target_fees[i]
+
+    assert sum_target_fees == _value, "Insufficient message value"
+
+    self._broadcast_block(
+        _block_number,
+        block_hash,
+        BroadcastData(targets=broadcast_targets, gas_limit=_ccip_receive_gas_limit, requester=msg.sender),
+    )
+
+
 ################################################################
 #                     EXTERNAL FUNCTIONS                       #
 ################################################################
@@ -329,33 +376,35 @@ def broadcast_latest_block(
     @param _target_chain_selectors List of CCIP chain selectors to broadcast to
     @param _target_fees List of fees per chain (must match _target_chain_selectors length)
     @param _ccip_receive_gas_limit Gas limit for ccipReceive (same for all targets)
-    @dev Only broadcast what was received via onReport to prevent potentially malicious hashes from other sources
+    @dev Reverts if another source confirmed the oracle's latest block; use broadcast_block then
     """
+    self._broadcast_confirmed(
+        self._latest_block_number(),
+        _target_chain_selectors,
+        _target_fees,
+        _ccip_receive_gas_limit,
+        msg.value,
+    )
 
-    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
-    assert len(_target_chain_selectors) == len(_target_fees), "Length mismatch"
 
-    # Get latest block from oracle
-    block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
-    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(block_number)
-    assert block_hash != empty(bytes32), "No confirmed blocks"
-
-    # Only broadcast if this block was received via onReport
-    assert self.received_blocks[block_number] == block_hash, "Unknown source"
-
-    # Prepare broadcast targets
-    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
-    sum_target_fees: uint256 = 0
-    for i: uint256 in range(0, len(_target_chain_selectors), bound=MAX_N_BROADCAST):
-        broadcast_targets.append(BroadcastTarget(chain_selector=_target_chain_selectors[i], max_fee=_target_fees[i]))
-        sum_target_fees += _target_fees[i]
-
-    assert sum_target_fees == msg.value, "Insufficient message value"
-
-    self._broadcast_block(
-        block_number,
-        block_hash,
-        BroadcastData(targets=broadcast_targets, gas_limit=_ccip_receive_gas_limit, requester=msg.sender),
+@external
+@payable
+def broadcast_block(
+    _block_number: uint256,
+    _target_chain_selectors: DynArray[uint64, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _ccip_receive_gas_limit: uint256,
+):
+    """
+    @notice Broadcast a confirmed block this relay received to specified chains
+    @param _block_number Block to broadcast; any confirmed block received via onReport, not only the latest
+    @param _target_chain_selectors List of CCIP chain selectors to broadcast to
+    @param _target_fees List of fees per chain (must match _target_chain_selectors length)
+    @param _ccip_receive_gas_limit Gas limit for ccipReceive (same for all targets)
+    @dev A newer block confirmed by another source must not stop rebroadcasting the ones this relay received
+    """
+    self._broadcast_confirmed(
+        _block_number, _target_chain_selectors, _target_fees, _ccip_receive_gas_limit, msg.value
     )
 
 

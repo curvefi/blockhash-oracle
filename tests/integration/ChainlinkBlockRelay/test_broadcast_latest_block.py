@@ -102,7 +102,7 @@ def test_broadcast_latest_block_no_confirmed_blocks(forked_env, configured_relay
     boa.env.set_balance(user, 10**20)
 
     with boa.env.prank(user):
-        with boa.reverts("No confirmed blocks"):
+        with boa.reverts("Block not confirmed"):
             configured_relay.broadcast_latest_block([], [], CCIP_RECEIVE_GAS_LIMIT)
 
 
@@ -250,3 +250,63 @@ def test_broadcast_latest_block_only_confirmed_block_is_broadcast(
 
     # The relay forwarded exactly the requested fee out to the router.
     assert boa.env.get_balance(configured_relay.address) == relay_balance_before
+
+
+# ─── broadcast_block: any received block, not only the oracle's latest ──────
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_after_another_source_confirms_newer(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """Another source confirming a newer block strands broadcast_latest_block on "Unknown source",
+    but broadcast_block still serves the block this relay received."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
+    _seed_confirmed_block(configured_relay, block_oracle, dev_deployer, n, h)
+
+    # a newer block confirmed without passing through this relay
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n + 10, bytes.fromhex("bb" * 32))
+
+    fees = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, 2 * sum(fees))
+
+    with boa.env.prank(user):
+        with boa.reverts("Unknown source"):
+            configured_relay.broadcast_latest_block(
+                [BASE_CHAIN_SELECTOR], fees, CCIP_RECEIVE_GAS_LIMIT, value=sum(fees)
+            )
+        configured_relay.broadcast_block(
+            n, [BASE_CHAIN_SELECTOR], fees, CCIP_RECEIVE_GAS_LIMIT, value=sum(fees)
+        )
+
+    broadcast = [e for e in configured_relay.get_logs() if type(e).__name__ == "BlockHashBroadcast"]
+    assert len(broadcast) == 1
+    assert broadcast[0].block_number == n
+    assert broadcast[0].block_hash == h
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_refuses_unconfirmed(forked_env, configured_relay, block_data):
+    """A block this relay received but the oracle has not confirmed is not broadcast."""
+    n, h = block_data["number"], block_data["hash"]
+    configured_relay.eval(f"self.received_blocks[{n}] = 0x{bytes(h).hex()}")
+
+    with boa.reverts("Block not confirmed"):
+        configured_relay.broadcast_block(n, [], [], CCIP_RECEIVE_GAS_LIMIT)
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_refuses_block_it_never_received(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A confirmed block that reached the oracle through another source is not broadcast."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, h)
+
+    with boa.reverts("Unknown source"):
+        configured_relay.broadcast_block(n, [], [], CCIP_RECEIVE_GAS_LIMIT)
