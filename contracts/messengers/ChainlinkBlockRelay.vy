@@ -121,6 +121,10 @@ event MessageSent:
     block_hash: indexed(bytes32)
     fee: uint256
 
+event RefundFailed:
+    requester: indexed(address)
+    amount: uint256
+
 
 ################################################################
 #                          CONSTRUCTOR                         #
@@ -185,7 +189,8 @@ def withdraw_eth(_amount: uint256):
     ownable._check_owner()
 
     assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
+    # raw_call, not send: a multisig or agent owner needs more than send's 2300-gas stipend
+    raw_call(msg.sender, b"", value=_amount)
 
 
 @external
@@ -257,9 +262,13 @@ def _broadcast_block(
         )
         successful_targets.append(target)
 
-    # Refund unused fee to a direct (public) requester; CRE path keeps it in the treasury
-    if _broadcast_data.requester != empty(address):
-        send(_broadcast_data.requester, unused_fees)
+    # Refund unused fee to a direct (public) requester; CRE path keeps it in the treasury.
+    # Non-fatal: a caller that cannot take the change still gets its broadcast, and the ETH stays
+    # in the treasury (owner-withdrawable). raw_call, not send: send's stipend (none at all on a
+    # zero refund) failed every contract caller.
+    if _broadcast_data.requester != empty(address) and unused_fees > 0:
+        if not raw_call(_broadcast_data.requester, b"", value=unused_fees, revert_on_failure=False):
+            log RefundFailed(requester=_broadcast_data.requester, amount=unused_fees)
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,

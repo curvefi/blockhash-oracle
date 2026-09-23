@@ -23,6 +23,8 @@ from conftest import (
     surcharge,
 )
 
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
+
 
 def _request(hub, caller, rails, eids, selectors, value, block_number=PINNED_BLOCK):
     with boa.env.prank(caller):
@@ -153,3 +155,16 @@ def test_owner_can_withdraw_surcharge(hub, alice, dev_deployer):
 
     assert boa.env.get_balance(hub.address) == 0
     assert boa.env.get_balance(dev_deployer) == before + accrued
+
+
+def test_withdraw_eth_to_contract_owner(hub, dev_deployer):
+    """A contract owner (multisig, DAO agent) needing more than send's 2300-gas stipend can withdraw."""
+    caller = boa.load(CONTRACT_CALLER, True)
+    with boa.env.prank(dev_deployer):
+        hub.transfer_ownership(caller.address)
+    boa.env.set_balance(hub.address, 10**18)
+
+    caller.execute(hub.address, hub.withdraw_eth.prepare_calldata(10**17))
+
+    assert caller.received() == 10**17
+    assert boa.env.get_balance(hub.address) == 9 * 10**17

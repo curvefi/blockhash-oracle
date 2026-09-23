@@ -5,6 +5,8 @@ import boa
 from boa.contracts.event_decoder import RawLogEntry
 from conftest import BASE_CHAIN_SELECTOR, ARBITRUM_CHAIN_SELECTOR, CCIP_RECEIVE_GAS_LIMIT
 
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
+
 
 def _seed_confirmed_block(relay, block_oracle, dev_deployer, block_number, block_hash):
     """Simulate a block arriving via onReport: set received_blocks and confirm in oracle."""
@@ -310,3 +312,73 @@ def test_broadcast_block_refuses_block_it_never_received(
 
     with boa.reverts("Unknown source"):
         configured_relay.broadcast_block(n, [], [], CCIP_RECEIVE_GAS_LIMIT)
+
+
+# ─── Contract callers ────────────────────────────────────────────────────────
+
+
+def _contract_broadcast(relay, block_oracle, dev_deployer, block_data, accept_eth, headroom):
+    """A contract broadcasts a received block with fee caps `headroom` times the quote."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
+    _seed_confirmed_block(relay, block_oracle, dev_deployer, n, h)
+
+    quote = relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[0]
+    caps = [quote * headroom]
+    caller = boa.load(CONTRACT_CALLER, accept_eth)
+    boa.env.set_balance(caller.address, sum(caps))
+    data = relay.broadcast_block.prepare_calldata(
+        n, [BASE_CHAIN_SELECTOR], caps, CCIP_RECEIVE_GAS_LIMIT
+    )
+    with boa.env.prank(caller.address):  # funds the call from the caller's own balance
+        caller.execute(relay.address, data, value=sum(caps))
+    return caller, quote
+
+
+@pytest.mark.mainnet
+def test_contract_caller_exact_fees_broadcasts(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """Exact fees leave no refund, so none is attempted: send used to call the caller with zero gas
+    and revert the whole broadcast."""
+    caller, _ = _contract_broadcast(
+        configured_relay, block_oracle, dev_deployer, block_data, accept_eth=True, headroom=1
+    )
+
+    events = caller.get_logs()  # the transaction went through the caller
+    assert len([e for e in events if type(e).__name__ == "BlockHashBroadcast"]) == 1
+    assert not [e for e in events if type(e).__name__ == "RefundFailed"]
+    assert caller.received() == 0
+
+
+@pytest.mark.mainnet
+def test_contract_caller_receives_refund_over_stipend(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A caller whose receive needs more than send's stipend still gets its unused fee back."""
+    caller, quote = _contract_broadcast(
+        configured_relay, block_oracle, dev_deployer, block_data, accept_eth=True, headroom=2
+    )
+
+    assert caller.received() == quote  # cap 2x quote, the router took 1x
+
+
+@pytest.mark.mainnet
+def test_contract_caller_rejecting_eth_still_broadcasts(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A caller that cannot take the change still gets its broadcast; the refund stays in the
+    treasury and RefundFailed records it."""
+    balance_before = boa.env.get_balance(configured_relay.address)
+    caller, quote = _contract_broadcast(
+        configured_relay, block_oracle, dev_deployer, block_data, accept_eth=False, headroom=2
+    )
+
+    events = caller.get_logs()  # the transaction went through the caller
+    assert len([e for e in events if type(e).__name__ == "BlockHashBroadcast"]) == 1
+    failed = [e for e in events if type(e).__name__ == "RefundFailed"]
+    assert len(failed) == 1
+    assert failed[0].requester == caller.address
+    assert failed[0].amount == quote
+    assert boa.env.get_balance(configured_relay.address) == balance_before + quote
