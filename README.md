@@ -181,7 +181,8 @@ on standard-EVM chains.
 
 `ccipReceive` gas measured on each chain's own node, September 2026, with two committers
 (`scripts/ccip_gas_probe.py`). The oracle counts votes over its current committers, so each
-further committer adds one cold storage read per threshold check:
+further committer adds ~4.4k gas per threshold check (its slot in the committers array plus its
+vote, both cold):
 
 | Chains | First vote (threshold 2) | Completing vote (threshold 2) | Sole vote applies (threshold 1) | Already applied |
 |---|---|---|---|---|
