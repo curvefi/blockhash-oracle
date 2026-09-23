@@ -404,7 +404,7 @@ def _broadcast_confirmed(
         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
 
-    assert sum_target_fees <= _value, "Insufficient message value"
+    assert sum_target_fees == _value, "Insufficient message value"
 
     self._broadcast_block(
         _block_number,
@@ -601,6 +601,12 @@ def lzReceive(
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
         if block_hash == empty(bytes32):
+            # The executor carried the broadcast fees in with the response, so give them back
+            # rather than stranding them here (MainnetBlockView answers zero out of range)
+            requester: address = self.broadcast_data[_guid].requester
+            if requester != empty(address) and msg.value > 0:
+                if not raw_call(requester, b"", value=msg.value, revert_on_failure=False):
+                    log RefundFailed(requester=requester, amount=msg.value)
             return  # Invalid response
 
         # Store received block hash
