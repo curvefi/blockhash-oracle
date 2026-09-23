@@ -69,3 +69,28 @@ def test_commit_block_reverts_on_conflicting_hash(
 
         with boa.reverts("Different blockhash already applied"):
             chainlink_block_relay.internal._commit_block(n, conflicting)
+
+
+@pytest.mark.mainnet
+def test_commit_block_skips_a_vote_already_cast(
+    forked_env, chainlink_block_relay, block_oracle, dev_deployer, block_data
+):
+    """A repeated delivery of the same hash does not call the oracle again; a different hash still
+    replaces the relay's vote."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(chainlink_block_relay.address, True)
+        block_oracle.add_committer(boa.env.generate_address(), True)  # threshold 2: no confirm yet
+        chainlink_block_relay.set_block_oracle(block_oracle.address)
+
+    def commit(block_hash):
+        chainlink_block_relay.internal._commit_block(n, block_hash)
+        return [e for e in chainlink_block_relay.get_logs() if type(e).__name__ == "CommitBlock"]
+
+    assert len(commit(h)) == 1
+    assert commit(h) == []  # same vote: skipped before the oracle
+    assert block_oracle.committer_votes(chainlink_block_relay.address, n) == h
+
+    other = bytes.fromhex("bb" * 32)
+    assert len(commit(other)) == 1
+    assert block_oracle.committer_votes(chainlink_block_relay.address, n) == other
