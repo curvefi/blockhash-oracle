@@ -202,6 +202,9 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
          Clearing the block last_confirmed_block_number names leaves the pointer on a block with
          no hash: broadcast_latest_block then reverts until a newer block is confirmed, and
          broadcast_block serves any received block meanwhile.
+         A clear is not a ban: a peer chain that still holds the hash can pay one message to
+         re-deliver it, and a committer removed before the clear keeps the vote this retracts.
+         Use remove_committer to stop a committer for good.
     """
 
     ownable._check_owner()
