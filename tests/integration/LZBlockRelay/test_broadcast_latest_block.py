@@ -45,7 +45,7 @@ def test_broadcast_latest_block(
 
     # Should fail if no confirmed block
     with boa.env.prank(user):
-        with boa.reverts("No confirmed blocks"):
+        with boa.reverts("Block not confirmed"):
             lz_block_relay.broadcast_latest_block(test_eids, broadcast_fees, 150_000)
 
     # Commit and confirm a block in the oracle to test broadcasting
@@ -71,3 +71,47 @@ def test_broadcast_latest_block(
     assert any(
         "BlockHashBroadcast" in str(event) for event in events
     ), "BlockHashBroadcast event not emitted"
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_after_another_source_confirms_newer(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """Another source confirming a newer block strands broadcast_latest_block on "Unknown source",
+    but broadcast_block still serves the block this relay read; blocks it did not read, or that
+    are not confirmed, are refused."""
+    test_eids = [30110]
+    n, h = block_data["number"], block_data["hash"]
+
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers(test_eids, [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+
+    # read but not yet confirmed
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+    with boa.reverts("Block not confirmed"):
+        lz_block_relay.broadcast_block(n, [], [], 150_000)
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, h)
+        # a newer block confirmed without passing through this relay
+        block_oracle.admin_apply_block(n + 10, bytes.fromhex("bb" * 32))
+
+    with boa.reverts("Unknown source"):
+        lz_block_relay.broadcast_block(n + 10, [], [], 150_000)
+
+    fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, 2 * sum(fees))
+
+    with boa.env.prank(user):
+        with boa.reverts("Unknown source"):
+            lz_block_relay.broadcast_latest_block(test_eids, fees, 150_000, value=sum(fees))
+        lz_block_relay.broadcast_block(n, test_eids, fees, 150_000, value=sum(fees))
+
+    broadcast = [e for e in lz_block_relay.get_logs() if type(e).__name__ == "BlockHashBroadcast"]
+    assert len(broadcast) == 1
+    assert broadcast[0].block_number == n
+    assert broadcast[0].block_hash == h
