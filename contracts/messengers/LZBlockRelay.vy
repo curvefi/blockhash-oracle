@@ -203,7 +203,8 @@ def withdraw_eth(_amount: uint256):
     ownable._check_owner()
 
     assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
+    # raw_call, not send: a multisig or agent owner needs more than send's 2300-gas stipend
+    raw_call(msg.sender, b"", value=_amount)
 
 
 ################################################################
