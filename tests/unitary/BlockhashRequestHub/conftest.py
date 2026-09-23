@@ -57,9 +57,14 @@ def cre_cost(n_targets):
     return ccip_max_fee(n_targets) + surcharge(n_targets)
 
 
+def lz_max_fee(n_targets=1):
+    """What the hub caps each LayerZero send at, given the mock's flat quote."""
+    return LZ_BROADCAST_FEE * FEE_MULTIPLIER_BPS // 10_000 * n_targets
+
+
 def lz_cost(n_targets):
     """quote_read_fee folds the broadcast value into the read quote."""
-    return READ_FEE + LZ_BROADCAST_FEE * n_targets
+    return READ_FEE + lz_max_fee(n_targets)
 
 
 def cre_vote(block_oracle, relay, block_number=PINNED_BLOCK, block_hash=BLOCK_HASH):

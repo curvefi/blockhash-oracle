@@ -194,15 +194,20 @@ def _lz_fees(
     _eids: DynArray[uint32, MAX_N_BROADCAST], _lz_gas: uint128
 ) -> DynArray[uint256, MAX_N_BROADCAST]:
     """
-    @dev The relay quotes 0 for a target it cannot reach, so this doubles as a peer check
+    @dev The relay quotes 0 for a target it cannot reach, so this doubles as a peer check.
+         Headroom as on the CCIP rail: the relay forwards the fee frozen here when the read
+         response lands minutes later, and the endpoint refunds the surplus to the requester
     """
     assert len(_eids) > 0, "No targets"
-    fees: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.lz_relay.quote_broadcast_fees(
+    quotes: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.lz_relay.quote_broadcast_fees(
         _eids, _lz_gas
     )
-    for fee: uint256 in fees:
-        assert fee != 0, "No LayerZero route"
-    return fees
+    multiplier: uint256 = self.fee_multiplier_bps
+    max_fees: DynArray[uint256, MAX_N_BROADCAST] = []
+    for quote: uint256 in quotes:
+        assert quote != 0, "No LayerZero route"
+        max_fees.append(quote * multiplier // BPS)
+    return max_fees
 
 
 @internal
@@ -211,8 +216,8 @@ def _ccip_max_fees(
     _selectors: DynArray[uint64, MAX_N_BROADCAST], _ccip_gas: uint256
 ) -> DynArray[uint256, MAX_N_BROADCAST]:
     """
-    @dev max_fee is a cap, not a payment: CCIP._transmit re-quotes and forwards only the real fee,
-         so headroom costs nothing unless fees rise between request and onReport
+    @dev max_fee is a cap, not a payment: CCIP._transmit re-quotes and forwards only the real fee.
+         Unspent headroom stays in the relay treasury, the CRE path never refunds a requester
     """
     assert len(_selectors) > 0, "No targets"
     quotes: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.cre_relay.quote_broadcast_fees(
