@@ -333,3 +333,29 @@ def test_on_report_conflicting_hash_reverts(
             configured_relay.onReport(
                 VALID_METADATA, _encode_report(configured_relay, n, conflicting)
             )
+
+
+@pytest.mark.mainnet
+def test_on_report_absurd_fee_caps_do_not_lose_the_commit(
+    forked_env, configured_relay, block_oracle, cre_forwarder, dev_deployer, block_data
+):
+    """The CRE path never refunds, so it must not tally the caps either: summing them would
+    overflow on a report like this and take the commit down with it."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_peers(
+            [BASE_CHAIN_SELECTOR, ARBITRUM_CHAIN_SELECTOR],
+            [boa.env.generate_address(), boa.env.generate_address()],
+        )
+    report = _encode_report(
+        configured_relay,
+        n,
+        h,
+        [BASE_CHAIN_SELECTOR, ARBITRUM_CHAIN_SELECTOR],
+        [2**256 - 1, 1],
+    )
+
+    with boa.env.prank(cre_forwarder):
+        configured_relay.onReport(VALID_METADATA, report)  # must not revert
+
+    assert block_oracle.committer_votes(configured_relay.address, n) == h
