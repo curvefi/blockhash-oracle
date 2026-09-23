@@ -299,3 +299,22 @@ def test_admin_clearing_a_hash_does_not_move_the_pointer(block_oracle, committer
         block_oracle.admin_apply_block(21_000_000, b"\x01" * 32)
 
     assert block_oracle.last_confirmed_block_number() == 21_000_000
+
+
+def test_clearing_a_hash_retracts_the_votes_behind_it(block_oracle, committers, dev_deployer):
+    """Clearing must not leave the votes standing: the live count would let anyone re-apply the
+    same hash in the next block."""
+    n, bad_hash = 21_000_000, b"\xbb" * 32
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_threshold(2)
+    for committer in committers[:2]:
+        with boa.env.prank(committer):
+            block_oracle.commit_block(n, bad_hash)
+    assert block_oracle.get_block_hash(n) == bad_hash
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, bytes(32))
+
+    assert block_oracle.commitment_count(n, bad_hash) == 0
+    with boa.reverts("Insufficient commitments"):
+        block_oracle.apply_block(n, bad_hash)

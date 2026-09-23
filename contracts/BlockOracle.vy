@@ -199,6 +199,9 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
     @param _block_hash The hash to apply
     @dev Only callable by owner. Replacing a hash drops both the header decoded from the old one
          and the snapshot if it was that block, so neither keeps serving the replaced state.
+         Clearing the block last_confirmed_block_number names leaves the pointer on a block with
+         no hash: broadcast_latest_block then reverts until a newer block is confirmed, and
+         broadcast_block serves any received block meanwhile.
     """
 
     ownable._check_owner()
@@ -206,6 +209,11 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
         self.block_header[_block_number] = empty(bh_rlp.BlockHeader)
         if self.last_confirmed_header.block_number == _block_number:
             self.last_confirmed_header = empty(bh_rlp.BlockHeader)
+
+    if _block_hash == empty(bytes32):
+        # Retract the votes as well, or the live count re-applies the same hash immediately
+        for committer: address in self.committers:
+            self.committer_votes[committer][_block_number] = empty(bytes32)
     self._apply_block(_block_number, _block_hash)
 
 
