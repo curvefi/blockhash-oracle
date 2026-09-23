@@ -116,6 +116,10 @@ event SetGasParams:
     base_on_report_gas: uint256
     ccip_send_gas: uint256
 
+event RefundFailed:
+    requester: indexed(address)
+    amount: uint256
+
 ################################################################
 #                          CONSTRUCTOR                         #
 ################################################################
@@ -443,8 +447,8 @@ def request(
     # Overpayment is returned, the quote is not. Non-fatal: a caller that cannot receive ETH has no
     # exact amount it could safely send, since quotes drift.
     if msg.value > spent:
-        returned: bool = raw_call(
-            msg.sender, b"", value=msg.value - spent, revert_on_failure=False
-        )
+        returned: uint256 = msg.value - spent
+        if not raw_call(msg.sender, b"", value=returned, revert_on_failure=False):
+            log RefundFailed(requester=msg.sender, amount=returned)
 
     return request_id
