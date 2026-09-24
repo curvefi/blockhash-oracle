@@ -73,9 +73,10 @@ bytes32 stateRoot = IBlockOracle(ORACLE_ADDRESS).get_state_root(blockNumber);
 On read-enabled chains (such as Optimism, Arbitrum, and Base), you can request a block hash using the following steps:
 
 ```python
-# 1. Quote the required fees
-read_fee = relay.quote_read_fee(read_gas_limit=200000, value=0)
+# 1. Quote the required fees. The read fee carries the broadcast fees back with the response,
+#    so quote it with their sum: that value is the whole payment.
 broadcast_fees = relay.quote_broadcast_fees(target_chains, gas_limit=100000)
+read_fee = relay.quote_read_fee(read_gas_limit=200000, value=sum(broadcast_fees))
 
 # 2. Request the block hash
 relay.request_block_hash(
@@ -84,7 +85,7 @@ relay.request_block_hash(
     lz_receive_gas_limit=100000,
     read_gas_limit=200000,
     block_number=0,  # 0 indicates the latest safe block
-    value=read_fee + sum(broadcast_fees)
+    value=read_fee
 )
 ```
 
@@ -167,8 +168,38 @@ The Curve Block Oracle is deployed on the following chains:
 ### Gas Considerations
 
 -   **Read Operations**: Approximately 200,000 gas is recommended.
--   **Broadcast Receive**: Approximately 100,000 gas per chain.
+-   **Broadcast Receive**: Approximately 100,000 gas per chain (LayerZero `lzReceive`).
+-   **CCIP Receive**: 150,000 gas on every destination, see below.
 -   **Header Size**: Headers must be under 1024 bytes.
+
+### CCIP receive gas limit
+
+`ChainlinkBlockRelay` sends one `ccipReceive` gas limit to every destination, and CCIP charges for
+the limit requested, not the gas used. It is set to **150,000**: the highest measured cost is
+~128k (Monad, when a vote confirms the block), so this leaves ~17% headroom there and roughly 1.8x
+on standard-EVM chains.
+
+`ccipReceive` gas measured on each chain's own node, September 2026, with two committers
+(`scripts/ccip_gas_probe.py`). The oracle counts votes over its current committers, so each
+further committer adds ~4.4k gas per threshold check (its slot in the committers array plus its
+vote, both cold):
+
+| Chains | First vote (threshold 2) | Completing vote (threshold 2) | Sole vote applies (threshold 1) | Already applied |
+|---|---|---|---|---|
+| Ethereum, Arbitrum, Avalanche, Base, BSC, Celo, Fraxtal, Gnosis, HyperEVM, Ink, Mantle, Optimism, Plasma, Plume, Sonic, TAC, Taiko, Unichain, XDC, X Layer | 55k | 82k | 82k | 16k |
+| Polygon | 92k | 121k | 121k | 30k |
+| Monad | 103k | 128k | 128k | 47k |
+
+Etherlink (its RPC ignores `eth_call` state overrides) and Corn (no working RPC) were not measured.
+
+**Re-run the probe and update this table** before adding a CCIP destination, when a chain reprices
+opcodes in a hard fork, when `ccipReceive` or `BlockOracle.commit_block` change, and when the number
+of committers grows. If a chain needs more than ~130k, raise the shared limit; if the spread between
+chains grows, per-destination limits (audit finding #057) become worth their cost.
+
+A delivery of a block this relay already voted for costs ~19k instead of ~35k: the relay reads its
+own vote and skips the oracle call. That read costs ~650 gas on every other delivery, so it pays for
+itself above roughly one duplicate in 24 deliveries.
 
 ### RLP Header Decoding
 

@@ -158,3 +158,149 @@ def test_lz_receive_read_response_with_broadcast(
     assert any(
         "BlockHashBroadcast" in str(event) for event in events
     ), "BlockHashBroadcast event not emitted"
+
+
+# ─── Blocks another source already confirmed ─────────────────────────────────
+
+
+def _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer):
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+
+
+def _read_origin(lz_block_relay):
+    return (LZ_READ_CHANNEL, boa.eval(f"convert({lz_block_relay.address}, bytes32)"), 0)
+
+
+@pytest.mark.mainnet
+def test_lz_receive_read_response_for_confirmed_block_still_broadcasts(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """Another source confirmed the block before the read response arrived: the response no longer
+    reverts on the oracle's "Already applied", so the paid broadcasts still go out."""
+    _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer)
+    test_eids = [30110]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers(test_eids, [boa.env.generate_address()])
+    boa.env.set_balance(dev_deployer, 10**20)
+    boa.env.set_balance(LZ_ENDPOINT, 10**20)
+
+    fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    read_fee = lz_block_relay.quote_read_fee(100_000, sum(fees))
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.request_block_hash(test_eids, fees, 150_000, 100_000, 0, value=read_fee)
+    guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
+
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(n, h)  # confirmed through another source first
+
+    message = boa.util.abi.abi_encode("(uint256,bytes32)", (n, h))
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(
+            _read_origin(lz_block_relay), guid, message, dev_deployer, b"", value=sum(fees)
+        )
+
+    assert lz_block_relay._storage.received_blocks.get()[n] == h
+    assert block_oracle.committer_votes(lz_block_relay.address, n) == bytes(32)  # no vote needed
+    events = lz_block_relay.get_logs()
+    assert len([e for e in events if type(e).__name__ == "BlockHashBroadcast"]) == 1
+
+
+@pytest.mark.mainnet
+def test_lz_receive_regular_message_for_confirmed_block(
+    forked_env, lz_block_relay, block_oracle, dev_deployer, block_data
+):
+    """A broadcast carrying a block the oracle already holds with the same hash is accepted."""
+    source_eid = 999
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        lz_block_relay.set_peers([source_eid], [lz_block_relay.address])
+        block_oracle.admin_apply_block(block_data["number"], block_data["hash"])
+
+    origin = (source_eid, boa.eval(f"convert({lz_block_relay.address}, bytes32)"), 0)
+    message = boa.util.abi.abi_encode(
+        "(uint256,bytes32)", (block_data["number"], block_data["hash"])
+    )
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(origin, bytes(32), message, dev_deployer, b"")  # must not revert
+
+    assert block_oracle.get_block_hash(block_data["number"]) == block_data["hash"]
+
+
+@pytest.mark.mainnet
+def test_lz_receive_conflicting_hash_reverts(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """A hash that disagrees with the one the oracle confirmed is still refused, on both paths."""
+    _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer)
+    source_eid = 999
+    n = block_data["number"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([source_eid], [lz_block_relay.address])
+        block_oracle.admin_apply_block(n, block_data["hash"])
+
+    conflicting = boa.util.abi.abi_encode("(uint256,bytes32)", (n, bytes.fromhex("bb" * 32)))
+    regular_origin = (source_eid, boa.eval(f"convert({lz_block_relay.address}, bytes32)"), 0)
+    for origin in (_read_origin(lz_block_relay), regular_origin):
+        with boa.env.prank(LZ_ENDPOINT):
+            with boa.reverts("Different blockhash already applied"):
+                lz_block_relay.lzReceive(origin, bytes(32), conflicting, dev_deployer, b"")
+
+
+@pytest.mark.mainnet
+def test_lz_receive_zero_hash_refunds_the_carried_fees(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """The executor carries the broadcast fees in with the response; a zero hash must give them
+    back instead of stranding them in the relay."""
+    _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer)
+    test_eids = [30110]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers(test_eids, [boa.env.generate_address()])
+    boa.env.set_balance(dev_deployer, 10**20)
+    boa.env.set_balance(LZ_ENDPOINT, 10**20)
+
+    fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    read_fee = lz_block_relay.quote_read_fee(100_000, sum(fees))
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.request_block_hash(test_eids, fees, 150_000, 100_000, 0, value=read_fee)
+    guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
+
+    relay_before = boa.env.get_balance(lz_block_relay.address)
+    requester_before = boa.env.get_balance(dev_deployer)
+    zero_response = boa.util.abi.abi_encode("(uint256,bytes32)", (block_data["number"], bytes(32)))
+
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(
+            _read_origin(lz_block_relay), guid, zero_response, dev_deployer, b"", value=sum(fees)
+        )
+
+    assert boa.env.get_balance(lz_block_relay.address) == relay_before
+    assert boa.env.get_balance(dev_deployer) == requester_before + sum(fees)
+
+
+@pytest.mark.mainnet
+def test_peer_message_with_zero_hash_is_ignored(
+    forked_env, lz_block_relay, block_oracle, dev_deployer, block_data
+):
+    """ccipReceive returns on a zero hash. The peer branch used to revert once a hash was applied,
+    leaving that message permanently unexecutable."""
+    n, h = block_data["number"], block_data["hash"]
+    peer_eid = 999
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        lz_block_relay.set_peers([peer_eid], [lz_block_relay.address])
+        block_oracle.admin_apply_block(n, h)
+
+    origin = (peer_eid, boa.eval(f"convert({lz_block_relay.address}, bytes32)"), 0)
+    zero_message = boa.util.abi.abi_encode("(uint256,bytes32)", (n, bytes(32)))
+
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(origin, bytes(32), zero_message, dev_deployer, b"")
+
+    assert block_oracle.get_block_hash(n) == h

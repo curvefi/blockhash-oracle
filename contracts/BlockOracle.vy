@@ -94,9 +94,6 @@ last_confirmed_header: public(bh_rlp.BlockHeader)  # last confirmed header
 
 committers: public(DynArray[address, MAX_COMMITTERS])  # List of all committers
 is_committer: public(HashMap[address, bool])
-commitment_count: public(
-    HashMap[uint256, HashMap[bytes32, uint256]]
-)  # block_number => hash => count
 committer_votes: public(
     HashMap[address, HashMap[uint256, bytes32]]
 )  # committer => block_number => committed_hash
@@ -160,6 +157,7 @@ def add_committer(_committer: address, _bump_threshold: bool = False):
 def remove_committer(_committer: address):
     """
     @notice Remove trusted address that can commit block data
+    @dev Swap and pop: get_all_committers order is not stable across removals
     @param _committer Address of trusted committer
     """
 
@@ -167,12 +165,12 @@ def remove_committer(_committer: address):
     if self.is_committer[_committer]:
         self.is_committer[_committer] = False
 
-        # Rebuild committers array excluding the removed committer
-        new_committers: DynArray[address, MAX_COMMITTERS] = []
-        for committer: address in self.committers:
-            if committer != _committer:
-                new_committers.append(committer)
-        self.committers = new_committers
+        # Swap and pop: order is not meaningful, the threshold count walks the whole array
+        for i: uint256 in range(len(self.committers), bound=MAX_COMMITTERS):
+            if self.committers[i] == _committer:
+                self.committers[i] = self.committers[len(self.committers) - 1]
+                self.committers.pop()
+                break
 
         log RemoveCommitter(committer=_committer)
 
@@ -200,16 +198,51 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
     @notice Apply a block hash with admin rights
     @param _block_number The block number to apply
     @param _block_hash The hash to apply
-    @dev Only callable by owner
+    @dev Only callable by owner. Replacing a hash drops both the header decoded from the old one
+         and the snapshot if it was that block, so neither keeps serving the replaced state.
+         Clearing the block last_confirmed_block_number names leaves the pointer on a block with
+         no hash: broadcast_latest_block then reverts until a newer block is confirmed, and
+         broadcast_block serves any received block meanwhile.
+         A clear is not a ban: a peer chain that still holds the hash can pay one message to
+         re-deliver it, and a committer removed before the clear keeps the vote this retracts.
+         Use remove_committer to stop a committer for good.
     """
 
     ownable._check_owner()
+    if self.block_header[_block_number].block_hash != _block_hash:
+        self.block_header[_block_number] = empty(bh_rlp.BlockHeader)
+        if self.last_confirmed_header.block_number == _block_number:
+            self.last_confirmed_header = empty(bh_rlp.BlockHeader)
+
+    if _block_hash == empty(bytes32):
+        # Retract the votes as well, or the live count re-applies the same hash immediately
+        for committer: address in self.committers:
+            self.committer_votes[committer][_block_number] = empty(bytes32)
     self._apply_block(_block_number, _block_hash)
 
 
 ################################################################
 #                     INTERNAL FUNCTIONS                       #
 ################################################################
+
+@view
+@internal
+def _commitment_count(_block_number: uint256, _block_hash: bytes32) -> uint256:
+    """
+    @notice Votes for a hash from current committers only
+    @dev Counted live rather than tallied, so a removed committer's votes stop counting at once.
+         Re-adding an address revives its old votes: rotate to a new key instead.
+    """
+    # An unset vote reads as empty, so the empty hash would count every committer who never voted
+    if _block_hash == empty(bytes32):
+        return 0
+
+    count: uint256 = 0
+    for committer: address in self.committers:
+        if self.committer_votes[committer][_block_number] == _block_hash:
+            count += 1
+    return count
+
 
 @internal
 def _apply_block(_block_number: uint256, _block_hash: bytes32):
@@ -221,7 +254,8 @@ def _apply_block(_block_number: uint256, _block_hash: bytes32):
     """
 
     self.block_hash[_block_number] = _block_hash
-    if self.last_confirmed_block_number < _block_number:
+    # An empty hash clears a block rather than confirming one, so it must not move the pointer
+    if _block_hash != empty(bytes32) and self.last_confirmed_block_number < _block_number:
         self.last_confirmed_block_number = _block_number
     log ApplyBlock(block_number=_block_number, block_hash=_block_hash)
 
@@ -245,18 +279,12 @@ def commit_block(_block_number: uint256, _block_hash: bytes32, _apply: bool = Tr
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
     assert _block_hash != empty(bytes32), "Invalid block hash"
 
-    previous_commitment: bytes32 = self.committer_votes[msg.sender][_block_number]
-
-    # Remove previous vote if exists, to avoid duplicate commitments
-    if previous_commitment != empty(bytes32):
-        self.commitment_count[_block_number][previous_commitment] -= 1
-
+    # A new vote replaces the committer's previous one; there is no stored tally to keep in step
     self.committer_votes[msg.sender][_block_number] = _block_hash
-    self.commitment_count[_block_number][_block_hash] += 1
     log CommitBlock(committer=msg.sender, block_number=_block_number, block_hash=_block_hash)
 
     # Optional attempt to apply block
-    if _apply and self.commitment_count[_block_number][_block_hash] >= self.threshold:
+    if _apply and self._commitment_count(_block_number, _block_hash) >= self.threshold:
         self._apply_block(_block_number, _block_hash)
         return True
     return False
@@ -272,15 +300,17 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
 
     # Safety checks
     assert _header_data.block_hash != empty(bytes32), "Invalid block hash"
-    assert self.block_hash[_header_data.block_number] != empty(bytes32), "Blockhash not applied"
-    assert _header_data.block_hash == self.block_hash[_header_data.block_number], "Blockhash does not match"
+    applied_hash: bytes32 = self.block_hash[_header_data.block_number]
+    assert applied_hash != empty(bytes32), "Blockhash not applied"
+    assert _header_data.block_hash == applied_hash, "Blockhash does not match"
     assert self.block_header[_header_data.block_number].block_hash == empty(bytes32), "Header already submitted"
 
     # Store decoded header
     self.block_header[_header_data.block_number] = _header_data
 
-    # Update last confirmed header if new
-    if _header_data.block_number > self.last_confirmed_header.block_number:
+    # Update last confirmed header if new, >= so a header resubmitted after an owner hash
+    # override replaces the snapshot decoded from the old hash
+    if _header_data.block_number >= self.last_confirmed_header.block_number:
         self.last_confirmed_header = _header_data
 
     log SubmitBlockHeader(
@@ -302,8 +332,9 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
     """
     assert self.threshold > 0, "Threshold not set"
     assert self.block_hash[_block_number] == empty(bytes32), "Already applied"
+    assert _block_hash != empty(bytes32), "Invalid block hash"
     assert (
-        self.commitment_count[_block_number][_block_hash] >= self.threshold
+        self._commitment_count(_block_number, _block_hash) >= self.threshold
     ), "Insufficient commitments"
     self._apply_block(_block_number, _block_hash)
 
@@ -311,6 +342,18 @@ def apply_block(_block_number: uint256, _block_hash: bytes32):
 ################################################################
 #                         VIEW FUNCTIONS                       #
 ################################################################
+
+@view
+@external
+def commitment_count(_block_number: uint256, _block_hash: bytes32) -> uint256:
+    """
+    @notice Votes for a hash from current committers, the count the threshold is checked against
+    @param _block_number The block number
+    @param _block_hash The block hash
+    @return Number of current committers whose vote for this block is this hash
+    """
+    return self._commitment_count(_block_number, _block_hash)
+
 
 @view
 @external

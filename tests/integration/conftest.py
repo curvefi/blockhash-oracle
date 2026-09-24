@@ -10,10 +10,13 @@ LZ_READ_CHANNEL = 4294967295  # max uint32 value as per standard
 LZ_EID = 30101  # Ethereum mainnet
 EMPTY_ADDRESS = boa.eval("empty(address)")
 
+# Tracked test fixture, resolved relative to this file so it works from any CWD.
+CHAINS_JSON = os.path.join(os.path.dirname(__file__), "chains.json")
+
 ALL_CHAINS = []
 OP_CHAINS = []
 NON_OP_CHAINS = []
-with open("chains.json", "r") as file:
+with open(CHAINS_JSON, "r") as file:
     chains = json.load(file)
     ALL_CHAINS = chains.keys()
     for chain in chains:
@@ -25,7 +28,7 @@ with open("chains.json", "r") as file:
 
 @pytest.fixture(scope="session")
 def chains():
-    with open("chains.json", "r") as file:
+    with open(CHAINS_JSON, "r") as file:
         return json.load(file)
 
 
