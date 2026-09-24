@@ -635,4 +635,6 @@ def lzReceive(
         block_number: uint256 = 0
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
+        if block_hash == empty(bytes32):
+            return  # Invalid message, as ccipReceive treats it
         self._commit_block(block_number, block_hash)
