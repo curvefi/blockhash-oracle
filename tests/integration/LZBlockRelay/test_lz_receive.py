@@ -281,3 +281,26 @@ def test_lz_receive_zero_hash_refunds_the_carried_fees(
 
     assert boa.env.get_balance(lz_block_relay.address) == relay_before
     assert boa.env.get_balance(dev_deployer) == requester_before + sum(fees)
+
+
+@pytest.mark.mainnet
+def test_peer_message_with_zero_hash_is_ignored(
+    forked_env, lz_block_relay, block_oracle, dev_deployer, block_data
+):
+    """ccipReceive returns on a zero hash. The peer branch used to revert once a hash was applied,
+    leaving that message permanently unexecutable."""
+    n, h = block_data["number"], block_data["hash"]
+    peer_eid = 999
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        lz_block_relay.set_peers([peer_eid], [lz_block_relay.address])
+        block_oracle.admin_apply_block(n, h)
+
+    origin = (peer_eid, boa.eval(f"convert({lz_block_relay.address}, bytes32)"), 0)
+    zero_message = boa.util.abi.abi_encode("(uint256,bytes32)", (n, bytes(32)))
+
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(origin, bytes(32), zero_message, dev_deployer, b"")
+
+    assert block_oracle.get_block_hash(n) == h
