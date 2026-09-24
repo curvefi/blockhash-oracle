@@ -176,7 +176,7 @@ The Curve Block Oracle is deployed on the following chains:
 
 `ChainlinkBlockRelay` sends one `ccipReceive` gas limit to every destination, and CCIP charges for
 the limit requested, not the gas used. It is set to **150,000**: the highest measured cost is
-~127k (Monad, when a vote confirms the block), so this leaves ~18% headroom there and roughly 1.85x
+~128k (Monad, when a vote confirms the block), so this leaves ~17% headroom there and roughly 1.8x
 on standard-EVM chains.
 
 `ccipReceive` gas measured on each chain's own node, September 2026, with two committers
@@ -186,9 +186,9 @@ vote, both cold):
 
 | Chains | First vote (threshold 2) | Completing vote (threshold 2) | Sole vote applies (threshold 1) | Already applied |
 |---|---|---|---|---|
-| Ethereum, Arbitrum, Avalanche, Base, BSC, Celo, Fraxtal, Gnosis, HyperEVM, Ink, Mantle, Optimism, Plasma, Plume, Sonic, TAC, Taiko, Unichain, XDC, X Layer | 54.5k | 81k | 81k | 16k |
-| Polygon | 89k | 118k | 118k | 30k |
-| Monad | 103k | 127k | 127k | 47k |
+| Ethereum, Arbitrum, Avalanche, Base, BSC, Celo, Fraxtal, Gnosis, HyperEVM, Ink, Mantle, Optimism, Plasma, Plume, Sonic, TAC, Taiko, Unichain, XDC, X Layer | 55k | 82k | 82k | 16k |
+| Polygon | 92k | 121k | 121k | 30k |
+| Monad | 103k | 128k | 128k | 47k |
 
 Etherlink (its RPC ignores `eth_call` state overrides) and Corn (no working RPC) were not measured.
 
@@ -196,6 +196,10 @@ Etherlink (its RPC ignores `eth_call` state overrides) and Corn (no working RPC)
 opcodes in a hard fork, when `ccipReceive` or `BlockOracle.commit_block` change, and when the number
 of committers grows. If a chain needs more than ~130k, raise the shared limit; if the spread between
 chains grows, per-destination limits (audit finding #057) become worth their cost.
+
+A delivery of a block this relay already voted for costs ~19k instead of ~35k: the relay reads its
+own vote and skips the oracle call. That read costs ~650 gas on every other delivery, so it pays for
+itself above roughly one duplicate in 24 deliveries.
 
 ### RLP Header Decoding
 
