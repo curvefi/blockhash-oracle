@@ -157,6 +157,7 @@ def add_committer(_committer: address, _bump_threshold: bool = False):
 def remove_committer(_committer: address):
     """
     @notice Remove trusted address that can commit block data
+    @dev Swap and pop: get_all_committers order is not stable across removals
     @param _committer Address of trusted committer
     """
 
@@ -164,12 +165,12 @@ def remove_committer(_committer: address):
     if self.is_committer[_committer]:
         self.is_committer[_committer] = False
 
-        # Rebuild committers array excluding the removed committer
-        new_committers: DynArray[address, MAX_COMMITTERS] = []
-        for committer: address in self.committers:
-            if committer != _committer:
-                new_committers.append(committer)
-        self.committers = new_committers
+        # Swap and pop: order is not meaningful, the threshold count walks the whole array
+        for i: uint256 in range(len(self.committers), bound=MAX_COMMITTERS):
+            if self.committers[i] == _committer:
+                self.committers[i] = self.committers[len(self.committers) - 1]
+                self.committers.pop()
+                break
 
         log RemoveCommitter(committer=_committer)
 
@@ -299,8 +300,9 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
 
     # Safety checks
     assert _header_data.block_hash != empty(bytes32), "Invalid block hash"
-    assert self.block_hash[_header_data.block_number] != empty(bytes32), "Blockhash not applied"
-    assert _header_data.block_hash == self.block_hash[_header_data.block_number], "Blockhash does not match"
+    applied_hash: bytes32 = self.block_hash[_header_data.block_number]
+    assert applied_hash != empty(bytes32), "Blockhash not applied"
+    assert _header_data.block_hash == applied_hash, "Blockhash does not match"
     assert self.block_header[_header_data.block_number].block_hash == empty(bytes32), "Header already submitted"
 
     # Store decoded header
