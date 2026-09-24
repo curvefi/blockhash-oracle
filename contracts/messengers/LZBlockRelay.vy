@@ -339,12 +339,14 @@ def _broadcast_block(
     _block_number: uint256,
     _block_hash: bytes32,
     _broadcast_data: BroadcastData,
+    _value: uint256,
 ):
     """
     @notice Internal function to broadcast block hash to multiple chains
     @param _block_number Block number to broadcast
     @param _block_hash Block hash to broadcast
     @param _broadcast_data Data for broadcasting
+    @param _value Fees carried into this call; whatever is left of it is change
     """
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = abi_encode(_block_number, _block_hash)
 
@@ -355,20 +357,22 @@ def _broadcast_block(
     )
 
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
-    unused_fees: uint256 = 0
+    # What was here before the fees arrived, so the change is whatever is left above it
+    treasury: uint256 = self.balance - _value
 
     for target: BroadcastTarget in _broadcast_data.targets:
-        # Skip if peer is not set; its fee goes back with the rest of the change
+        # Skip if peer is not set; its fee is never spent and comes back with the change
         if OApp.peers[target.eid] == empty(bytes32):
-            unused_fees += target.fee
             continue
 
-        # Send message
+        # Send message. The endpoint refunds the surplus with a transfer that reverts the send on
+        # failure, so take it here rather than naming the requester and risking the whole delivery
         fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=target.fee, lzTokenFee=0)
-        OApp._lzSend(target.eid, message, options, fees, _broadcast_data.requester)
+        OApp._lzSend(target.eid, message, options, fees, self)
         successful_targets.append(target)
 
     # Non-fatal: a caller that cannot take the change still gets its broadcast
+    unused_fees: uint256 = self.balance - treasury
     if _broadcast_data.requester != empty(address) and unused_fees > 0:
         if not raw_call(_broadcast_data.requester, b"", value=unused_fees, revert_on_failure=False):
             log RefundFailed(requester=_broadcast_data.requester, amount=unused_fees)
@@ -426,6 +430,7 @@ def _broadcast_confirmed(
         _block_number,
         block_hash,
         BroadcastData(targets=broadcast_targets, gas_limit=_lz_receive_gas_limit, requester=msg.sender),
+        _value,
     )
 
 
@@ -645,6 +650,7 @@ def lzReceive(
                 block_number,
                 block_hash,
                 broadcast_data,
+                msg.value,
             )
     else:
         # Regular message - decode and commit block hash
