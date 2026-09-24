@@ -208,3 +208,32 @@ def test_broadcast_block_refuses_overpayment(
     with boa.env.prank(user):
         with boa.reverts("Insufficient message value"):
             lz_block_relay.broadcast_block(n, [30110], [fee], 150_000, value=fee + 1)
+
+
+_MOCK_ERC20 = """# pragma version 0.4.3
+balanceOf: public(HashMap[address, uint256])
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balanceOf[_to] += _amount
+
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    self.balanceOf[msg.sender] -= _amount
+    self.balanceOf[_to] += _amount
+    return True
+"""
+
+
+@pytest.mark.mainnet
+def test_owner_recovers_erc20(forked_env, lz_block_relay, dev_deployer):
+    """A data-only relay can still receive a direct transfer; its Chainlink twin already recovers."""
+    token = boa.loads(_MOCK_ERC20)
+    recipient = boa.env.generate_address()
+    token.mint(lz_block_relay.address, 1000)
+
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.recover_erc20(token.address, recipient, 1000)
+
+    assert token.balanceOf(lz_block_relay.address) == 0
+    assert token.balanceOf(recipient) == 1000
