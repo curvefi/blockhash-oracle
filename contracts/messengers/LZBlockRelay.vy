@@ -40,6 +40,8 @@ interface IBlockOracle:
 ################################################################
 
 # Import ownership management
+from ethereum.ercs import IERC20
+
 from snekmate.auth import ownable
 
 initializes: ownable
@@ -211,6 +213,20 @@ def withdraw_eth(_amount: uint256):
     assert self.balance >= _amount, "Insufficient balance"
     # raw_call, not send: a multisig or agent owner needs more than send's 2300-gas stipend
     raw_call(msg.sender, b"", value=_amount)
+
+
+@external
+def recover_erc20(_token: address, _to: address, _amount: uint256):
+    """
+    @notice Recover ERC20 tokens sent to this contract
+    @dev Data-only relay, but a direct transfer can still land here
+    """
+    ownable._check_owner()
+
+    # default_return_value: tokens that return nothing on a successful transfer (USDT) are recoverable
+    assert extcall IERC20(_token).transfer(
+        _to, _amount, default_return_value=True
+    ), "Transfer failed"
 
 
 ################################################################
