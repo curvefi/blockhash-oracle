@@ -32,6 +32,7 @@ interface IBlockOracle:
     def commit_block(block_number: uint256, block_hash: bytes32) -> bool: nonpayable
     def last_confirmed_block_number() -> uint256: view
     def get_block_hash(block_number: uint256) -> bytes32: view
+    def committer_votes(committer: address, block_number: uint256) -> bytes32: view
 
 
 ################################################################
@@ -223,6 +224,9 @@ def _commit_block(_block_number: uint256, _block_hash: bytes32):
     if applied_blockhash == _block_hash:
         return
     assert applied_blockhash == empty(bytes32), "Different blockhash already applied"
+    # Skip a vote this relay already cast; if a lowered threshold now suffices, apply_block is permissionless
+    if staticcall self.block_oracle.committer_votes(self, _block_number) == _block_hash:
+        return
     extcall self.block_oracle.commit_block(_block_number, _block_hash)
 
 
