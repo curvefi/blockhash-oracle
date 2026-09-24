@@ -210,6 +210,67 @@ def test_broadcast_block_refuses_overpayment(
             lz_block_relay.broadcast_block(n, [30110], [fee], 150_000, value=fee + 1)
 
 
+@pytest.mark.mainnet
+def test_endpoint_surplus_does_not_revert_for_a_contract_caller(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """The endpoint refunds the surplus with a hard transfer. Naming the requester there let a
+    caller that cannot take ETH lose the whole broadcast, so the relay takes it and passes it on."""
+    sent_eid = 30110
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([sent_eid], [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        block_oracle.admin_apply_block(n, h)
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+
+    quote = lz_block_relay.quote_broadcast_fees([sent_eid], 150_000)[0]
+    paid = quote * 2  # headroom, so the endpoint has a surplus to hand back
+    caller = boa.load(CONTRACT_CALLER, False)  # rejects ETH
+    boa.env.set_balance(caller.address, paid)
+    data = lz_block_relay.broadcast_block.prepare_calldata(n, [sent_eid], [paid], 150_000)
+
+    with boa.env.prank(caller.address):
+        caller.execute(lz_block_relay.address, data, value=paid)  # must not revert
+
+    events = caller.get_logs()
+    assert [
+        t.eid for t in [e for e in events if type(e).__name__ == "BlockHashBroadcast"][0].targets
+    ] == [sent_eid]
+    failed = [e for e in events if type(e).__name__ == "RefundFailed"]
+    assert len(failed) == 1 and failed[0].amount == paid - quote
+
+
+@pytest.mark.mainnet
+def test_endpoint_surplus_returns_to_an_eoa_requester(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """Taking the refund at the relay must not keep it: the change still reaches the requester."""
+    sent_eid = 30110
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([sent_eid], [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        block_oracle.admin_apply_block(n, h)
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+
+    quote = lz_block_relay.quote_broadcast_fees([sent_eid], 150_000)[0]
+    paid = quote * 2
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, paid)
+    relay_before = boa.env.get_balance(lz_block_relay.address)
+
+    with boa.env.prank(user):
+        lz_block_relay.broadcast_block(n, [sent_eid], [paid], 150_000, value=paid)
+
+    assert boa.env.get_balance(lz_block_relay.address) == relay_before  # nothing retained
+    assert boa.env.get_balance(user) == paid - quote
+
+
 _MOCK_ERC20 = """# pragma version 0.4.3
 balanceOf: public(HashMap[address, uint256])
 
