@@ -621,13 +621,23 @@ def lzReceive(
         block_number: uint256 = 0
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
+
+        # Both exits below consume the packet, so both require the value the requester prepaid:
+        # a short delivery must revert and stay retryable rather than keep the requester's drop
+        broadcast_data: BroadcastData = self.broadcast_data[_guid]
+        total_fee: uint256 = 0
+        for target: BroadcastTarget in broadcast_data.targets:
+            total_fee += target.fee
+        assert msg.value >= total_fee, "Insufficient msg.value"
+
         if block_hash == empty(bytes32):
             # The executor carried the broadcast fees in with the response, so give them back
             # rather than stranding them here (MainnetBlockView answers zero out of range)
-            requester: address = self.broadcast_data[_guid].requester
-            if requester != empty(address) and msg.value > 0:
-                if not raw_call(requester, b"", value=msg.value, revert_on_failure=False):
-                    log RefundFailed(requester=requester, amount=msg.value)
+            if broadcast_data.requester != empty(address) and msg.value > 0:
+                if not raw_call(
+                    broadcast_data.requester, b"", value=msg.value, revert_on_failure=False
+                ):
+                    log RefundFailed(requester=broadcast_data.requester, amount=msg.value)
             return  # Invalid response
 
         # Store received block hash
@@ -636,15 +646,7 @@ def lzReceive(
         # Commit block hash to oracle
         self._commit_block(block_number, block_hash)
 
-        broadcast_data: BroadcastData = self.broadcast_data[_guid]
-
         if len(broadcast_data.targets) > 0:
-            # Verify that attached value covers requested broadcast fees
-            total_fee: uint256 = 0
-            for target: BroadcastTarget in broadcast_data.targets:
-                total_fee += target.fee
-            assert msg.value >= total_fee, "Insufficient msg.value"
-
             # Perform broadcast
             self._broadcast_block(
                 block_number,
