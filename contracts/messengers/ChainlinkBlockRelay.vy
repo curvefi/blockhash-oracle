@@ -381,7 +381,7 @@ def quote_broadcast_fees(
     @param _ccip_receive_gas_limit Gas limit for ccipReceive
     @return Array of fees per target chain, 0 where there is no route (no receiver configured, or
             the router does not support that chain). Quoting a batch must not revert because of one
-            bad destination; callers treat 0 as unreachable, as BlockhashRequestHub does
+            unsupported destination; callers treat 0 as unreachable, as BlockhashRequestHub does
     """
     # Prepare dummy broadcast message (uint256 number, bytes32 hash)
     data: Bytes[64] = abi_encode(empty(uint256), empty(bytes32))
