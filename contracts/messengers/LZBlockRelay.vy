@@ -424,7 +424,7 @@ def _broadcast_confirmed(
         broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
         sum_target_fees += _target_fees[i]
 
-    assert sum_target_fees == _value, "Insufficient message value"
+    assert sum_target_fees == _value, "Value must equal fee sum"
 
     self._broadcast_block(
         _block_number,
