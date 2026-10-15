@@ -136,11 +136,30 @@ def test_broadcast_latest_block_insufficient_value(
     user = boa.env.generate_address()
     boa.env.set_balance(user, 10**20)
 
-    # fee > 0 but value = 0 → "Insufficient message value" before router is touched
+    # fee > 0 but value = 0 → refused before router is touched
     with boa.env.prank(user):
-        with boa.reverts("Insufficient message value"):
+        with boa.reverts("Value must equal fee sum"):
             configured_relay.broadcast_latest_block(
                 [111], [10**14], CCIP_RECEIVE_GAS_LIMIT, value=0
+            )
+
+
+@pytest.mark.mainnet
+def test_broadcast_latest_block_refuses_overpayment(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """Value above the fee sum is refused too, so the message must not claim it was insufficient."""
+    _seed_confirmed_block(
+        configured_relay, block_oracle, dev_deployer, block_data["number"], block_data["hash"]
+    )
+
+    user = boa.env.generate_address()
+    boa.env.set_balance(user, 10**20)
+
+    with boa.env.prank(user):
+        with boa.reverts("Value must equal fee sum"):
+            configured_relay.broadcast_latest_block(
+                [111], [10**14], CCIP_RECEIVE_GAS_LIMIT, value=10**14 + 1
             )
 
 
