@@ -284,6 +284,47 @@ def test_lz_receive_zero_hash_refunds_the_carried_fees(
 
 
 @pytest.mark.mainnet
+def test_lz_receive_zero_hash_refuses_a_short_delivery(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """Whoever executes the packet picks its value. Delivering a zero hash short must revert and
+    leave the packet retryable, not consume it and keep the drop the requester prepaid."""
+    _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer)
+    test_eids = [30110]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers(test_eids, [boa.env.generate_address()])
+    boa.env.set_balance(dev_deployer, 10**20)
+    boa.env.set_balance(LZ_ENDPOINT, 10**20)
+
+    fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    read_fee = lz_block_relay.quote_read_fee(100_000, sum(fees))
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.request_block_hash(test_eids, fees, 150_000, 100_000, 0, value=read_fee)
+    guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
+    zero_response = boa.util.abi.abi_encode("(uint256,bytes32)", (block_data["number"], bytes(32)))
+
+    for short in (0, sum(fees) - 1):
+        with boa.env.prank(LZ_ENDPOINT):
+            with boa.reverts("Insufficient msg.value"):
+                lz_block_relay.lzReceive(
+                    _read_origin(lz_block_relay),
+                    guid,
+                    zero_response,
+                    dev_deployer,
+                    b"",
+                    value=short,
+                )
+
+    # the same packet still delivers, and the requester gets the drop back
+    requester_before = boa.env.get_balance(dev_deployer)
+    with boa.env.prank(LZ_ENDPOINT):
+        lz_block_relay.lzReceive(
+            _read_origin(lz_block_relay), guid, zero_response, dev_deployer, b"", value=sum(fees)
+        )
+    assert boa.env.get_balance(dev_deployer) == requester_before + sum(fees)
+
+
+@pytest.mark.mainnet
 def test_peer_message_with_zero_hash_is_ignored(
     forked_env, lz_block_relay, block_oracle, dev_deployer, block_data
 ):
