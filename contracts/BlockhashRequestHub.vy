@@ -141,6 +141,10 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
+    @param _base_on_report_gas Fixed part of the gas the workflow forwards into onReport
+    @param _ccip_send_gas Gas per CCIP target in that budget, at least ~220_000: one getFee and
+           ccipSend measured ~195_500 on Ethereum mainnet, and less makes 4+ target requests revert.
+           Not the ccipReceive limit, which is the destination side
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
