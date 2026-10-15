@@ -206,7 +206,7 @@ def test_broadcast_block_refuses_overpayment(
     boa.env.set_balance(user, fee + 1)
 
     with boa.env.prank(user):
-        with boa.reverts("Insufficient message value"):
+        with boa.reverts("Value must equal fee sum"):
             lz_block_relay.broadcast_block(n, [30110], [fee], 150_000, value=fee + 1)
 
 
