@@ -75,12 +75,9 @@ exports: (
 MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
 READ_RETURN_SIZE: constant(uint32) = 64
-# Gas a refund recipient gets, fixed so whoever executes a delivery cannot starve it
-REFUND_GAS: constant(uint256) = 50_000
-# The value call's own cost: cold account plus value transfer, ~11.6k on Ethereum and ~19.1k on
-# Monad, which charges 10,100 for a cold account; rounded up
-REFUND_CALL_COST: constant(uint256) = 20_000
-# Gas needed to hand the recipient all of REFUND_GAS, since EIP-150 keeps 1/64 back
+REFUND_GAS: constant(uint256) = 50_000  # fixed, so the executor cannot starve a refund
+REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
+# EIP-150 keeps 1/64 back
 MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 ################################################################
@@ -394,8 +391,7 @@ def _broadcast_block(
 def _refund(_requester: address, _amount: uint256):
     """
     @notice Return change to a requester, logging rather than reverting if it refuses
-    @dev With too little gas to give the recipient REFUND_GAS the whole call reverts: a refund
-         starved of gas would otherwise be logged as a refusal and the delivery consumed
+    @dev Reverts rather than starve the recipient, which would read as a refusal
     """
     if _requester == empty(address) or _amount == 0:
         return
@@ -642,8 +638,7 @@ def lzReceive(
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
 
-        # Both exits below consume the packet, so both require the value the requester prepaid:
-        # a short delivery must revert and stay retryable rather than keep the requester's drop
+        # Both exits consume the packet, so a short delivery must revert and stay retryable
         broadcast_data: BroadcastData = self.broadcast_data[_guid]
         total_fee: uint256 = 0
         for target: BroadcastTarget in broadcast_data.targets:
@@ -651,8 +646,7 @@ def lzReceive(
         assert msg.value >= total_fee, "Insufficient msg.value"
 
         if block_hash == empty(bytes32):
-            # The executor carried the broadcast fees in with the response, so give them back
-            # rather than stranding them here (MainnetBlockView answers zero out of range)
+            # Return the fees carried in (MainnetBlockView answers zero out of range)
             self._refund(broadcast_data.requester, msg.value)
             return  # Invalid response
 
