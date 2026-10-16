@@ -75,6 +75,12 @@ exports: (
 MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
 READ_RETURN_SIZE: constant(uint32) = 64
+# Gas a refund recipient gets, fixed so whoever executes a delivery cannot starve it
+REFUND_GAS: constant(uint256) = 50_000
+# The value call's own cost (cold account plus value transfer, ~11.6k), rounded up
+REFUND_CALL_COST: constant(uint256) = 15_000
+# Gas needed to hand the recipient all of REFUND_GAS, since EIP-150 keeps 1/64 back
+MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 ################################################################
 #                            STORAGE                           #
@@ -372,16 +378,27 @@ def _broadcast_block(
         successful_targets.append(target)
 
     # Non-fatal: a caller that cannot take the change still gets its broadcast
-    unused_fees: uint256 = self.balance - treasury
-    if _broadcast_data.requester != empty(address) and unused_fees > 0:
-        if not raw_call(_broadcast_data.requester, b"", value=unused_fees, revert_on_failure=False):
-            log RefundFailed(requester=_broadcast_data.requester, amount=unused_fees)
+    self._refund(_broadcast_data.requester, self.balance - treasury)
 
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,
         targets=successful_targets,
     )
+
+
+@internal
+def _refund(_requester: address, _amount: uint256):
+    """
+    @notice Return change to a requester, logging rather than reverting if it refuses
+    @dev With too little gas to give the recipient REFUND_GAS the whole call reverts: a refund
+         starved of gas would otherwise be logged as a refusal and the delivery consumed
+    """
+    if _requester == empty(address) or _amount == 0:
+        return
+    assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
+    if not raw_call(_requester, b"", value=_amount, gas=REFUND_GAS, revert_on_failure=False):
+        log RefundFailed(requester=_requester, amount=_amount)
 
 
 @view
@@ -633,11 +650,7 @@ def lzReceive(
         if block_hash == empty(bytes32):
             # The executor carried the broadcast fees in with the response, so give them back
             # rather than stranding them here (MainnetBlockView answers zero out of range)
-            if broadcast_data.requester != empty(address) and msg.value > 0:
-                if not raw_call(
-                    broadcast_data.requester, b"", value=msg.value, revert_on_failure=False
-                ):
-                    log RefundFailed(requester=broadcast_data.requester, amount=msg.value)
+            self._refund(broadcast_data.requester, msg.value)
             return  # Invalid response
 
         # Store received block hash
