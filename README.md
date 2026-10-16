@@ -209,7 +209,8 @@ of committers grows. If a chain needs more than ~130k, raise the shared limit; i
 chains grows, per-destination limits (audit finding #057) become worth their cost.
 
 Up to 32 committers are allowed, but these limits fit only a few more than the two measured: at
-~4.4k each, 150k leaves room for about five more on Monad and fifteen on standard-EVM chains. The
+~4.4k each on standard-EVM chains and ~8.4k on Monad, which prices cold reads higher, 150k leaves
+room for about fifteen more on standard-EVM chains and two on Monad. The
 same count runs in `lzReceive` when a peer delivers a block, so raise both receive limits before
 adding committers.
 
