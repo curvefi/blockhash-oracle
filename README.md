@@ -76,16 +76,18 @@ On read-enabled chains (such as Optimism, Arbitrum, and Base), you can request a
 # 1. Quote the broadcast fees with headroom: they are frozen until the read response lands minutes
 #    later, and a rise in that window reverts the delivery. The unspent part is refunded.
 broadcast_fees = [f * 12 // 10 for f in relay.quote_broadcast_fees(target_chains, gas_limit=100000)]
+# The response executes every broadcast, ~150k gas each, so size its gas per target.
+read_gas_limit = 250000 + 170000 * len(target_chains)
 # The read fee carries the broadcast fees back with the response, so quote it with their sum:
 # that value is the whole payment.
-read_fee = relay.quote_read_fee(read_gas_limit=200000, value=sum(broadcast_fees))
+read_fee = relay.quote_read_fee(read_gas_limit=read_gas_limit, value=sum(broadcast_fees))
 
 # 2. Request the block hash
 relay.request_block_hash(
     target_chains,
     broadcast_fees,
     lz_receive_gas_limit=100000,
-    read_gas_limit=200000,
+    read_gas_limit=read_gas_limit,
     block_number=0,  # 0 indicates the latest safe block
     value=read_fee
 )
@@ -169,7 +171,8 @@ The Curve Block Oracle is deployed on the following chains:
 
 ### Gas Considerations
 
--   **Read Operations**: Approximately 200,000 gas is recommended.
+-   **Read Operations**: 250,000 gas plus 170,000 per broadcast target: the response sends every
+    broadcast (one target measured ~332k in total, ten ~1.66M), and a refund needs ~66k left.
 -   **Broadcast Receive**: Approximately 100,000 gas per chain (LayerZero `lzReceive`).
 -   **CCIP Receive**: 170,000 gas on every destination, see below.
 -   **Header Size**: Headers must be under 1024 bytes.
