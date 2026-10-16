@@ -158,8 +158,7 @@ def remove_committer(_committer: address):
     """
     @notice Remove trusted address that can commit block data
     @dev Swap and pop: get_all_committers order is not stable across removals
-    @dev Leaves the threshold as is: removing below it halts confirmation until a committer is
-         added or the threshold lowered, so a removal never lowers the bar
+    @dev Leaves the threshold as is, so a removal can halt confirmation but never lowers the bar
     @param _committer Address of trusted committer
     """
 
@@ -200,9 +199,8 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
     @notice Apply a block hash with admin rights
     @param _block_number The block number to apply
     @param _block_hash The hash to apply
-    @dev Only callable by owner. Replacing a hash drops both the header decoded from the old one
-         and the snapshot if it was that block, so neither keeps serving the replaced state. The
-         snapshot keeps its block number, so an older header cannot take its place.
+    @dev Only callable by owner. Replacing a hash drops the header decoded from the old one and
+         empties the snapshot if it was that block, keeping its number so no older header wins.
          Clearing the block last_confirmed_block_number names leaves the pointer on a block with
          no hash: broadcast_latest_block then reverts until a newer block is confirmed, and
          broadcast_block serves any received block meanwhile.
@@ -312,7 +310,7 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
     # Store decoded header
     self.block_header[_header_data.block_number] = _header_data
 
-    # Update last confirmed header if new, >= so the header replacing an owner override takes over
+    # >= so the header replacing an owner override takes over
     if _header_data.block_number >= self.last_confirmed_header.block_number:
         self.last_confirmed_header = _header_data
 
