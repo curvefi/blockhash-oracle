@@ -148,12 +148,13 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
-    @param _base_on_report_gas Fixed part of the writeReport gas limit, which also pays the
-           KeystoneForwarder, at least ~250_000: onReport alone measured ~110k cold on Ethereum
-           mainnet, and the first CCIP lane costs ~60k more than the others
-    @param _ccip_send_gas Gas per CCIP target in that budget, at least ~240_000: one getFee and
-           ccipSend to a lane not yet touched in the transaction measured ~226_000 cold on Ethereum
-           mainnet. Not the ccipReceive limit, which is the destination side
+    @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~350_000: it pays
+           the KeystoneForwarder (~105k with three signatures), onReport itself (~110k cold) and the
+           first CCIP lane's ~60k extra
+    @param _ccip_send_gas Gas per CCIP target in that budget, at least ~250_000: one getFee and
+           ccipSend to a lane not yet touched in the transaction measured ~225_000 cold on Ethereum
+           and Base, ~240_000 on Base Sepolia. Not the ccipReceive limit, which is the destination
+           side
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
