@@ -158,6 +158,8 @@ def remove_committer(_committer: address):
     """
     @notice Remove trusted address that can commit block data
     @dev Swap and pop: get_all_committers order is not stable across removals
+    @dev Leaves the threshold as is: removing below it halts confirmation until a committer is
+         added or the threshold lowered, so a removal never lowers the bar
     @param _committer Address of trusted committer
     """
 
