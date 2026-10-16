@@ -77,8 +77,9 @@ GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bo
 READ_RETURN_SIZE: constant(uint32) = 64
 # Gas a refund recipient gets, fixed so whoever executes a delivery cannot starve it
 REFUND_GAS: constant(uint256) = 50_000
-# The value call's own cost (cold account plus value transfer, ~11.6k), rounded up
-REFUND_CALL_COST: constant(uint256) = 15_000
+# The value call's own cost: cold account plus value transfer, ~11.6k on Ethereum and ~19.1k on
+# Monad, which charges 10,100 for a cold account; rounded up
+REFUND_CALL_COST: constant(uint256) = 20_000
 # Gas needed to hand the recipient all of REFUND_GAS, since EIP-150 keeps 1/64 back
 MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
