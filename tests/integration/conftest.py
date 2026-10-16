@@ -8,6 +8,8 @@ BOA_CACHE = False
 LZ_ENDPOINT = "0x1a44076050125825900e736c501f859c50fE728c"  # mainnet
 LZ_READ_CHANNEL = 4294967295  # max uint32 value as per standard
 LZ_EID = 30101  # Ethereum mainnet
+# ContractCaller.set_burn_rounds that makes taking ETH cost ~290k, enough to starve it
+HUNGRY_RECEIVE_ROUNDS = 3_000
 EMPTY_ADDRESS = boa.eval("empty(address)")
 
 # Tracked test fixture, resolved relative to this file so it works from any CWD.

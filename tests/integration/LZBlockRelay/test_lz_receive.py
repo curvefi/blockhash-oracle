@@ -2,8 +2,11 @@
 
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
-from conftest import LZ_READ_CHANNEL, LZ_EID, LZ_ENDPOINT
+from conftest import LZ_READ_CHANNEL, LZ_EID, LZ_ENDPOINT, HUNGRY_RECEIVE_ROUNDS
+
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
 
 
 @pytest.mark.mainnet
@@ -322,6 +325,49 @@ def test_lz_receive_zero_hash_refuses_a_short_delivery(
             _read_origin(lz_block_relay), guid, zero_response, dev_deployer, b"", value=sum(fees)
         )
     assert boa.env.get_balance(dev_deployer) == requester_before + sum(fees)
+
+
+@pytest.mark.mainnet
+def test_lz_receive_zero_hash_refund_does_not_depend_on_the_executors_gas(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """Whoever executes the packet picks its gas. Against a requester that needs a lot of gas to take
+    ETH, that choice must not decide whether the refund lands or is logged as a refusal."""
+    _read_enabled_relay(lz_block_relay, block_oracle, mainnet_block_view, dev_deployer)
+    test_eids = [30110]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers(test_eids, [boa.env.generate_address()])
+    boa.env.set_balance(LZ_ENDPOINT, 10**20)
+
+    fees = lz_block_relay.quote_broadcast_fees(test_eids, 150_000)
+    read_fee = lz_block_relay.quote_read_fee(100_000, sum(fees))
+    requester = boa.load(CONTRACT_CALLER, True)
+    requester.set_burn_rounds(HUNGRY_RECEIVE_ROUNDS)
+    boa.env.set_balance(requester.address, read_fee)
+    data = lz_block_relay.request_block_hash.prepare_calldata(test_eids, fees, 150_000, 100_000, 0)
+    with boa.env.prank(requester.address):
+        requester.execute(lz_block_relay.address, data, value=read_fee)
+    guid = list(lz_block_relay._storage.broadcast_data.get().keys())[0]
+    zero_response = boa.util.abi.abi_encode("(uint256,bytes32)", (block_data["number"], bytes(32)))
+
+    refunded = set()
+    for gas in range(25_000, 500_000, 2_000):
+        with boa.env.anchor():
+            try:
+                with boa.env.prank(LZ_ENDPOINT):
+                    lz_block_relay.lzReceive(
+                        _read_origin(lz_block_relay),
+                        guid,
+                        zero_response,
+                        dev_deployer,
+                        b"",
+                        value=sum(fees),
+                        gas=gas,
+                    )
+            except BoaError:
+                continue
+            refunded.add(requester.received() == sum(fees))
+    assert len(refunded) == 1
 
 
 @pytest.mark.mainnet
