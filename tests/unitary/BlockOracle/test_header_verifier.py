@@ -254,3 +254,26 @@ def test_override_clears_the_snapshot_of_that_block(block_oracle, dev_deployer):
 
     assert block_oracle.last_confirmed_header()[0] == bytes(32)
     assert block_oracle.last_confirmed_header()[2] == bytes(32)
+
+
+def test_override_does_not_let_an_older_header_take_the_snapshot(block_oracle, dev_deployer):
+    """After the snapshot's block is overridden, a header for an older block must not become the
+    snapshot while a newer one is still stored; only the replacement header or a newer block does."""
+    verifier = boa.env.generate_address()
+    with boa.env.prank(dev_deployer):
+        block_oracle.set_header_verifier(verifier)
+        for n in (10, 20, 30):
+            block_oracle.admin_apply_block(n, bytes([n]) * 32)
+    for n in (20, 30):
+        _submit(block_oracle, verifier, _header(n, bytes([n]) * 32, b"" * 32))
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.admin_apply_block(30, b"1" * 32)
+    _submit(block_oracle, verifier, _header(10, bytes([10]) * 32, b"" * 32))
+
+    assert block_oracle.last_confirmed_header()[4] == 30
+    assert block_oracle.last_confirmed_header()[0] == bytes(32)
+
+    _submit(block_oracle, verifier, _header(30, b"1" * 32, b"" * 32))
+    assert block_oracle.last_confirmed_header()[0] == b"1" * 32
+    assert block_oracle.last_confirmed_header()[2] == b"" * 32

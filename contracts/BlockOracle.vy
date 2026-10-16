@@ -199,7 +199,8 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
     @param _block_number The block number to apply
     @param _block_hash The hash to apply
     @dev Only callable by owner. Replacing a hash drops both the header decoded from the old one
-         and the snapshot if it was that block, so neither keeps serving the replaced state.
+         and the snapshot if it was that block, so neither keeps serving the replaced state. The
+         snapshot keeps its block number, so an older header cannot take its place.
          Clearing the block last_confirmed_block_number names leaves the pointer on a block with
          no hash: broadcast_latest_block then reverts until a newer block is confirmed, and
          broadcast_block serves any received block meanwhile.
@@ -213,6 +214,7 @@ def admin_apply_block(_block_number: uint256, _block_hash: bytes32):
         self.block_header[_block_number] = empty(bh_rlp.BlockHeader)
         if self.last_confirmed_header.block_number == _block_number:
             self.last_confirmed_header = empty(bh_rlp.BlockHeader)
+            self.last_confirmed_header.block_number = _block_number
 
     if _block_hash == empty(bytes32):
         # Retract the votes as well, or the live count re-applies the same hash immediately
@@ -308,8 +310,7 @@ def submit_block_header(_header_data: bh_rlp.BlockHeader):
     # Store decoded header
     self.block_header[_header_data.block_number] = _header_data
 
-    # Update last confirmed header if new, >= so a header resubmitted after an owner hash
-    # override replaces the snapshot decoded from the old hash
+    # Update last confirmed header if new, >= so the header replacing an owner override takes over
     if _header_data.block_number >= self.last_confirmed_header.block_number:
         self.last_confirmed_header = _header_data
 
