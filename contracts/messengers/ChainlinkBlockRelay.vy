@@ -81,14 +81,11 @@ exports: (
 ################################################################
 
 MAX_N_BROADCAST: constant(uint256) = 32
-# Gas a refund recipient gets, fixed so whoever triggers a broadcast cannot starve it. Keep it far
-# below the CRE forwarder's ~160k routing minimum: the lock makes supportsInterface revert, so a
-# refund callback that could route a pending report would burn it
+# Fixed so the caller cannot starve a refund, and far below the forwarder's ~160k routing minimum:
+# under the lock, a callback that could route a pending report would burn it
 REFUND_GAS: constant(uint256) = 50_000
-# The value call's own cost: cold account plus value transfer, ~11.6k on Ethereum and ~19.1k on
-# Monad, which charges 10,100 for a cold account; rounded up
-REFUND_CALL_COST: constant(uint256) = 20_000
-# Gas needed to hand the recipient all of REFUND_GAS, since EIP-150 keeps 1/64 back
+REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
+# EIP-150 keeps 1/64 back
 MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 ################################################################
@@ -301,11 +298,7 @@ def _broadcast_block(
         )
         successful_targets.append(target)
 
-    # Refund unused fee to a direct (public) requester; CRE path keeps it in the treasury.
-    # Non-fatal: a caller that cannot take the change still gets its broadcast, and the ETH stays
-    # in the treasury (owner-withdrawable). raw_call, not send: send's stipend (none at all on a
-    # zero refund) failed every contract caller.
-    # A fixed gas budget: a refund starved of gas would otherwise be logged as a refusal.
+    # Change goes back to a direct requester, non-fatally; the CRE path keeps it in the treasury
     if refunds and unused_fees > 0:
         assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
         if not raw_call(

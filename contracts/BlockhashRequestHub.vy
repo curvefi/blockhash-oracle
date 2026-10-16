@@ -59,12 +59,9 @@ RAIL_LZ: public(constant(uint8)) = 1
 RAIL_CRE: public(constant(uint8)) = 2
 
 BPS: constant(uint256) = 10_000
-# Gas a refund recipient gets, fixed so whoever triggers a request cannot starve it
-REFUND_GAS: constant(uint256) = 50_000
-# The value call's own cost: cold account plus value transfer, ~11.6k on Ethereum and ~19.1k on
-# Monad, which charges 10,100 for a cold account; rounded up
-REFUND_CALL_COST: constant(uint256) = 20_000
-# Gas needed to hand the recipient all of REFUND_GAS, since EIP-150 keeps 1/64 back
+REFUND_GAS: constant(uint256) = 50_000  # fixed, so the caller cannot starve a refund
+REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
+# EIP-150 keeps 1/64 back
 MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 
@@ -148,13 +145,9 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
-    @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~350_000: it pays
-           the KeystoneForwarder (~105k with three signatures), onReport itself (~110k cold) and the
-           first CCIP lane's ~60k extra
-    @param _ccip_send_gas Gas per CCIP target in that budget, at least ~250_000: one getFee and
-           ccipSend to a lane not yet touched in the transaction measured ~225_000 cold on Ethereum
-           and Base, ~240_000 on Base Sepolia. Not the ccipReceive limit, which is the destination
-           side
+    @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~350_000:
+           forwarder, onReport and the first CCIP lane's extra
+    @param _ccip_send_gas Gas per CCIP target, at least ~250_000. Not the ccipReceive limit
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
@@ -213,9 +206,7 @@ def _lz_fees(
 ) -> DynArray[uint256, MAX_N_BROADCAST]:
     """
     @dev The relay quotes 0 for a target it cannot reach, so this doubles as a peer check.
-         Headroom as on the CCIP rail: the relay forwards the fee frozen here when the read
-         response lands minutes later, and the unspent part comes back to this hub, the relay's
-         requester, and stays in the treasury
+         Headroom as on the CCIP rail, frozen until the read response; the unspent part stays here
     """
     assert len(_eids) > 0, "No targets"
     quotes: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.lz_relay.quote_broadcast_fees(
@@ -462,9 +453,7 @@ def request(
             + len(_target_selectors) * self.ccip_send_gas,
         )
 
-    # Overpayment is returned, the quote is not. Non-fatal: a caller that cannot receive ETH has no
-    # exact amount it could safely send, since quotes drift. A fixed gas budget: a refund starved
-    # of gas would otherwise be logged as a refusal.
+    # Overpayment is returned, the quote is not; non-fatally, since quotes drift
     if msg.value > spent:
         returned: uint256 = msg.value - spent
         assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
