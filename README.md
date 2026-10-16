@@ -31,7 +31,7 @@ The Curve Block Oracle consists of four main smart contracts:
     -   **Address**: `0xb10cface698eBbEeda6Fd1aC3e1687a8a3f5c5Df`
     -   Stores confirmed block hashes and decoded block headers.
     -   Uses a threshold-based consensus mechanism to validate block data. Currently, the threshold is set to 1, with `LZBlockRelay` as the sole committer.
-    -   Once a block hash is confirmed, it is immutable.
+    -   Once confirmed, a block hash changes only through the owner's `admin_apply_block`.
 
 3.  **`LZBlockRelay`** (All supported chains):
     -   **Address**: `0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2`
@@ -75,9 +75,12 @@ On read-enabled chains (such as Optimism, Arbitrum, and Base), you can request a
 ```python
 # 1. Quote the broadcast fees with headroom: they are frozen until the read response lands minutes
 #    later, and a rise in that window reverts the delivery. The unspent part is refunded.
-broadcast_fees = [f * 12 // 10 for f in relay.quote_broadcast_fees(target_chains, gas_limit=100000)]
-# The response executes every broadcast, ~150k gas each, so size its gas per target.
-read_gas_limit = 250000 + 170000 * len(target_chains)
+lz_receive_gas_limit = 150000  # 200000 for Monad, see Gas Considerations
+broadcast_fees = [
+    f * 12 // 10 for f in relay.quote_broadcast_fees(target_chains, gas_limit=lz_receive_gas_limit)
+]
+# The response executes every broadcast, ~200k gas each when cold, so size its gas per target.
+read_gas_limit = 400000 + 200000 * len(target_chains)
 # The read fee carries the broadcast fees back with the response, so quote it with their sum:
 # that value is the whole payment.
 read_fee = relay.quote_read_fee(read_gas_limit=read_gas_limit, value=sum(broadcast_fees))
@@ -86,7 +89,7 @@ read_fee = relay.quote_read_fee(read_gas_limit=read_gas_limit, value=sum(broadca
 relay.request_block_hash(
     target_chains,
     broadcast_fees,
-    lz_receive_gas_limit=100000,
+    lz_receive_gas_limit=lz_receive_gas_limit,
     read_gas_limit=read_gas_limit,
     block_number=0,  # 0 indicates the latest safe block
     value=read_fee
@@ -171,9 +174,12 @@ The Curve Block Oracle is deployed on the following chains:
 
 ### Gas Considerations
 
--   **Read Operations**: 250,000 gas plus 170,000 per broadcast target: the response sends every
-    broadcast (one target measured ~332k in total, ten ~1.66M), and a refund needs ~66k left.
--   **Broadcast Receive**: Approximately 100,000 gas per chain (LayerZero `lzReceive`).
+-   **Read Operations**: 400,000 gas plus 200,000 per broadcast target. The response sends every
+    broadcast; measured cold on a mainnet fork, one target needs ~472k and five ~1.24M, up to
+    ~565k for one when this relay's vote confirms the block, and a refund needs ~66k left.
+-   **Broadcast Receive**: 150,000 gas per chain (LayerZero `lzReceive`), about 1.5x the ~100k
+    measured on Ethereum. Monad charges more for cold reads (~138k measured for the relay alone),
+    so send it 200,000.
 -   **CCIP Receive**: 170,000 gas on every destination, see below.
 -   **Header Size**: Headers must be under 1024 bytes.
 
