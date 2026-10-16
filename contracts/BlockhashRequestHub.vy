@@ -312,6 +312,9 @@ def recover_erc20(_token: address, _to: address, _amount: uint256):
     """
     @notice Recover ERC20 tokens sent to this contract
     @dev The hub deals only in native token; a direct transfer can still land here
+    @param _token ERC20 token to recover
+    @param _to Recipient of the tokens
+    @param _amount Amount to transfer
     """
     ownable._check_owner()
 

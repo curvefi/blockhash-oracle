@@ -211,6 +211,9 @@ def recover_erc20(_token: address, _to: address, _amount: uint256):
     """
     @notice Recover ERC20 tokens sent to this contract
     @dev Data-only relay: token-bearing CCIP messages are rejected, but a direct transfer can still land here
+    @param _token ERC20 token to recover
+    @param _to Recipient of the tokens
+    @param _amount Amount to transfer
     """
     ownable._check_owner()
 
@@ -259,7 +262,6 @@ def _broadcast_block(
     # Public callers pay per send and can re-quote, so a refused destination reverts for them;
     # the CRE path skips instead: one bad lane must not undo the other sends or the commit
     refunds: bool = _broadcast_data.requester != empty(address)
-    skip_refused: bool = not refunds
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     unused_fees: uint256 = 0
 
@@ -277,10 +279,7 @@ def _broadcast_block(
         fee: uint256 = 0
         sent, message_id, fee = CCIP._try_transmit(target.chain_selector, message, target.max_fee)
         if not sent:
-            assert skip_refused, "Transmit failed"
-            # No refund on the CRE path, so nothing to add up; max_fee is caller-supplied
-            if refunds:
-                unused_fees += target.max_fee
+            assert not refunds, "Transmit failed"
             log BroadcastSkipped(
                 chain_selector=target.chain_selector,
                 block_number=_block_number,
@@ -304,7 +303,7 @@ def _broadcast_block(
     # in the treasury (owner-withdrawable). raw_call, not send: send's stipend (none at all on a
     # zero refund) failed every contract caller.
     # A fixed gas budget: a refund starved of gas would otherwise be logged as a refusal.
-    if _broadcast_data.requester != empty(address) and unused_fees > 0:
+    if refunds and unused_fees > 0:
         assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
         if not raw_call(
             _broadcast_data.requester,
