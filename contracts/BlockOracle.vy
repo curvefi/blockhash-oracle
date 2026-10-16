@@ -10,7 +10,7 @@ Notable features are:
     - Committers can submit block hashes and optionally trigger validation
     - Each block requires threshold number of matching commitments to be confirmed
     - Committers can update their votes before confirmation
-    - Once confirmed, block hashes are immutable
+    - Once confirmed, block hashes change only through the owner's admin_apply_block
     - Owner can manage committers and adjust threshold
 
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
