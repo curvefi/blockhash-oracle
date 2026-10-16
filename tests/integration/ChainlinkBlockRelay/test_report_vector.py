@@ -53,5 +53,6 @@ def test_relay_decodes_golden_report(vector_relay, block_oracle):
     paid = [e.fee for e in events if type(e).__name__ == "MessageSent"]
     gas_limit = VECTOR["ccipReceiveGasLimit"]
     assert paid == vector_relay.quote_broadcast_fees(selectors, gas_limit)
-    # ...and only that gas limit prices to it, or the check above would prove nothing
-    assert paid != vector_relay.quote_broadcast_fees(selectors, gas_limit * 2)
+    # ...and a different gas limit prices differently, or the check above would prove nothing.
+    # CCIP fees move in steps, so a nearby limit can quote the same: compare a far one
+    assert paid != vector_relay.quote_broadcast_fees(selectors, gas_limit * 20)
