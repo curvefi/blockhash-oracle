@@ -1,4 +1,5 @@
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
 from conftest import (
     ARBITRUM_EID,
@@ -8,6 +9,7 @@ from conftest import (
     CCIP_RECEIVE_GAS_LIMIT,
     CCIP_SEND_GAS,
     CCIP_TWO,
+    HUNGRY_RECEIVE_ROUNDS,
     KAVA_EID,
     LZ_ONE,
     LZ_READ_GAS_LIMIT,
@@ -194,3 +196,31 @@ def test_failed_overpayment_refund_is_logged(hub, mock_lz_relay):
     assert len(failed) == 1
     assert failed[0].amount == 10**17
     assert boa.env.get_balance(hub.address) == 10**17
+
+
+def test_overpayment_refund_does_not_depend_on_the_callers_gas(hub, mock_lz_relay):
+    """A requester contract that anyone can trigger lets them pick the gas. That choice must not
+    decide whether the overpayment comes back or is logged as a refusal."""
+    caller = boa.load(CONTRACT_CALLER, True)
+    caller.set_burn_rounds(HUNGRY_RECEIVE_ROUNDS)
+    boa.env.set_balance(caller.address, lz_cost(1) + 10**17)
+    data = hub.request.prepare_calldata(
+        RAIL_LZ,
+        LZ_ONE,
+        [],
+        PINNED_BLOCK,
+        CCIP_RECEIVE_GAS_LIMIT,
+        LZ_RECEIVE_GAS_LIMIT,
+        LZ_READ_GAS_LIMIT,
+    )
+
+    refunded = set()
+    for gas in range(100_000, 800_000, 2_000):
+        with boa.env.anchor():
+            try:
+                with boa.env.prank(caller.address):
+                    caller.execute(hub.address, data, value=lz_cost(1) + 10**17, gas=gas)
+            except BoaError:
+                continue
+            refunded.add(caller.received() > 0)
+    assert len(refunded) == 1

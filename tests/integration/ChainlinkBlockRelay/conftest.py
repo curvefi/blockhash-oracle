@@ -17,6 +17,9 @@ ARBITRUM_CHAIN_SELECTOR = 4949039107694359620  # Arbitrum One mainnet
 # Default gas limit for ccipReceive on the destination chain
 CCIP_RECEIVE_GAS_LIMIT = 150_000
 
+# ContractCaller.set_burn_rounds that makes taking ETH cost ~290k, enough to starve it
+HUNGRY_RECEIVE_ROUNDS = 3_000
+
 # Workflow identity bound by configured_relay (strict onReport enforcement requires one).
 # 62-byte Keystone metadata carrying just this workflow id (name/owner zeroed).
 EXPECTED_WORKFLOW_ID = bytes.fromhex("cc" * 32)

@@ -2,8 +2,14 @@
 
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 from boa.contracts.event_decoder import RawLogEntry
-from conftest import BASE_CHAIN_SELECTOR, ARBITRUM_CHAIN_SELECTOR, CCIP_RECEIVE_GAS_LIMIT
+from conftest import (
+    BASE_CHAIN_SELECTOR,
+    ARBITRUM_CHAIN_SELECTOR,
+    CCIP_RECEIVE_GAS_LIMIT,
+    HUNGRY_RECEIVE_ROUNDS,
+)
 
 CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
 
@@ -433,3 +439,35 @@ def test_contract_caller_rejecting_eth_still_broadcasts(
     assert failed[0].requester == caller.address
     assert failed[0].amount == quote
     assert boa.env.get_balance(configured_relay.address) == balance_before + quote
+
+
+@pytest.mark.mainnet
+def test_contract_caller_refund_does_not_depend_on_the_callers_gas(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """A requester contract that anyone can trigger lets them pick the gas. That choice must not
+    decide whether the refund lands or is logged as a refusal."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
+    _seed_confirmed_block(configured_relay, block_oracle, dev_deployer, n, h)
+
+    quote = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[0]
+    caps = [quote * 2]
+    caller = boa.load(CONTRACT_CALLER, True)
+    caller.set_burn_rounds(HUNGRY_RECEIVE_ROUNDS)
+    boa.env.set_balance(caller.address, sum(caps))
+    data = configured_relay.broadcast_block.prepare_calldata(
+        n, [BASE_CHAIN_SELECTOR], caps, CCIP_RECEIVE_GAS_LIMIT
+    )
+
+    refunded = set()
+    for gas in range(200_000, 800_000, 4_000):
+        with boa.env.anchor():
+            try:
+                with boa.env.prank(caller.address):
+                    caller.execute(configured_relay.address, data, value=sum(caps), gas=gas)
+            except BoaError:
+                continue
+            refunded.add(caller.received() > 0)
+    assert len(refunded) == 1

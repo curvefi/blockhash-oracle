@@ -81,6 +81,12 @@ exports: (
 ################################################################
 
 MAX_N_BROADCAST: constant(uint256) = 32
+# Gas a refund recipient gets, fixed so whoever triggers a broadcast cannot starve it
+REFUND_GAS: constant(uint256) = 50_000
+# The value call's own cost (cold account plus value transfer, ~11.6k), rounded up
+REFUND_CALL_COST: constant(uint256) = 15_000
+# Gas needed to hand the recipient all of REFUND_GAS, since EIP-150 keeps 1/64 back
+MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 ################################################################
 #                            STORAGE                           #
@@ -297,8 +303,16 @@ def _broadcast_block(
     # Non-fatal: a caller that cannot take the change still gets its broadcast, and the ETH stays
     # in the treasury (owner-withdrawable). raw_call, not send: send's stipend (none at all on a
     # zero refund) failed every contract caller.
+    # A fixed gas budget: a refund starved of gas would otherwise be logged as a refusal.
     if _broadcast_data.requester != empty(address) and unused_fees > 0:
-        if not raw_call(_broadcast_data.requester, b"", value=unused_fees, revert_on_failure=False):
+        assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
+        if not raw_call(
+            _broadcast_data.requester,
+            b"",
+            value=unused_fees,
+            gas=REFUND_GAS,
+            revert_on_failure=False,
+        ):
             log RefundFailed(requester=_broadcast_data.requester, amount=unused_fees)
     log BlockHashBroadcast(
         block_number=_block_number,
