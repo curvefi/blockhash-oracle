@@ -138,7 +138,6 @@ def __init__(
     @notice Initialize contract with core settings
     @dev Can only be called once, assumes caller is owner, sets as delegate
     @param _endpoint LayerZero endpoint address
-    @param _lz_receive_gas_limit Gas limit for lzReceive
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
@@ -226,6 +225,9 @@ def recover_erc20(_token: address, _to: address, _amount: uint256):
     """
     @notice Recover ERC20 tokens sent to this contract
     @dev Data-only relay, but a direct transfer can still land here
+    @param _token ERC20 token to recover
+    @param _to Recipient of the tokens
+    @param _amount Amount to transfer
     """
     ownable._check_owner()
 
