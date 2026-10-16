@@ -81,7 +81,9 @@ exports: (
 ################################################################
 
 MAX_N_BROADCAST: constant(uint256) = 32
-# Gas a refund recipient gets, fixed so whoever triggers a broadcast cannot starve it
+# Gas a refund recipient gets, fixed so whoever triggers a broadcast cannot starve it. Keep it far
+# below the CRE forwarder's ~160k routing minimum: the lock makes supportsInterface revert, so a
+# refund callback that could route a pending report would burn it
 REFUND_GAS: constant(uint256) = 50_000
 # The value call's own cost: cold account plus value transfer, ~11.6k on Ethereum and ~19.1k on
 # Monad, which charges 10,100 for a cold account; rounded up

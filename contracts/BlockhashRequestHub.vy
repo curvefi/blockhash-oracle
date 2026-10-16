@@ -148,10 +148,12 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
-    @param _base_on_report_gas Fixed part of the gas the workflow forwards into onReport
-    @param _ccip_send_gas Gas per CCIP target in that budget, at least ~220_000: one getFee and
-           ccipSend measured ~195_500 on Ethereum mainnet, and less makes 4+ target requests revert.
-           Not the ccipReceive limit, which is the destination side
+    @param _base_on_report_gas Fixed part of the writeReport gas limit, which also pays the
+           KeystoneForwarder, at least ~250_000: onReport alone measured ~110k cold on Ethereum
+           mainnet, and the first CCIP lane costs ~60k more than the others
+    @param _ccip_send_gas Gas per CCIP target in that budget, at least ~240_000: one getFee and
+           ccipSend to a lane not yet touched in the transaction measured ~226_000 cold on Ethereum
+           mainnet. Not the ccipReceive limit, which is the destination side
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
@@ -211,7 +213,8 @@ def _lz_fees(
     """
     @dev The relay quotes 0 for a target it cannot reach, so this doubles as a peer check.
          Headroom as on the CCIP rail: the relay forwards the fee frozen here when the read
-         response lands minutes later, and the endpoint refunds the surplus to the requester
+         response lands minutes later, and the unspent part comes back to this hub, the relay's
+         requester, and stays in the treasury
     """
     assert len(_eids) > 0, "No targets"
     quotes: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.lz_relay.quote_broadcast_fees(
