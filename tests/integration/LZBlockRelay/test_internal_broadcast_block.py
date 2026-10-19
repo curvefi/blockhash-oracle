@@ -43,6 +43,7 @@ def test_broadcast_block(forked_env, lz_block_relay, dev_deployer, block_data):
             test_block_number,
             test_block_hash,
             (broadcast_targets, 150_000, dev_deployer),
+            sum(test_fees),
             value=sum(test_fees),
         )
 

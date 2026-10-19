@@ -155,7 +155,7 @@ def _decode_block_header(encoded_header: Bytes[BLOCK_HEADER_SIZE]) -> BlockHeade
 @internal
 def _skip_rlp_list_header(encoded: Bytes[BLOCK_HEADER_SIZE], pos: uint256) -> uint256:
     """@dev Returns position after list header"""
-    first_byte: uint256 = convert(slice(encoded, 0, 1), uint256)
+    first_byte: uint256 = convert(slice(encoded, pos, 1), uint256)
     assert first_byte >= RLP_LIST_SHORT_START, "Not a list"
     if first_byte <= RLP_LIST_LONG_START:
         return pos + 1
