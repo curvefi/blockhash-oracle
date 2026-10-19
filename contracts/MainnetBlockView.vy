@@ -22,8 +22,8 @@ def get_blockhash(
 ) -> (uint256, bytes32):
     """
     @notice Get block hash for a given block number.
-    @dev The valid range for historical block hashes is between the last 64
-         and the last 8192 blocks.
+    @dev The valid range for historical block hashes is [block.number - 8191, block.number - 65],
+         both ends inclusive.
     @param _block_number Block number to get hash for, defaults to block.number - 65.
     @param _avoid_failure If True, returns (0, 0x0) on failure instead of reverting.
     @return Tuple of (actual block number, block hash).
@@ -37,8 +37,8 @@ def get_blockhash(
         requested_block_number = block.number - 65
 
     # Check for invalid conditions first to exit early.
-    # The requested block must be at least 64 blocks old for reorg protection
-    # and not more than 8192 blocks old, which is the EVM's limit post EIP-2935.
+    # The requested block must be at least 65 blocks old for reorg protection
+    # and at most 8191 blocks old, one inside the EVM's 8192 limit post EIP-2935.
     is_too_recent: bool = requested_block_number >= block.number - 64
     is_too_old: bool = requested_block_number <= block.number - 8192
 
