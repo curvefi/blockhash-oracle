@@ -208,11 +208,11 @@ opcodes in a hard fork, when `ccipReceive` or `BlockOracle.commit_block` change,
 of committers grows. If a chain needs more than ~130k, raise the shared limit; if the spread between
 chains grows, per-destination limits (audit finding #057) become worth their cost.
 
-Up to 32 committers are allowed, but these limits fit only a few more than the two measured: at
-~4.4k each on standard-EVM chains and ~8.4k on Monad, which prices cold reads higher, 150k leaves
-room for about fifteen more on standard-EVM chains and two on Monad. The
-same count runs in `lzReceive` when a peer delivers a block, so raise both receive limits before
-adding committers.
+Up to 32 committers are allowed, but these limits fit only a few more than the two measured. Each
+costs ~4.4k on standard-EVM chains, ~8.4k on Monad and ~11k on Polygon, which price cold reads
+higher: 150k fits about fifteen more in `ccipReceive` on standard-EVM chains and two on Monad and
+Polygon. `lzReceive` starts ~30k higher and fits about half as many, none more on Polygon. Raise
+both receive limits before adding committers.
 
 A delivery of a block this relay already voted for costs ~19k instead of ~35k: the relay reads its
 own vote and skips the oracle call. That read costs ~650 gas on every other delivery, so it pays for
