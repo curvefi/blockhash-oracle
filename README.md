@@ -175,8 +175,8 @@ The Curve Block Oracle is deployed on the following chains:
 ### Gas Considerations
 
 -   **Read Operations**: 400,000 gas plus 200,000 per broadcast target. The response sends every
-    broadcast; measured cold on a mainnet fork, one target needs ~472k and five ~1.24M, up to
-    ~565k for one when this relay's vote confirms the block, and a refund needs ~66k left.
+    broadcast; measured cold, one target needs ~490k and five ~1.24M, and ~570k for one when the
+    fee headroom leaves change, since a refund needs over ~71k left.
 -   **Broadcast Receive**: 150,000 gas per chain (LayerZero `lzReceive`), about 1.5x the ~100k
     measured on Ethereum. Monad charges more for cold reads (~138k measured for the relay alone),
     so send it 200,000.

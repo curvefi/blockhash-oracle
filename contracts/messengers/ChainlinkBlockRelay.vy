@@ -372,8 +372,7 @@ def _broadcast_confirmed(
 @reentrant
 def __default__():
     """
-    @notice Receive ETH: treasury funding and public overpayment
-    @dev CCIP does not refund Router overpayment, so any surplus accrues here (owner-withdrawable)
+    @notice Receive ETH: treasury funding; unspent CRE max_fee and failed refunds also stay here
     """
     pass
 

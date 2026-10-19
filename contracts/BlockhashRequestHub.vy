@@ -80,7 +80,7 @@ base_fee: public(uint256)  # flat charge per CRE request, covers one workflow ex
 fee_per_target: public(uint256)  # added per CCIP target, tracks onReport's per-send gas
 fee_multiplier_bps: public(uint256)  # headroom on CCIP quotes, they drift before onReport fires
 
-# Gas the workflow forwards into onReport; on-chain so it retunes without a workflow redeploy
+# writeReport gas limit = base + ccip_send_gas per target; on-chain so it retunes without a redeploy
 base_on_report_gas: public(uint256)
 ccip_send_gas: public(uint256)
 
@@ -280,7 +280,7 @@ def set_fees(_base_fee: uint256, _fee_per_target: uint256, _fee_multiplier_bps: 
 @external
 def set_gas_params(_base_on_report_gas: uint256, _ccip_send_gas: uint256):
     """
-    @notice Retune the gas the workflow forwards into onReport
+    @notice Retune the writeReport gas limit: forwarder, onReport and each CCIP send
     @dev Under-estimating strands a request: writeReport runs out of gas after fees were pushed
     """
     ownable._check_owner()
@@ -389,8 +389,8 @@ def request(
                          room to spare - head - 100 is comfortable.
     @param _ccip_gas Gas limit for ccipReceive on each CCIP target; 170_000 covers every measured
                      chain (README, "CCIP receive gas limit")
-    @param _lz_gas Gas limit for lzReceive on each LayerZero target
-    @param _read_gas Gas limit for the lzRead return message
+    @param _lz_gas Gas limit for lzReceive on each LayerZero target; 150_000, 200_000 on Monad
+    @param _read_gas Gas limit for the lzRead return message; 400_000 + 200_000 per target
     @return Request id, for correlating the emitted logs with delivery
     """
     assert _rails & (RAIL_LZ | RAIL_CRE) != 0, "No rail selected"

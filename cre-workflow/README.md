@@ -29,7 +29,7 @@ Failures are best-effort: a failed broadcast to one relay does not stop the othe
         { "selector": "5009297550715157269", "fees": "1000000000000000" }
       ],
       "ccipReceiveGasLimit": "170000",
-      "onReportGasLimit": "500000"
+      "onReportGasLimit": "600000"
     }
   ]
 }
