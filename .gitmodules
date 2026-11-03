@@ -1,4 +1,7 @@
 [submodule "contracts/modules/oapp_vyper"]
 	path = contracts/modules/oapp_vyper
-	url = git@github.com:curvefi/LayerZero-v2-vyper.git
+	url = https://github.com/curvefi/LayerZero-v2-vyper.git
 	branch = blockhash-oracle
+[submodule "contracts/modules/chainlink"]
+	path = contracts/modules/chainlink
+	url = https://github.com/curvefi/Chainlink-vyper.git
