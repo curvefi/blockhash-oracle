@@ -145,8 +145,8 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
-    @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~350_000:
-           forwarder, onReport and the first CCIP lane's extra
+    @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~700_000:
+           the relay holds 500k back for each CCIP call, one target measures ~886k end to end
     @param _ccip_send_gas Gas per CCIP target, at least ~250_000. Not the ccipReceive limit
     """
     ownable.__init__()
