@@ -31,7 +31,7 @@ The Curve Block Oracle consists of four main smart contracts:
     -   **Address**: `0xb10cface698eBbEeda6Fd1aC3e1687a8a3f5c5Df`
     -   Stores confirmed block hashes and decoded block headers.
     -   Uses a threshold-based consensus mechanism to validate block data. Currently, the threshold is set to 1, with `LZBlockRelay` as the sole committer.
-    -   Once a block hash is confirmed, it is immutable.
+    -   Once confirmed, a block hash changes only through the owner's `admin_apply_block`.
 
 3.  **`LZBlockRelay`** (All supported chains):
     -   **Address**: `0xfacefeed69e0eb9dB6Ad8Cb0883fC45Df7561Dc2`
@@ -73,18 +73,26 @@ bytes32 stateRoot = IBlockOracle(ORACLE_ADDRESS).get_state_root(blockNumber);
 On read-enabled chains (such as Optimism, Arbitrum, and Base), you can request a block hash using the following steps:
 
 ```python
-# 1. Quote the required fees
-read_fee = relay.quote_read_fee(read_gas_limit=200000, value=0)
-broadcast_fees = relay.quote_broadcast_fees(target_chains, gas_limit=100000)
+# 1. Quote the broadcast fees with headroom: they are frozen until the read response lands minutes
+#    later, and a rise in that window reverts the delivery. The unspent part is refunded.
+lz_receive_gas_limit = 150000  # 200000 for Monad, see Gas Considerations
+broadcast_fees = [
+    f * 12 // 10 for f in relay.quote_broadcast_fees(target_chains, gas_limit=lz_receive_gas_limit)
+]
+# The response executes every broadcast, ~200k gas each when cold, so size its gas per target.
+read_gas_limit = 400000 + 200000 * len(target_chains)
+# The read fee carries the broadcast fees back with the response, so quote it with their sum:
+# that value is the whole payment.
+read_fee = relay.quote_read_fee(read_gas_limit=read_gas_limit, value=sum(broadcast_fees))
 
 # 2. Request the block hash
 relay.request_block_hash(
     target_chains,
     broadcast_fees,
-    lz_receive_gas_limit=100000,
-    read_gas_limit=200000,
+    lz_receive_gas_limit=lz_receive_gas_limit,
+    read_gas_limit=read_gas_limit,
     block_number=0,  # 0 indicates the latest safe block
-    value=read_fee + sum(broadcast_fees)
+    value=read_fee
 )
 ```
 
@@ -166,9 +174,37 @@ The Curve Block Oracle is deployed on the following chains:
 
 ### Gas Considerations
 
--   **Read Operations**: Approximately 200,000 gas is recommended.
--   **Broadcast Receive**: Approximately 100,000 gas per chain.
+-   **Read Operations**: 400,000 gas plus 200,000 per broadcast target. The response sends every
+    broadcast; measured cold, one target needs ~490k and five ~1.24M, and ~570k for one when the
+    fee headroom leaves change, since a refund needs over ~71k left.
+-   **Broadcast Receive**: 150,000 gas per chain (LayerZero `lzReceive`), about 1.5x the ~100k
+    measured on Ethereum. Monad charges more for cold reads (~138k measured for the relay alone),
+    so send it 200,000.
+-   **CCIP Receive**: 170,000 gas on every destination, see below.
 -   **Header Size**: Headers must be under 1024 bytes.
+
+### CCIP receive gas limit
+
+`ChainlinkBlockRelay` sends one `ccipReceive` gas limit to every destination, and CCIP charges for
+the limit requested, not the gas used. It is set to **170,000**: the highest measured cost is
+~147k (Monad, when a single vote confirms the block), so this leaves ~15% headroom there and
+roughly 2x on standard-EVM chains.
+
+`ccipReceive` gas measured on each chain's own node, September 2026
+(`scripts/ccip_gas_probe.py`):
+
+| Chains | First vote (threshold 2) | Completing vote (threshold 2) | Sole vote applies (threshold 1) | Already applied |
+|---|---|---|---|---|
+| Ethereum, Arbitrum, Avalanche, Base, BSC, Celo, Fraxtal, Gnosis, HyperEVM, Ink, Mantle, Optimism, Plasma, Plume, Sonic, TAC, Taiko, Unichain, XDC, X Layer | 68k | 77.5k | 94.6k | 16k |
+| Polygon | 95k | 106k | 124k | 30k |
+| Monad | 122k | 130k | 147k | 47k |
+
+Etherlink (its RPC ignores `eth_call` state overrides) and Corn (no working RPC) were not measured.
+
+**Re-run the probe and update this table** before adding a CCIP destination, when a chain reprices
+opcodes in a hard fork, and when `ccipReceive` or `BlockOracle.commit_block` change. If a chain
+needs more than ~150k, raise the shared limit; if the spread between chains grows, per-destination
+limits (audit finding #057) become worth their cost.
 
 ### RLP Header Decoding
 
