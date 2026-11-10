@@ -8,12 +8,23 @@ BOA_CACHE = False
 LZ_ENDPOINT = "0x1a44076050125825900e736c501f859c50fE728c"  # mainnet
 LZ_READ_CHANNEL = 4294967295  # max uint32 value as per standard
 LZ_EID = 30101  # Ethereum mainnet
+# ContractCaller.set_burn_rounds that makes taking ETH cost ~290k, enough to starve it
+HUNGRY_RECEIVE_ROUNDS = 3_000
+# Taking ETH costs ~72k cold: over the initial refund gas, under its cap
+RECEIVE_ROUNDS_OVER_INITIAL_REFUND = 500
+# The Funds module's initial values and bounds
+INITIAL_REFUND_GAS = 50_000
+MAX_REFUND_GAS = 100_000
+MIN_REFUND_CALL_COST = 20_000
 EMPTY_ADDRESS = boa.eval("empty(address)")
+
+# Tracked test fixture, resolved relative to this file so it works from any CWD.
+CHAINS_JSON = os.path.join(os.path.dirname(__file__), "chains.json")
 
 ALL_CHAINS = []
 OP_CHAINS = []
 NON_OP_CHAINS = []
-with open("chains.json", "r") as file:
+with open(CHAINS_JSON, "r") as file:
     chains = json.load(file)
     ALL_CHAINS = chains.keys()
     for chain in chains:
@@ -25,7 +36,7 @@ with open("chains.json", "r") as file:
 
 @pytest.fixture(scope="session")
 def chains():
-    with open("chains.json", "r") as file:
+    with open(CHAINS_JSON, "r") as file:
         return json.load(file)
 
 
