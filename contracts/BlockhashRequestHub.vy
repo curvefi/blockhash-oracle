@@ -26,8 +26,6 @@ Fees are not refunded past the quote.
 #                           INTERFACES                         #
 ################################################################
 
-from ethereum.ercs import IERC20
-
 # Imported for their interfaces, so a relay signature change breaks this contract's compilation
 from . import BlockOracle
 from .messengers import ChainlinkBlockRelay
@@ -48,6 +46,18 @@ exports: (
     ownable.renounce_ownership,
 )
 
+# Fixed-gas refunds, budget retunable by the owner, and the owner's withdrawals
+from .modules import Funds
+
+initializes: Funds[ownable := ownable]
+exports: (
+    Funds.refund_gas,
+    Funds.refund_call_cost,
+    Funds.set_refund_gas,
+    Funds.withdraw_eth,
+    Funds.recover_erc20,
+)
+
 
 ################################################################
 #                           CONSTANTS                          #
@@ -59,10 +69,6 @@ RAIL_LZ: public(constant(uint8)) = 1
 RAIL_CRE: public(constant(uint8)) = 2
 
 BPS: constant(uint256) = 10_000
-REFUND_GAS: constant(uint256) = 50_000  # fixed, so the caller cannot starve a refund
-REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
-# EIP-150 keeps 1/64 back
-MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 
 ################################################################
@@ -120,10 +126,6 @@ event SetGasParams:
     base_on_report_gas: uint256
     ccip_send_gas: uint256
 
-event RefundFailed:
-    requester: indexed(address)
-    amount: uint256
-
 ################################################################
 #                          CONSTRUCTOR                         #
 ################################################################
@@ -151,6 +153,7 @@ def __init__(
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+    Funds.__init__()
 
     assert _block_oracle != empty(address), "Oracle not set"
     assert _fee_multiplier_bps >= BPS, "Multiplier below 100%"
@@ -291,36 +294,6 @@ def set_gas_params(_base_on_report_gas: uint256, _ccip_send_gas: uint256):
     log SetGasParams(base_on_report_gas=_base_on_report_gas, ccip_send_gas=_ccip_send_gas)
 
 
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @dev Surcharges accrue here; CCIP fees do not, they are pushed to the relay on request
-    """
-    ownable._check_owner()
-
-    assert self.balance >= _amount, "Insufficient balance"
-    # raw_call, not send: a multisig or agent owner needs more than send's 2300-gas stipend
-    raw_call(msg.sender, b"", value=_amount)
-
-
-@external
-def recover_erc20(_token: address, _to: address, _amount: uint256):
-    """
-    @notice Recover ERC20 tokens sent to this contract
-    @dev The hub deals only in native token; a direct transfer can still land here
-    @param _token ERC20 token to recover
-    @param _to Recipient of the tokens
-    @param _amount Amount to transfer
-    """
-    ownable._check_owner()
-
-    # default_return_value: tokens that return nothing on a successful transfer (USDT) are recoverable
-    assert extcall IERC20(_token).transfer(
-        _to, _amount, default_return_value=True
-    ), "Transfer failed"
-
-
 ################################################################
 #                     EXTERNAL FUNCTIONS                       #
 ################################################################
@@ -457,8 +430,6 @@ def request(
     # Overpayment is returned, the quote is not; non-fatally, since quotes drift
     if msg.value > spent:
         returned: uint256 = msg.value - spent
-        assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
-        if not raw_call(msg.sender, b"", value=returned, gas=REFUND_GAS, revert_on_failure=False):
-            log RefundFailed(requester=msg.sender, amount=returned)
+        Funds._refund(msg.sender, returned)
 
     return request_id

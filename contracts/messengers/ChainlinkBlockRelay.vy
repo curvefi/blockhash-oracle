@@ -22,7 +22,6 @@ This contract should be deployed on multiple chains along with BlockOracle and M
 ################################################################
 
 from ..modules.chainlink.src import IReceiver
-from ethereum.ercs import IERC20
 
 implements: IReceiver
 
@@ -45,6 +44,18 @@ exports: (
     ownable.owner,
     ownable.transfer_ownership,
     ownable.renounce_ownership,
+)
+
+# Fixed-gas refunds, budget retunable by the owner, and the owner's withdrawals
+from ..modules import Funds
+
+initializes: Funds[ownable := ownable]
+exports: (
+    Funds.refund_gas,
+    Funds.refund_call_cost,
+    Funds.set_refund_gas,
+    Funds.withdraw_eth,
+    Funds.recover_erc20,
 )
 
 # Import CREReceiver module for cross-chain messaging
@@ -84,12 +95,6 @@ exports: (
 ################################################################
 
 MAX_N_BROADCAST: constant(uint256) = 32
-# Fixed so the caller cannot starve a refund, and far below the forwarder's ~160k routing minimum:
-# under the lock, a callback that could route a pending report would burn it
-REFUND_GAS: constant(uint256) = 50_000
-REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
-# EIP-150 keeps 1/64 back
-MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 ################################################################
 #                            STORAGE                           #
@@ -137,10 +142,6 @@ event MessageSent:
     block_hash: indexed(bytes32)
     fee: uint256
 
-event RefundFailed:
-    requester: indexed(address)
-    amount: uint256
-
 
 ################################################################
 #                          CONSTRUCTOR                         #
@@ -158,6 +159,7 @@ def __init__(
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+    Funds.__init__()
 
     CREReceiver.__init__(_forwarder_address)
 
@@ -193,37 +195,6 @@ def set_block_oracle(_oracle: address):
 
     self.block_oracle = IBlockOracle(_oracle)
     log SetBlockOracle(oracle=_oracle)
-
-
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @dev ETH can be accumulated from unused CCIP fees
-    @param _amount Amount to withdraw
-    """
-    ownable._check_owner()
-
-    assert self.balance >= _amount, "Insufficient balance"
-    # raw_call, not send: a multisig or agent owner needs more than send's 2300-gas stipend
-    raw_call(msg.sender, b"", value=_amount)
-
-
-@external
-def recover_erc20(_token: address, _to: address, _amount: uint256):
-    """
-    @notice Recover ERC20 tokens sent to this contract
-    @dev Data-only relay: token-bearing CCIP messages are rejected, but a direct transfer can still land here
-    @param _token ERC20 token to recover
-    @param _to Recipient of the tokens
-    @param _amount Amount to transfer
-    """
-    ownable._check_owner()
-
-    # default_return_value: tokens that return nothing on a successful transfer (USDT) are recoverable
-    assert extcall IERC20(_token).transfer(
-        _to, _amount, default_return_value=True
-    ), "Transfer failed"
 
 
 ################################################################
@@ -303,15 +274,7 @@ def _broadcast_block(
 
     # Change goes back to a direct requester, non-fatally; the CRE path keeps it in the treasury
     if refunds and unused_fees > 0:
-        assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
-        if not raw_call(
-            _broadcast_data.requester,
-            b"",
-            value=unused_fees,
-            gas=REFUND_GAS,
-            revert_on_failure=False,
-        ):
-            log RefundFailed(requester=_broadcast_data.requester, amount=unused_fees)
+        Funds._refund(_broadcast_data.requester, unused_fees)
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,

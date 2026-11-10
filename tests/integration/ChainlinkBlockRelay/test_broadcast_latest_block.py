@@ -9,6 +9,9 @@ from conftest import (
     ARBITRUM_CHAIN_SELECTOR,
     CCIP_RECEIVE_GAS_LIMIT,
     HUNGRY_RECEIVE_ROUNDS,
+    MAX_REFUND_GAS,
+    MIN_REFUND_CALL_COST,
+    RECEIVE_ROUNDS_OVER_INITIAL_REFUND,
 )
 
 CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
@@ -471,3 +474,33 @@ def test_contract_caller_refund_does_not_depend_on_the_callers_gas(
                 continue
             refunded.add(caller.received() > 0)
     assert len(refunded) == 1
+
+
+@pytest.mark.mainnet
+def test_contract_caller_refund_gets_the_configured_gas(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """The refund gets refund_gas, not a compiled-in figure."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
+    _seed_confirmed_block(configured_relay, block_oracle, dev_deployer, n, h)
+
+    quote = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[0]
+    caller = boa.load(CONTRACT_CALLER, True)
+    caller.set_burn_rounds(RECEIVE_ROUNDS_OVER_INITIAL_REFUND)
+    boa.env.set_balance(caller.address, 2 * quote)
+    data = configured_relay.broadcast_block.prepare_calldata(
+        n, [BASE_CHAIN_SELECTOR], [2 * quote], CCIP_RECEIVE_GAS_LIMIT
+    )
+
+    def received():
+        with boa.env.anchor():
+            with boa.env.prank(caller.address):
+                caller.execute(configured_relay.address, data, value=2 * quote)
+            return caller.received()
+
+    assert received() == 0  # the initial budget is too little for this receiver
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_refund_gas(MAX_REFUND_GAS, MIN_REFUND_CALL_COST)
+    assert received() == quote
