@@ -15,6 +15,8 @@ from conftest import (
 )
 
 CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
+INTERFACE_PROBER = "tests/mocks/InterfaceProber.vy"
+IRECEIVER_ID = bytes.fromhex("805f2132")
 
 
 def _seed_confirmed_block(relay, block_oracle, dev_deployer, block_number, block_hash):
@@ -504,3 +506,27 @@ def test_contract_caller_refund_gets_the_configured_gas(
     with boa.env.prank(dev_deployer):
         configured_relay.set_refund_gas(MAX_REFUND_GAS, MIN_REFUND_CALL_COST)
     assert received() == quote
+
+
+@pytest.mark.mainnet
+def test_refund_callback_still_sees_a_report_receiver(
+    forked_env, configured_relay, block_oracle, dev_deployer, block_data
+):
+    """The CRE forwarder and CCIP's OffRamp ask supportsInterface before delivering. Asked while the
+    relay holds its lock (here from a refund callback), it must still say yes, so a delivery under
+    the lock fails retryably in onReport or ccipReceive instead of being lost as no receiver."""
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        configured_relay.set_receiver(BASE_CHAIN_SELECTOR, boa.env.generate_address())
+    _seed_confirmed_block(configured_relay, block_oracle, dev_deployer, n, h)
+
+    quote = configured_relay.quote_broadcast_fees([BASE_CHAIN_SELECTOR], CCIP_RECEIVE_GAS_LIMIT)[0]
+    prober = boa.load(INTERFACE_PROBER, IRECEIVER_ID)
+    boa.env.set_balance(prober.address, 2 * quote)
+    data = configured_relay.broadcast_block.prepare_calldata(
+        n, [BASE_CHAIN_SELECTOR], [2 * quote], CCIP_RECEIVE_GAS_LIMIT
+    )
+    with boa.env.prank(prober.address):
+        prober.execute(configured_relay.address, data, value=2 * quote)
+
+    assert prober.answer() is True
