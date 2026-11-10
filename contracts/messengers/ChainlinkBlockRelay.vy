@@ -68,6 +68,9 @@ initializes: CCIP[ownable := ownable]
 exports: (
     CCIP.set_router,
     CCIP.router,
+    CCIP.set_router_call_gas,
+    CCIP.router_call_gas,
+    CCIP.router_call_cost,
     CCIP.selector_to_receiver,
     CCIP.selector_to_sender,
     CCIP.set_peer,
@@ -87,8 +90,6 @@ REFUND_GAS: constant(uint256) = 50_000
 REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
 # EIP-150 keeps 1/64 back
 MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
-# Per getFee and per ccipSend: ~190k cold today, ~400k worst case under Glamsterdam
-CCIP_CALL_GAS: constant(uint256) = 500_000
 
 ################################################################
 #                            STORAGE                           #
@@ -279,9 +280,7 @@ def _broadcast_block(
         sent: bool = False
         message_id: bytes32 = empty(bytes32)
         fee: uint256 = 0
-        sent, message_id, fee = CCIP._try_transmit(
-            target.chain_selector, message, target.max_fee, CCIP_CALL_GAS
-        )
+        sent, message_id, fee = CCIP._try_transmit(target.chain_selector, message, target.max_fee)
         if not sent:
             assert not refunds, "Transmit failed"
             log BroadcastSkipped(
