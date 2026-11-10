@@ -36,9 +36,9 @@ BLOCK_NUMBER = 21_000_000
 BLOCK_HASH = bytes.fromhex("ab" * 32)
 
 # Storage slots from `vyper -f layout`; re-check them if either contract's storage changes
-RELAY_ROUTER_SLOT = 5
-RELAY_SENDERS_SLOT = 7
-RELAY_ORACLE_SLOT = 8
+RELAY_ROUTER_SLOT = 7
+RELAY_SENDERS_SLOT = 11
+RELAY_ORACLE_SLOT = 12
 ORACLE_BLOCK_HASH_SLOT = 1
 ORACLE_LAST_CONFIRMED_SLOT = 2
 ORACLE_IS_COMMITTER_SLOT = 44
