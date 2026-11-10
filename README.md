@@ -176,12 +176,27 @@ The Curve Block Oracle is deployed on the following chains:
 
 -   **Read Operations**: 400,000 gas plus 200,000 per broadcast target. The response sends every
     broadcast; measured cold, one target needs ~490k and five ~1.24M, and ~570k for one when the
-    fee headroom leaves change, since a refund needs over ~71k left.
+    fee headroom leaves change, since a refund needs over ~75k left. That holds at the default
+    refund settings: raising `refund_gas` or `refund_call_cost` adds `refund_gas` × 64/63 plus the
+    cost increase to every response that leaves change, ~51k at the 100k cap.
 -   **Broadcast Receive**: 150,000 gas per chain (LayerZero `lzReceive`), about 1.5x the ~100k
     measured on Ethereum. Monad charges more for cold reads (~138k measured for the relay alone),
     so send it 200,000.
 -   **CCIP Receive**: 150,000 gas on every destination, see below.
 -   **Header Size**: Headers must be under 1024 bytes.
+
+### Retuning gas without a redeploy
+
+The owner can retune these, but gas limits already fixed in pending requests do not follow:
+
+-   **`router_call_gas` / `router_call_cost`** (Chainlink relay, 500k / 25k): each CCIP send in
+    `onReport` holds `router_call_gas` × 64/63 + `router_call_cost` back. To raise them, first raise
+    every `writeReport` gas limit (the hub's `base_on_report_gas`, the keeper's `BASE_ON_REPORT_GAS`,
+    any workflow `onReportGasLimit`) and let pending reports land. To lower them, lower the relay
+    first.
+-   **`refund_gas` / `refund_call_cost`** (hub and both relays, 50k / 20k): an LZ read response that
+    leaves change refunds it, so raise the read gas first and let pending reads land. The hub and the
+    Chainlink relay refund their own caller, who sends the gas.
 
 ### CCIP receive gas limit
 
