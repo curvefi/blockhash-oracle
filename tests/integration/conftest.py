@@ -10,6 +10,12 @@ LZ_READ_CHANNEL = 4294967295  # max uint32 value as per standard
 LZ_EID = 30101  # Ethereum mainnet
 # ContractCaller.set_burn_rounds that makes taking ETH cost ~290k, enough to starve it
 HUNGRY_RECEIVE_ROUNDS = 3_000
+# Taking ETH costs ~72k cold: over the initial refund gas, under its cap
+RECEIVE_ROUNDS_OVER_INITIAL_REFUND = 500
+# The Funds module's initial values and bounds
+INITIAL_REFUND_GAS = 50_000
+MAX_REFUND_GAS = 100_000
+MIN_REFUND_CALL_COST = 20_000
 EMPTY_ADDRESS = boa.eval("empty(address)")
 
 # Tracked test fixture, resolved relative to this file so it works from any CWD.
