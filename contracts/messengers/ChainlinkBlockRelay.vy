@@ -505,7 +505,9 @@ def ccipReceive(_message: CCIP.Any2EVMMessage):
     self._commit_block(block_number, block_hash)
 
 
+# Reentrant: the forwarder and the offramp ask before delivering, and a lock-reverted answer reads as no receiver
 @view
 @external
+@reentrant
 def supportsInterface(_interface_id: bytes4) -> bool:
     return _interface_id in CCIP.SUPPORTED_INTERFACES or _interface_id in CREReceiver.SUPPORTED_INTERFACES
