@@ -1,0 +1,16 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate-bindings": "bun run scripts/generate-bindings.ts"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.6.0",
+    "viem": "2.34.0"
+  },
+  "overrides": {
+    "ws": ">=8.21.0"
+  }
+}

@@ -32,6 +32,7 @@ interface IBlockOracle:
     def commit_block(block_number: uint256, block_hash: bytes32) -> bool: nonpayable
     def last_confirmed_block_number() -> uint256: view
     def get_block_hash(block_number: uint256) -> bytes32: view
+    def committer_votes(committer: address, block_number: uint256) -> bytes32: view
 
 
 ################################################################
@@ -46,6 +47,18 @@ exports: (
     ownable.owner,
     ownable.transfer_ownership,
     ownable.renounce_ownership,
+)
+
+# Fixed-gas refunds, budget retunable by the owner, and the owner's withdrawals
+from ..modules import Funds
+
+initializes: Funds[ownable := ownable]
+exports: (
+    Funds.refund_gas,
+    Funds.refund_call_cost,
+    Funds.set_refund_gas,
+    Funds.withdraw_eth,
+    Funds.recover_erc20,
 )
 
 # Import LayerZero module for cross-chain messaging
@@ -106,6 +119,7 @@ received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 #                            EVENTS                            #
 ################################################################
 
+
 event BlockHashBroadcast:
     block_number: indexed(uint256)
     block_hash: indexed(bytes32)
@@ -124,10 +138,10 @@ def __init__(
     @notice Initialize contract with core settings
     @dev Can only be called once, assumes caller is owner, sets as delegate
     @param _endpoint LayerZero endpoint address
-    @param _lz_receive_gas_limit Gas limit for lzReceive
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+    Funds.__init__()
 
     OApp.__init__(_endpoint, tx.origin)  # origin also set as delegate
 
@@ -193,19 +207,6 @@ def set_block_oracle(_oracle: address):
     self.block_oracle = IBlockOracle(_oracle)
 
 
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @dev ETH can be accumulated from LZ refunds
-    @param _amount Amount to withdraw
-    """
-    ownable._check_owner()
-
-    assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
-
-
 ################################################################
 #                     INTERNAL FUNCTIONS                       #
 ################################################################
@@ -217,6 +218,14 @@ def _commit_block(_block_number: uint256, _block_hash: bytes32):
     @notice Commit block hash to oracle
     """
     assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    # Skip if block already applied with the same hash
+    applied_blockhash: bytes32 = staticcall self.block_oracle.get_block_hash(_block_number)
+    if applied_blockhash == _block_hash:
+        return
+    assert applied_blockhash == empty(bytes32), "Different blockhash already applied"
+    # Skip a vote this relay already cast; if a lowered threshold now suffices, apply_block is permissionless
+    if staticcall self.block_oracle.committer_votes(self, _block_number) == _block_hash:
+        return
     extcall self.block_oracle.commit_block(_block_number, _block_hash)
 
 
@@ -308,12 +317,14 @@ def _broadcast_block(
     _block_number: uint256,
     _block_hash: bytes32,
     _broadcast_data: BroadcastData,
+    _value: uint256,
 ):
     """
     @notice Internal function to broadcast block hash to multiple chains
     @param _block_number Block number to broadcast
     @param _block_hash Block hash to broadcast
     @param _broadcast_data Data for broadcasting
+    @param _value Fees carried into this call; whatever is left of it is change
     """
     message: Bytes[OApp.MAX_MESSAGE_SIZE] = abi_encode(_block_number, _block_hash)
 
@@ -323,19 +334,88 @@ def _broadcast_block(
         options, _broadcast_data.gas_limit, 0
     )
 
+    successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    # What was here before the fees arrived, so the change is whatever is left above it
+    treasury: uint256 = self.balance - _value
+
     for target: BroadcastTarget in _broadcast_data.targets:
-        # Skip if peer is not set
+        # Skip if peer is not set; its fee is never spent and comes back with the change
         if OApp.peers[target.eid] == empty(bytes32):
             continue
 
-        # Send message
+        # Send message. The endpoint refunds the surplus with a transfer that reverts the send on
+        # failure, so take it here rather than naming the requester and risking the whole delivery
         fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=target.fee, lzTokenFee=0)
-        OApp._lzSend(target.eid, message, options, fees, _broadcast_data.requester)
+        OApp._lzSend(target.eid, message, options, fees, self)
+        successful_targets.append(target)
+
+    # Non-fatal: a caller that cannot take the change still gets its broadcast
+    self._refund(_broadcast_data.requester, self.balance - treasury)
 
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,
-        targets=_broadcast_data.targets,
+        targets=successful_targets,
+    )
+
+
+@internal
+def _refund(_requester: address, _amount: uint256):
+    """
+    @notice Return change to a requester, logging rather than reverting if it refuses
+    """
+    if _requester == empty(address) or _amount == 0:
+        return
+    Funds._refund(_requester, _amount)
+
+
+@view
+@internal
+def _latest_block_number() -> uint256:
+    """
+    @notice The oracle's latest confirmed block, checking read and the oracle are set before calling it
+    """
+    assert self.read_enabled, "Can only broadcast from read-enabled chains"
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    return staticcall self.block_oracle.last_confirmed_block_number()
+
+
+@internal
+def _broadcast_confirmed(
+    _block_number: uint256,
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _lz_receive_gas_limit: uint128,
+    _value: uint256,
+):
+    """
+    @notice Broadcast a confirmed block this relay read itself, fees paid by the caller
+    @dev Only broadcast what was received via lzRead to prevent potentially malicious hashes from other sources
+    """
+    assert self.read_enabled, "Can only broadcast from read-enabled chains"
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    assert len(_target_eids) == len(_target_fees), "Length mismatch"
+
+    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(_block_number)
+    assert block_hash != empty(bytes32), "Block not confirmed"
+
+    # Only broadcast if this block was received via lzRead
+    assert self.received_blocks[_block_number] == block_hash, "Unknown source"
+
+    # Prepare broadcast targets
+    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    sum_target_fees: uint256 = 0
+    for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
+        broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
+        sum_target_fees += _target_fees[i]
+
+    assert sum_target_fees == _value, "Value must equal fee sum"
+
+    self._broadcast_block(
+        _block_number,
+        block_hash,
+        BroadcastData(targets=broadcast_targets, gas_limit=_lz_receive_gas_limit, requester=msg.sender),
+        _value,
     )
 
 
@@ -464,34 +544,35 @@ def broadcast_latest_block(
     @param _target_eids List of chain IDs to broadcast to
     @param _target_fees List of fees per chain (must match _target_eids length)
     @param _lz_receive_gas_limit Gas limit for lzReceive (same for all targets)
-    @dev Only broadcast what was received via lzRead to prevent potentially malicious hashes from other sources
+    @dev Reverts if another source confirmed the oracle's latest block; use broadcast_block then
     """
+    self._broadcast_confirmed(
+        self._latest_block_number(),
+        _target_eids,
+        _target_fees,
+        _lz_receive_gas_limit,
+        msg.value,
+    )
 
-    assert self.read_enabled, "Can only broadcast from read-enabled chains"
-    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
-    assert len(_target_eids) == len(_target_fees), "Length mismatch"
 
-    # Get latest block from oracle
-    block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
-    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(block_number)
-    assert block_hash != empty(bytes32), "No confirmed blocks"
-
-    # Only broadcast if this block was received via lzRead
-    assert self.received_blocks[block_number] == block_hash, "Unknown source"
-
-    # Prepare broadcast targets
-    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
-    sum_target_fees: uint256 = 0
-    for i: uint256 in range(0, len(_target_eids), bound=MAX_N_BROADCAST):
-        broadcast_targets.append(BroadcastTarget(eid=_target_eids[i], fee=_target_fees[i]))
-        sum_target_fees += _target_fees[i]
-
-    assert sum_target_fees <= msg.value, "Insufficient message value"
-
-    self._broadcast_block(
-        block_number,
-        block_hash,
-        BroadcastData(targets=broadcast_targets, gas_limit=_lz_receive_gas_limit, requester=msg.sender),
+@external
+@payable
+def broadcast_block(
+    _block_number: uint256,
+    _target_eids: DynArray[uint32, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _lz_receive_gas_limit: uint128,
+):
+    """
+    @notice Broadcast a confirmed block this relay read to specified chains
+    @param _block_number Block to broadcast; any confirmed block received via lzRead, not only the latest
+    @param _target_eids List of chain IDs to broadcast to
+    @param _target_fees List of fees per chain (must match _target_eids length)
+    @param _lz_receive_gas_limit Gas limit for lzReceive (same for all targets)
+    @dev A newer block confirmed by another source must not stop rebroadcasting the ones this relay read
+    """
+    self._broadcast_confirmed(
+        _block_number, _target_eids, _target_fees, _lz_receive_gas_limit, msg.value
     )
 
 
@@ -525,7 +606,17 @@ def lzReceive(
         block_number: uint256 = 0
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
+
+        # Both exits consume the packet, so a short delivery must revert and stay retryable
+        broadcast_data: BroadcastData = self.broadcast_data[_guid]
+        total_fee: uint256 = 0
+        for target: BroadcastTarget in broadcast_data.targets:
+            total_fee += target.fee
+        assert msg.value >= total_fee, "Insufficient msg.value"
+
         if block_hash == empty(bytes32):
+            # Return the fees carried in (MainnetBlockView answers zero out of range)
+            self._refund(broadcast_data.requester, msg.value)
             return  # Invalid response
 
         # Store received block hash
@@ -534,24 +625,19 @@ def lzReceive(
         # Commit block hash to oracle
         self._commit_block(block_number, block_hash)
 
-        broadcast_data: BroadcastData = self.broadcast_data[_guid]
-
         if len(broadcast_data.targets) > 0:
-            # Verify that attached value covers requested broadcast fees
-            total_fee: uint256 = 0
-            for target: BroadcastTarget in broadcast_data.targets:
-                total_fee += target.fee
-            assert msg.value >= total_fee, "Insufficient msg.value"
-
             # Perform broadcast
             self._broadcast_block(
                 block_number,
                 block_hash,
                 broadcast_data,
+                msg.value,
             )
     else:
         # Regular message - decode and commit block hash
         block_number: uint256 = 0
         block_hash: bytes32 = empty(bytes32)
         block_number, block_hash = abi_decode(_message, (uint256, bytes32))
+        if block_hash == empty(bytes32):
+            return  # Invalid message, as ccipReceive treats it
         self._commit_block(block_number, block_hash)
