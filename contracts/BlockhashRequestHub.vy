@@ -146,7 +146,7 @@ def __init__(
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
     @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~700_000:
-           the relay holds 500k back for each CCIP call, one target measures ~886k end to end
+           the relay holds its router_call_gas (500k) back per CCIP call, one target measures ~890k
     @param _ccip_send_gas Gas per CCIP target, at least ~250_000. Not the ccipReceive limit
     """
     ownable.__init__()
@@ -282,6 +282,7 @@ def set_gas_params(_base_on_report_gas: uint256, _ccip_send_gas: uint256):
     """
     @notice Retune the writeReport gas limit: forwarder, onReport and each CCIP send
     @dev Under-estimating strands a request: writeReport runs out of gas after fees were pushed
+    @dev Raise this, and let pending requests land, before raising the relay's router_call_gas
     """
     ownable._check_owner()
 
