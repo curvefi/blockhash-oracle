@@ -40,8 +40,6 @@ interface IBlockOracle:
 ################################################################
 
 # Import ownership management
-from ethereum.ercs import IERC20
-
 from snekmate.auth import ownable
 
 initializes: ownable
@@ -49,6 +47,18 @@ exports: (
     ownable.owner,
     ownable.transfer_ownership,
     ownable.renounce_ownership,
+)
+
+# Fixed-gas refunds, budget retunable by the owner, and the owner's withdrawals
+from ..modules import Funds
+
+initializes: Funds[ownable := ownable]
+exports: (
+    Funds.refund_gas,
+    Funds.refund_call_cost,
+    Funds.set_refund_gas,
+    Funds.withdraw_eth,
+    Funds.recover_erc20,
 )
 
 # Import LayerZero module for cross-chain messaging
@@ -75,10 +85,6 @@ exports: (
 MAX_N_BROADCAST: constant(uint256) = 32
 GET_BLOCKHASH_SELECTOR: constant(Bytes[4]) = method_id("get_blockhash(uint256,bool)")
 READ_RETURN_SIZE: constant(uint32) = 64
-REFUND_GAS: constant(uint256) = 50_000  # fixed, so the executor cannot starve a refund
-REFUND_CALL_COST: constant(uint256) = 20_000  # the value call itself, Monad's cold access included
-# EIP-150 keeps 1/64 back
-MIN_GAS_TO_REFUND: constant(uint256) = REFUND_GAS * 64 // 63 + REFUND_CALL_COST
 
 ################################################################
 #                            STORAGE                           #
@@ -113,10 +119,6 @@ received_blocks: HashMap[uint256, bytes32]  # block_number -> block_hash
 #                            EVENTS                            #
 ################################################################
 
-event RefundFailed:
-    requester: indexed(address)
-    amount: uint256
-
 
 event BlockHashBroadcast:
     block_number: indexed(uint256)
@@ -139,6 +141,7 @@ def __init__(
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+    Funds.__init__()
 
     OApp.__init__(_endpoint, tx.origin)  # origin also set as delegate
 
@@ -202,37 +205,6 @@ def set_block_oracle(_oracle: address):
     ownable._check_owner()
 
     self.block_oracle = IBlockOracle(_oracle)
-
-
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @dev ETH can be accumulated from LZ refunds
-    @param _amount Amount to withdraw
-    """
-    ownable._check_owner()
-
-    assert self.balance >= _amount, "Insufficient balance"
-    # raw_call, not send: a multisig or agent owner needs more than send's 2300-gas stipend
-    raw_call(msg.sender, b"", value=_amount)
-
-
-@external
-def recover_erc20(_token: address, _to: address, _amount: uint256):
-    """
-    @notice Recover ERC20 tokens sent to this contract
-    @dev Data-only relay, but a direct transfer can still land here
-    @param _token ERC20 token to recover
-    @param _to Recipient of the tokens
-    @param _amount Amount to transfer
-    """
-    ownable._check_owner()
-
-    # default_return_value: tokens that return nothing on a successful transfer (USDT) are recoverable
-    assert extcall IERC20(_token).transfer(
-        _to, _amount, default_return_value=True
-    ), "Transfer failed"
 
 
 ################################################################
@@ -391,13 +363,10 @@ def _broadcast_block(
 def _refund(_requester: address, _amount: uint256):
     """
     @notice Return change to a requester, logging rather than reverting if it refuses
-    @dev Reverts rather than starve the recipient, which would read as a refusal
     """
     if _requester == empty(address) or _amount == 0:
         return
-    assert msg.gas > MIN_GAS_TO_REFUND, "Not enough gas to refund"
-    if not raw_call(_requester, b"", value=_amount, gas=REFUND_GAS, revert_on_failure=False):
-        log RefundFailed(requester=_requester, amount=_amount)
+    Funds._refund(_requester, _amount)
 
 
 @view

@@ -4,7 +4,14 @@ import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
-from conftest import LZ_READ_CHANNEL, LZ_EID, HUNGRY_RECEIVE_ROUNDS
+from conftest import (
+    LZ_READ_CHANNEL,
+    LZ_EID,
+    HUNGRY_RECEIVE_ROUNDS,
+    MAX_REFUND_GAS,
+    MIN_REFUND_CALL_COST,
+    RECEIVE_ROUNDS_OVER_INITIAL_REFUND,
+)
 
 CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
 
@@ -338,3 +345,39 @@ def test_owner_recovers_erc20(forked_env, lz_block_relay, dev_deployer):
 
     assert token.balanceOf(lz_block_relay.address) == 0
     assert token.balanceOf(recipient) == 1000
+
+
+@pytest.mark.mainnet
+def test_broadcast_block_refund_gets_the_configured_gas(
+    forked_env, lz_block_relay, block_oracle, mainnet_block_view, dev_deployer, block_data
+):
+    """The refund gets refund_gas, not a compiled-in figure."""
+    sent_eid, unset_eid = 30110, 30111
+    n, h = block_data["number"], block_data["hash"]
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_peers([sent_eid], [boa.env.generate_address()])
+        lz_block_relay.set_block_oracle(block_oracle.address)
+        lz_block_relay.set_read_config(True, LZ_READ_CHANNEL, LZ_EID, mainnet_block_view.address)
+        block_oracle.add_committer(lz_block_relay.address, True)
+        block_oracle.admin_apply_block(n, h)
+    lz_block_relay.eval(f"self.received_blocks[{n}] = {'0x' + h.hex()}")
+
+    fee = lz_block_relay.quote_broadcast_fees([sent_eid], 150_000)[0]
+    skipped_fee = 10**16
+    requester = boa.load(CONTRACT_CALLER, True)
+    requester.set_burn_rounds(RECEIVE_ROUNDS_OVER_INITIAL_REFUND)
+    boa.env.set_balance(requester.address, fee + skipped_fee)
+    data = lz_block_relay.broadcast_block.prepare_calldata(
+        n, [sent_eid, unset_eid], [fee, skipped_fee], 150_000
+    )
+
+    def received():
+        with boa.env.anchor():
+            with boa.env.prank(requester.address):
+                requester.execute(lz_block_relay.address, data, value=fee + skipped_fee)
+            return requester.received()
+
+    assert received() == 0  # the initial budget is too little for this receiver
+    with boa.env.prank(dev_deployer):
+        lz_block_relay.set_refund_gas(MAX_REFUND_GAS, MIN_REFUND_CALL_COST)
+    assert received() == skipped_fee
