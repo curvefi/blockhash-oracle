@@ -125,6 +125,15 @@ event BlockHashBroadcast:
     block_hash: indexed(bytes32)
     targets: DynArray[BroadcastTarget, MAX_N_BROADCAST]
 
+event SetBlockOracle:
+    oracle: indexed(address)
+
+event SetReadConfig:
+    is_enabled: bool
+    read_channel: uint32
+    mainnet_eid: uint32
+    mainnet_view: address
+
 
 ################################################################
 #                          CONSTRUCTOR                         #
@@ -180,6 +189,12 @@ def set_read_config(
 
     peer: bytes32 = convert(self, bytes32) if _is_enabled else convert(empty(address), bytes32)
     OApp._setPeer(_read_channel, peer)
+    log SetReadConfig(
+        is_enabled=_is_enabled,
+        read_channel=_read_channel,
+        mainnet_eid=_mainnet_eid,
+        mainnet_view=_mainnet_view,
+    )
 
 
 @external
@@ -205,6 +220,7 @@ def set_block_oracle(_oracle: address):
     ownable._check_owner()
 
     self.block_oracle = IBlockOracle(_oracle)
+    log SetBlockOracle(oracle=_oracle)
 
 
 ################################################################

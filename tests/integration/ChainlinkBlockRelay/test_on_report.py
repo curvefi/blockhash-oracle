@@ -227,6 +227,9 @@ def test_on_report_broadcast_only_sends_to_registered_peers(
     assert len(broadcast_events) == 1
     assert len(broadcast_events[0].targets) == 1
     assert broadcast_events[0].targets[0].chain_selector == BASE_CHAIN_SELECTOR
+    assert [e.chain_selector for e in events if type(e).__name__ == "BroadcastSkipped"] == [
+        unregistered_selector
+    ]
 
 
 @pytest.mark.mainnet

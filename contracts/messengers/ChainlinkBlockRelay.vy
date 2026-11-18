@@ -245,6 +245,11 @@ def _broadcast_block(
         if receiver == empty(address):
             if refunds:
                 unused_fees += target.max_fee
+            log BroadcastSkipped(
+                chain_selector=target.chain_selector,
+                block_number=_block_number,
+                max_fee=target.max_fee,
+            )
             continue
 
         message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(target.chain_selector, data, extra_args)
