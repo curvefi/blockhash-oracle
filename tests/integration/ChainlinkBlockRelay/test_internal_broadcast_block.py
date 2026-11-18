@@ -84,6 +84,9 @@ def test_broadcast_block_skips_unregistered_peers(
     # Only the registered chain appears in the event (fix for review finding #2)
     assert len(broadcast_events[0].targets) == 1
     assert broadcast_events[0].targets[0].chain_selector == BASE_CHAIN_SELECTOR
+    assert [e.chain_selector for e in events if type(e).__name__ == "BroadcastSkipped"] == [
+        unregistered_selector
+    ]
 
 
 @pytest.mark.mainnet

@@ -150,7 +150,9 @@ def add_committer(_committer: address, _bump_threshold: bool = False):
         log AddCommitter(committer=_committer)
 
         if _bump_threshold:
-            self.threshold += 1
+            new_threshold: uint256 = self.threshold + 1
+            self.threshold = new_threshold
+            log SetThreshold(new_threshold=new_threshold)
 
 
 @external
