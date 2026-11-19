@@ -3,12 +3,10 @@ export type BroadcastPayload = {
     chainSelectorName: string;
     contractAddress: string;
   };
-  targetChains: [
-    {
-      selector: string,
-      fees: string
-    }
-  ];
+  targetChains: {
+    selector: string;
+    fees: string;
+  }[];
   ccipReceiveGasLimit: string;
   onReportGasLimit: string;
 };
