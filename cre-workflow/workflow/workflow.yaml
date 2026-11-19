@@ -1,0 +1,21 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE
+# ==========================================================================
+
+testnets-settings:
+  user-workflow:
+    workflow-name: "blockhash-relay-testnets"
+    deployment-registry: "onchain:ethereum-mainnet"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.testnets.json"
+    secrets-path: ""
+
+mainnets-settings:
+  user-workflow:
+    workflow-name: "blockhash-relay"
+    deployment-registry: "onchain:ethereum-mainnet"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.mainnets.json"
+    secrets-path: ""

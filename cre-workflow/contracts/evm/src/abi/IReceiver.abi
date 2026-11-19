@@ -1,0 +1,1 @@
+[{"stateMutability": "payable", "type": "function", "name": "onReport", "inputs": [{"name": "metadata", "type": "bytes"}, {"name": "report", "type": "bytes"}], "outputs": []}]
