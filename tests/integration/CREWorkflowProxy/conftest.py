@@ -77,7 +77,8 @@ def registry(forked_env):
 def linked_owner(registry):
     """A real address already linked in the registry, with room in its DON quota."""
     for owner in registry.getLinkedOwners(0, 40):
-        if registry.totalActiveWorkflowsByOwner(owner) == 0:
+        has_quota = registry.getMaxWorkflowsPerUserDON(owner, DON_FAMILY) > 0
+        if has_quota and registry.totalActiveWorkflowsByOwner(owner) == 0:
             boa.env.set_balance(owner, 10**19)
             return owner
     pytest.skip("no linked owner with a free workflow slot in the first 40")
