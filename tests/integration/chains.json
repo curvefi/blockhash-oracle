@@ -1,0 +1,74 @@
+{
+    "mainnet": {
+        "id": 1,
+        "rpc": "https://rpc.ankr.com/eth",
+        "drpc": "https://lb.drpc.org/ogrpc?network=ethereum&dkey=",
+        "l1block": ""
+    },
+    "optimism": {
+        "id": 10,
+        "rpc": "https://mainnet.optimism.io",
+        "drpc": "https://lb.drpc.org/ogrpc?network=optimism&dkey=",
+        "l1block": "0x4200000000000000000000000000000000000015"
+    },
+    "base": {
+        "id": 8453,
+        "rpc": "https://mainnet.base.org",
+        "drpc": "https://lb.drpc.org/ogrpc?network=base&dkey=",
+        "l1block": "0x4200000000000000000000000000000000000015"
+    },
+    "fraxtal": {
+        "id": 252,
+        "rpc": "https://rpc.frax.com",
+        "drpc": "https://lb.drpc.org/ogrpc?network=fraxtal&dkey=",
+        "l1block": "0x4200000000000000000000000000000000000015"
+    },
+    "mantle": {
+        "id": 5000,
+        "rpc": "https://rpc.mantle.xyz/",
+        "drpc": "https://lb.drpc.org/ogrpc?network=mantle&dkey=",
+        "l1block": "0x4200000000000000000000000000000000000015"
+    },
+    "arbitrum": {
+        "id": 42161,
+        "rpc": "https://arb1.arbitrum.io/rpc",
+        "drpc": "https://lb.drpc.org/ogrpc?network=arbitrum&dkey=",
+        "l1block": ""
+    },
+    "taiko": {
+        "id": 167000,
+        "rpc": "https://rpc.taiko.xyz",
+        "drpc": "https://lb.drpc.org/ogrpc?network=taiko&dkey=",
+        "l1block": ""
+    },
+    "sonic": {
+        "id": 146,
+        "rpc": "https://rpc.soniclabs.com",
+        "drpc": "https://lb.drpc.org/ogrpc?network=sonic&dkey=",
+        "l1block": ""
+    },
+    "polygon": {
+        "id": 137,
+        "rpc": "https://polygon-rpc.com",
+        "drpc": "https://lb.drpc.org/ogrpc?network=polygon&dkey=",
+        "l1block": ""
+    },
+    "bsc": {
+        "id": 56,
+        "rpc": "https://bsc-dataseed.binance.org/",
+        "drpc": "https://lb.drpc.org/ogrpc?network=bsc&dkey=",
+        "l1block": ""
+    },
+    "gnosis": {
+        "id": 100,
+        "rpc": "https://rpc.gnosischain.com",
+        "drpc": "https://lb.drpc.org/ogrpc?network=gnosis&dkey=",
+        "l1block": ""
+    },
+    "xlayer": {
+        "id": 196,
+        "rpc": "https://xlayerrpc.okx.com",
+        "drpc": "https://lb.drpc.org/ogrpc?network=xlayer&dkey=",
+        "l1block": ""
+    }
+}
