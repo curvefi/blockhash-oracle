@@ -20,6 +20,12 @@ def test_set_block_oracle(forked_env, lz_block_relay, block_oracle, dev_deployer
     with boa.env.prank(dev_deployer):
         lz_block_relay.set_block_oracle(block_oracle.address)
 
+    # capture logs before any getter (a view call resets boa's log buffer)
+    events = lz_block_relay.get_logs()
+    assert [e.oracle for e in events if type(e).__name__ == "SetBlockOracle"] == [
+        block_oracle.address
+    ]
+
     assert lz_block_relay.block_oracle() == block_oracle.address
 
     # Can set to zero address to disable

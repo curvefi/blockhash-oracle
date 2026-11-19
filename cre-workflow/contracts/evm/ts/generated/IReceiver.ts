@@ -30,7 +30,7 @@ const encodeTopicValue = (t: Hex | Hex[] | null): string[] => {
 
 
 
-export const IReceiverABI = [{"stateMutability":"payable","type":"function","name":"onReport","inputs":[{"name":"metadata","type":"bytes"},{"name":"report","type":"bytes"}],"outputs":[]}] as const
+export const IReceiverABI = [{"stateMutability":"nonpayable","type":"function","name":"onReport","inputs":[{"name":"metadata","type":"bytes"},{"name":"report","type":"bytes"}],"outputs":[]}] as const
 
 export class IReceiver {
   constructor(

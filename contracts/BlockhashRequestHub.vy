@@ -26,8 +26,6 @@ Fees are not refunded past the quote.
 #                           INTERFACES                         #
 ################################################################
 
-from ethereum.ercs import IERC20
-
 # Imported for their interfaces, so a relay signature change breaks this contract's compilation
 from . import BlockOracle
 from .messengers import ChainlinkBlockRelay
@@ -46,6 +44,18 @@ exports: (
     ownable.owner,
     ownable.transfer_ownership,
     ownable.renounce_ownership,
+)
+
+# Fixed-gas refunds, budget retunable by the owner, and the owner's withdrawals
+from .modules import Funds
+
+initializes: Funds[ownable := ownable]
+exports: (
+    Funds.refund_gas,
+    Funds.refund_call_cost,
+    Funds.set_refund_gas,
+    Funds.withdraw_eth,
+    Funds.recover_erc20,
 )
 
 
@@ -76,7 +86,7 @@ base_fee: public(uint256)  # flat charge per CRE request, covers one workflow ex
 fee_per_target: public(uint256)  # added per CCIP target, tracks onReport's per-send gas
 fee_multiplier_bps: public(uint256)  # headroom on CCIP quotes, they drift before onReport fires
 
-# Gas the workflow forwards into onReport; on-chain so it retunes without a workflow redeploy
+# writeReport gas limit = base + ccip_send_gas per target; on-chain so it retunes without a redeploy
 base_on_report_gas: public(uint256)
 ccip_send_gas: public(uint256)
 
@@ -137,9 +147,13 @@ def __init__(
     @param _lz_relay LayerZero relay, empty to ship with that rail disabled
     @param _cre_relay Chainlink relay, empty to ship with that rail disabled
     @param _fee_multiplier_bps Headroom on CCIP quotes, in bps; must be at least 10_000
+    @param _base_on_report_gas Fixed part of the writeReport gas limit, at least ~700_000:
+           the relay holds its router_call_gas (500k) back per CCIP call, one target measures ~890k
+    @param _ccip_send_gas Gas per CCIP target, at least ~250_000. Not the ccipReceive limit
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+    Funds.__init__()
 
     assert _block_oracle != empty(address), "Oracle not set"
     assert _fee_multiplier_bps >= BPS, "Multiplier below 100%"
@@ -194,15 +208,19 @@ def _lz_fees(
     _eids: DynArray[uint32, MAX_N_BROADCAST], _lz_gas: uint128
 ) -> DynArray[uint256, MAX_N_BROADCAST]:
     """
-    @dev The relay quotes 0 for a target it cannot reach, so this doubles as a peer check
+    @dev The relay quotes 0 for a target it cannot reach, so this doubles as a peer check.
+         Headroom as on the CCIP rail, frozen until the read response; the unspent part stays here
     """
     assert len(_eids) > 0, "No targets"
-    fees: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.lz_relay.quote_broadcast_fees(
+    quotes: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.lz_relay.quote_broadcast_fees(
         _eids, _lz_gas
     )
-    for fee: uint256 in fees:
-        assert fee != 0, "No LayerZero route"
-    return fees
+    multiplier: uint256 = self.fee_multiplier_bps
+    max_fees: DynArray[uint256, MAX_N_BROADCAST] = []
+    for quote: uint256 in quotes:
+        assert quote != 0, "No LayerZero route"
+        max_fees.append(quote * multiplier // BPS)
+    return max_fees
 
 
 @internal
@@ -211,8 +229,8 @@ def _ccip_max_fees(
     _selectors: DynArray[uint64, MAX_N_BROADCAST], _ccip_gas: uint256
 ) -> DynArray[uint256, MAX_N_BROADCAST]:
     """
-    @dev max_fee is a cap, not a payment: CCIP._transmit re-quotes and forwards only the real fee,
-         so headroom costs nothing unless fees rise between request and onReport
+    @dev max_fee is a cap, not a payment: CCIP._transmit re-quotes and forwards only the real fee.
+         Unspent headroom stays in the relay treasury, the CRE path never refunds a requester
     """
     assert len(_selectors) > 0, "No targets"
     quotes: DynArray[uint256, MAX_N_BROADCAST] = staticcall self.cre_relay.quote_broadcast_fees(
@@ -265,37 +283,15 @@ def set_fees(_base_fee: uint256, _fee_per_target: uint256, _fee_multiplier_bps: 
 @external
 def set_gas_params(_base_on_report_gas: uint256, _ccip_send_gas: uint256):
     """
-    @notice Retune the gas the workflow forwards into onReport
+    @notice Retune the writeReport gas limit: forwarder, onReport and each CCIP send
     @dev Under-estimating strands a request: writeReport runs out of gas after fees were pushed
+    @dev Raise this, and let pending requests land, before raising the relay's router_call_gas
     """
     ownable._check_owner()
 
     self.base_on_report_gas = _base_on_report_gas
     self.ccip_send_gas = _ccip_send_gas
     log SetGasParams(base_on_report_gas=_base_on_report_gas, ccip_send_gas=_ccip_send_gas)
-
-
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @dev Surcharges accrue here; CCIP fees do not, they are pushed to the relay on request
-    """
-    ownable._check_owner()
-
-    assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
-
-
-@external
-def recover_erc20(_token: address, _to: address, _amount: uint256):
-    """
-    @notice Recover ERC20 tokens sent to this contract
-    @dev The hub deals only in native token; a direct transfer can still land here
-    """
-    ownable._check_owner()
-
-    assert extcall IERC20(_token).transfer(_to, _amount), "Transfer failed"
 
 
 ################################################################
@@ -362,12 +358,13 @@ def request(
     @param _target_eids LayerZero endpoint ids, used only by the LayerZero rail
     @param _target_selectors CCIP chain selectors, used only by the Chainlink rail
     @param _block_number Block to fetch, and the value both rails vote with. Unchecked beyond being
-                         non-zero: MainnetBlockView serves [head - 8192, head - 64] and both rails
+                         non-zero: MainnetBlockView serves [head - 8191, head - 65] and both rails
                          resolve later than this call, which only makes the block older, so pick with
                          room to spare - head - 100 is comfortable.
-    @param _ccip_gas Gas limit for ccipReceive on each CCIP target
-    @param _lz_gas Gas limit for lzReceive on each LayerZero target
-    @param _read_gas Gas limit for the lzRead return message
+    @param _ccip_gas Gas limit for ccipReceive on each CCIP target; 150_000 covers every measured
+                     chain (README, "CCIP receive gas limit")
+    @param _lz_gas Gas limit for lzReceive on each LayerZero target; 150_000, 200_000 on Monad
+    @param _read_gas Gas limit for the lzRead return message; 400_000 + 200_000 per target
     @return Request id, for correlating the emitted logs with delivery
     """
     assert _rails & (RAIL_LZ | RAIL_CRE) != 0, "No rail selected"
@@ -430,11 +427,9 @@ def request(
             + len(_target_selectors) * self.ccip_send_gas,
         )
 
-    # Overpayment is returned, the quote is not. Non-fatal: a caller that cannot receive ETH has no
-    # exact amount it could safely send, since quotes drift.
+    # Overpayment is returned, the quote is not; non-fatally, since quotes drift
     if msg.value > spent:
-        returned: bool = raw_call(
-            msg.sender, b"", value=msg.value - spent, revert_on_failure=False
-        )
+        returned: uint256 = msg.value - spent
+        Funds._refund(msg.sender, returned)
 
     return request_id

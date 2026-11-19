@@ -3,6 +3,8 @@
 import pytest
 import boa
 
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
+
 
 @pytest.mark.mainnet
 def test_withdraw_eth(forked_env, chainlink_block_relay, dev_deployer):
@@ -39,6 +41,27 @@ def test_withdraw_eth(forked_env, chainlink_block_relay, dev_deployer):
 
     assert boa.env.get_balance(chainlink_block_relay.address) == 0
 
+
+# Returns nothing on transfer, as USDT does
+_MOCK_ERC20_NO_RETURN = """# pragma version 0.4.3
+balanceOf: public(HashMap[address, uint256])
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balanceOf[_to] += _amount
+
+@external
+def transfer(_to: address, _amount: uint256):
+    self.balanceOf[msg.sender] -= _amount
+    self.balanceOf[_to] += _amount
+"""
+
+# Reports failure the compliant way
+_MOCK_ERC20_FALSE = """# pragma version 0.4.3
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    return False
+"""
 
 _MOCK_ERC20 = """# pragma version 0.4.3
 balanceOf: public(HashMap[address, uint256])
@@ -78,3 +101,43 @@ def test_recover_erc20_non_owner_reverts(forked_env, chainlink_block_relay):
     with boa.env.prank(stranger):
         with boa.reverts("ownable: caller is not the owner"):
             chainlink_block_relay.recover_erc20(token.address, stranger, 1)
+
+
+@pytest.mark.mainnet
+def test_withdraw_eth_to_contract_owner(forked_env, chainlink_block_relay, dev_deployer):
+    """A contract owner (multisig, DAO agent) needing more than send's 2300-gas stipend can withdraw."""
+    caller = boa.load(CONTRACT_CALLER, True)
+    with boa.env.prank(dev_deployer):
+        chainlink_block_relay.transfer_ownership(caller.address)
+    boa.env.set_balance(chainlink_block_relay.address, 10**18)
+
+    caller.execute(
+        chainlink_block_relay.address, chainlink_block_relay.withdraw_eth.prepare_calldata(10**17)
+    )
+
+    assert caller.received() == 10**17
+    assert boa.env.get_balance(chainlink_block_relay.address) == 9 * 10**17
+
+
+@pytest.mark.mainnet
+def test_recover_erc20_token_without_return_value(forked_env, chainlink_block_relay, dev_deployer):
+    """A token that returns nothing on a successful transfer (USDT) can still be recovered."""
+    token = boa.loads(_MOCK_ERC20_NO_RETURN)
+    recipient = boa.env.generate_address()
+    token.mint(chainlink_block_relay.address, 1000)
+
+    with boa.env.prank(dev_deployer):
+        chainlink_block_relay.recover_erc20(token.address, recipient, 1000)
+
+    assert token.balanceOf(recipient) == 1000
+    assert token.balanceOf(chainlink_block_relay.address) == 0
+
+
+@pytest.mark.mainnet
+def test_recover_erc20_failing_token_reverts(forked_env, chainlink_block_relay, dev_deployer):
+    """A token that reports failure still reverts."""
+    token = boa.loads(_MOCK_ERC20_FALSE)
+
+    with boa.env.prank(dev_deployer):
+        with boa.reverts("Transfer failed"):
+            chainlink_block_relay.recover_erc20(token.address, boa.env.generate_address(), 1)

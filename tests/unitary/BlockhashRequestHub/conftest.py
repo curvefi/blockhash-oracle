@@ -39,6 +39,15 @@ CCIP_RECEIVE_GAS_LIMIT = 150_000
 LZ_RECEIVE_GAS_LIMIT = 150_000
 LZ_READ_GAS_LIMIT = 300_000
 
+# ContractCaller.set_burn_rounds that makes taking ETH cost ~290k, enough to starve it
+HUNGRY_RECEIVE_ROUNDS = 3_000
+# Taking ETH costs ~72k cold: over the initial refund gas, under its cap
+RECEIVE_ROUNDS_OVER_INITIAL_REFUND = 500
+# The Funds module's initial values and bounds
+INITIAL_REFUND_GAS = 50_000
+MAX_REFUND_GAS = 100_000
+MIN_REFUND_CALL_COST = 20_000
+
 # Any block above the oracle's height; the oracle starts empty in these tests
 PINNED_BLOCK = 21_000_000
 BLOCK_HASH = boa.eval("keccak256(b'block')")
@@ -57,9 +66,14 @@ def cre_cost(n_targets):
     return ccip_max_fee(n_targets) + surcharge(n_targets)
 
 
+def lz_max_fee(n_targets=1):
+    """What the hub caps each LayerZero send at, given the mock's flat quote."""
+    return LZ_BROADCAST_FEE * FEE_MULTIPLIER_BPS // 10_000 * n_targets
+
+
 def lz_cost(n_targets):
     """quote_read_fee folds the broadcast value into the read quote."""
-    return READ_FEE + LZ_BROADCAST_FEE * n_targets
+    return READ_FEE + lz_max_fee(n_targets)
 
 
 def cre_vote(block_oracle, relay, block_number=PINNED_BLOCK, block_hash=BLOCK_HASH):

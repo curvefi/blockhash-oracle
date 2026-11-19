@@ -9,7 +9,7 @@ import {
 	TxStatus,
 	type Runtime,
 } from '@chainlink/cre-sdk'
-import type { EVM_PB } from '@chainlink/cre-sdk/pb'
+import { EVM_PB } from '@chainlink/cre-sdk/pb'
 import {
 	type Address,
 	isAddress,
@@ -19,11 +19,27 @@ import {
 	toEventSelector,
 } from 'viem'
 import { z } from 'zod'
-import type {BroadcastPayload, BroadcastResult, RequestPayload, ResultPayload} from "./types/types";
+import type { BroadcastResult, ResultPayload } from "./types/types";
 import {
 	MainnetBlockView
 } from '../contracts/evm/ts/generated/MainnetBlockView'
 import { IReceiver } from '../contracts/evm/ts/generated/IReceiver'
+
+// ─── Limits ──────────────────────────────────────────────────
+// ABI bounds for the decimal strings an HTTP request carries
+const UINT64_MAX = 2n ** 64n - 1n
+const UINT256_MAX = 2n ** 256n - 1n
+
+// ChainlinkBlockRelay.MAX_N_BROADCAST: the relay cannot decode a report naming more targets
+export const MAX_TARGETS_PER_RELAY = 32
+
+// CRE writes to at most 10 destination chains per execution (README, "CRE service limits"),
+// and each relay sits on its own chain
+export const MAX_RELAYS_PER_REQUEST = 10
+
+// CRE monitors at most 5 log addresses per workflow (README, "CRE service limits"), and each
+// hub has its own log trigger
+export const MAX_REQUEST_HUBS = 5
 
 // ─── Config Schema ──────────────────────────────────────────
 export const evmAddressSchema = z.custom<Address>(
@@ -36,15 +52,94 @@ export const requestHubSchema = z.object({
 	address: evmAddressSchema, // emits CREBlockhashRequested
 	relayAddress: evmAddressSchema, // ChainlinkBlockRelay the report is written to
 })
+type RequestHub = z.infer<typeof requestHubSchema>
 
 export const configSchema = z.object({
 	authorizedEVMAddress: evmAddressSchema,
 	blockViewChainSelectorName: z.string(),
 	blockViewContractAddress: evmAddressSchema,
-	// One log trigger per hub; CRE caps a workflow at 5 monitored log addresses
-	requestHubs: z.array(requestHubSchema).default([]),
+	// One log trigger per hub. The same address may repeat across chains (CreateX), but a repeated
+	// (chain, address) would register two triggers and deliver every request twice.
+	requestHubs: z
+		.array(requestHubSchema)
+		.max(MAX_REQUEST_HUBS, `CRE monitors at most ${MAX_REQUEST_HUBS} log addresses per workflow`)
+		.default([])
+		.refine(
+			(hubs) =>
+				new Set(hubs.map((h) => `${h.chainSelectorName}:${h.address.toLowerCase()}`)).size ===
+				hubs.length,
+			{ message: 'Duplicate request hub (chain, address)' },
+		),
 })
 type Config = z.infer<typeof configSchema>
+
+// ─── HTTP Payload Schema ─────────────────────────────────────
+// Decimal strings, bounded so BigInt and ABI encoding cannot throw once delivery has started
+const uintString = (max: bigint) =>
+	z
+		.string()
+		.regex(/^\d+$/, 'expected a decimal integer')
+		.refine((v) => BigInt(v) <= max, 'out of range')
+
+export const broadcastPayloadSchema = z
+	.object({
+		relay: z.object({
+			chainSelectorName: z
+				.string()
+				.refine(
+					(name) => getNetwork({ chainFamily: 'evm', chainSelectorName: name }) !== undefined,
+					'unknown chain',
+				),
+			contractAddress: evmAddressSchema,
+		}),
+		targetChains: z
+			.array(z.object({ selector: uintString(UINT64_MAX), fees: uintString(UINT256_MAX) }))
+			.max(MAX_TARGETS_PER_RELAY),
+		ccipReceiveGasLimit: uintString(UINT256_MAX),
+		onReportGasLimit: uintString(UINT256_MAX),
+	})
+	.strict()
+export type BroadcastPayload = z.infer<typeof broadcastPayloadSchema>
+
+export const requestPayloadSchema = z
+	.object({
+		// Strict, and no zero: a misspelled or zero blockNumber would silently deliver an unpinned
+		// block while the other rail votes on the pinned one
+		blockNumber: uintString(UINT256_MAX)
+			.refine((v) => BigInt(v) !== 0n, 'must not be zero')
+			.optional(),
+		data: z.array(broadcastPayloadSchema).min(1).max(MAX_RELAYS_PER_REQUEST),
+	})
+	.strict()
+export type RequestPayload = z.infer<typeof requestPayloadSchema>
+
+// ─── Report ──────────────────────────────────────────────────
+// Must match ChainlinkBlockRelay.onReport's abi_decode. The forwarder does not sign the receiver,
+// so the relay and its chain lead the payload and the relay refuses a report naming anyone else.
+// One literal, not a concatenation: viem infers the encoded tuple's types from the literal only
+export const REPORT_PARAMS = parseAbiParameters(
+	'address relay, uint256 chainId, uint256 blockNumber, bytes32 blockhash, uint64[] targetChainSelectors, uint256[] targetFees, uint256 ccipReceiveGasLimit'
+)
+
+export function encodeReport(
+	relay: Address,
+	chainId: bigint,
+	blockNumber: bigint,
+	blockhash: `0x${string}`,
+	targetChainSelectors: bigint[],
+	targetFees: bigint[],
+	ccipReceiveGasLimit: bigint,
+): `0x${string}` {
+	return encodeAbiParameters(REPORT_PARAMS, [
+		relay,
+		chainId,
+		blockNumber,
+		blockhash,
+		targetChainSelectors,
+		targetFees,
+		ccipReceiveGasLimit,
+	])
+}
 
 // ─── Broadcast ───────────────────────────────────────────────
 export function broadcast(
@@ -88,15 +183,15 @@ export function broadcast(
 	const relay = new IReceiver(evmClient, broadcastPayload.relay.contractAddress as Address)
 
 	// Prepare and send report
-	const reportData = encodeAbiParameters(
-		parseAbiParameters(
-			'uint256 blockNumber,' +
-			'bytes32 blockhash,' +
-			'uint64[] targetChainSelectors,' +
-			'uint256[] targetFees,' +
-			'uint256 ccipReceiveGasLimit'),
-		[blockNumber, blockhash, targetChainSelectors, targetFees, ccipReceiveGasLimit],
-	);
+	const reportData = encodeReport(
+		broadcastPayload.relay.contractAddress as Address,
+		BigInt(writeNetwork.chainId),
+		blockNumber,
+		blockhash,
+		targetChainSelectors,
+		targetFees,
+		ccipReceiveGasLimit,
+	)
 
 	const writeResult = relay.writeReport(runtime, reportData, {
       gasLimit: broadcastPayload.onReportGasLimit,
@@ -104,8 +199,12 @@ export function broadcast(
 
 	const txHash = bytesToHex(writeResult.txHash || new Uint8Array(32))
 	result.txHash = txHash;
-	if (writeResult.txStatus !== TxStatus.SUCCESS ||
-		writeResult.receiverContractExecutionStatus != 0 ) { // TODO use constant when possible
+	if (
+		writeResult.txStatus !== TxStatus.SUCCESS ||
+		// Undefined counts as failure: a false success hides an undelivered hash, a false failure
+		// only costs a retry
+		writeResult.receiverContractExecutionStatus !== EVM_PB.ReceiverContractExecutionStatus.SUCCESS
+	) {
 		const message = `TX ${txHash} failed: ${writeResult.errorMessage || writeResult.txStatus}`
 		runtime.log(message)
 		result.message = message
@@ -135,7 +234,8 @@ export function fetchBlockhash(
 
 	// LATEST_BLOCK_NUMBER, not the finalized default: a finalized-tag eth_call sees an older head
 	// and can make a pinned block look "too recent" to MainnetBlockView
-	const [number, hash] = blockNumber
+	// undefined, not falsy: a zero block number must never read as an unpinned request
+	const [number, hash] = blockNumber !== undefined
 		? mainnetBlockView.getBlockhash0(runtime, blockNumber, LATEST_BLOCK_NUMBER)
 		: mainnetBlockView.getBlockhash(runtime, LATEST_BLOCK_NUMBER)
 
@@ -162,7 +262,22 @@ function deliver(
 	}
 
 	for (const payload of payloads) {
-		const broadcastResult = broadcast(runtime, blockNumber, blockhash, payload)
+		let broadcastResult: BroadcastResult
+		try {
+			broadcastResult = broadcast(runtime, blockNumber, blockhash, payload)
+		} catch (e) {
+			// One relay's exception must not cost the others their delivery; a full retry would
+			// repeat the paid broadcasts that already went out
+			const message = `Broadcast to ${payload.relay.chainSelectorName} threw: ${e instanceof Error ? e.message : String(e)}`
+			runtime.log(message)
+			broadcastResult = {
+				relayChainSelectorName: payload.relay.chainSelectorName,
+				targetChainSelectors: payload.targetChains.map((t) => t.selector),
+				txHash: '',
+				success: false,
+				message,
+			}
+		}
 		if (broadcastResult.success) result.anySuccess = true
 		result.data.push(broadcastResult)
 	}
@@ -176,11 +291,12 @@ function deliver(
 
 // ─── HTTP Callback ───────────────────────────────────────────
 export const onNewBlock = (runtime: Runtime<Config>, payload: HTTPPayload): string => {
-	const blockData = decodeJson(payload.input) as RequestPayload
+	// Reject a malformed request whole, before the first report is written
+	const blockData = requestPayloadSchema.parse(decodeJson(payload.input))
 
 	return deliver(
 		runtime,
-		blockData.blockNumber ? BigInt(blockData.blockNumber) : undefined,
+		blockData.blockNumber !== undefined ? BigInt(blockData.blockNumber) : undefined,
 		blockData.data,
 	)
 }
@@ -195,18 +311,22 @@ const REQUESTED_DATA_PARAMS = parseAbiParameters(
 	'uint256 blockNumber, uint64[] chainSelectors, uint256[] maxFees, uint256 ccipReceiveGasLimit, uint256 onReportGasLimit'
 )
 
-export const onBlockhashRequested = (runtime: Runtime<Config>, log: EVM_PB.Log): string => {
-	// Every hub shares this handler, so the emitting address decides which relay to answer on
-	const emitter = bytesToHex(log.address).toLowerCase()
-	const hub = runtime.config.requestHubs.find((h) => h.address.toLowerCase() === emitter)
-	if (!hub) throw new Error(`Log from unknown request hub ${emitter}`)
-
+// The hub comes from the trigger that fired, not from log.address: the log carries no chain, so
+// hubs sharing an address across chains cannot be told apart from the log alone
+export const onBlockhashRequested = (
+	runtime: Runtime<Config>,
+	log: EVM_PB.Log,
+	hub: RequestHub,
+): string => {
 	const [requestedBlock, chainSelectors, maxFees, ccipReceiveGasLimit, onReportGasLimit] =
 		decodeAbiParameters(REQUESTED_DATA_PARAMS, bytesToHex(log.data))
 
 	// The hub pins the block so both rails vote on the same number; the hash itself is read from
-	// mainnet here, never taken from the log
-	return deliver(runtime, requestedBlock === 0n ? undefined : requestedBlock, [
+	// mainnet here, never taken from the log. A zero block cannot come from the hub
+	// (BlockhashRequestHub: "No block number") and would deliver an unpinned block to one rail
+	if (requestedBlock === 0n) throw new Error('Request log carries no block number')
+
+	return deliver(runtime, requestedBlock, [
 		{
 			relay: { chainSelectorName: hub.chainSelectorName, contractAddress: hub.relayAddress },
 			targetChains: chainSelectors.map((selector, i) => ({
@@ -235,7 +355,7 @@ export function initWorkflow(config: Config) {
 		onNewBlock,
 	)
 
-	// One trigger per hub: the config pins a single (chain, address) pair each
+	// One trigger per hub, each with its hub bound in: the config pins a single (chain, address) pair each
 	const logHandlers = config.requestHubs.map((hub) => {
 		const network = getNetwork({ chainFamily: 'evm', chainSelectorName: hub.chainSelectorName })
 		if (!network) throw new Error(`Network not found: ${hub.chainSelectorName}`)
@@ -247,11 +367,12 @@ export function initWorkflow(config: Config) {
 				// Deployed triggers need base64 addresses and topics; the simulator takes hex
 				addresses: [hexToBase64(hub.address)],
 				topics: [{ values: [hexToBase64(toEventSelector(REQUESTED_EVENT_SIGNATURE))] }],
-				// The log is only a signal - the hash is read fresh from mainnet - so a reorged
-				// request costs one wasted execution and never a wrong hash
-				confidence: 'CONFIDENCE_LEVEL_LATEST',
+				// SAFE, not LATEST: the hub pays the relay in the request's own transaction, so a
+				// reorged request would still get a report that spends the relay's existing balance.
+				// The hash is read fresh from mainnet either way, never taken from the log
+				confidence: 'CONFIDENCE_LEVEL_SAFE',
 			}),
-			onBlockhashRequested,
+			(runtime: Runtime<Config>, log: EVM_PB.Log) => onBlockhashRequested(runtime, log, hub),
 		)
 	})
 

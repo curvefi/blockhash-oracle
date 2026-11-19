@@ -51,6 +51,14 @@ def test_skip_rlp_list_header(block_headers_decoder_module):
     )
     assert result == 3, "Long list header (0xf9) should return position 3"
 
+    # Test case 6: header read at pos, not at byte 0
+    offset_header = bytes([0x01, 0xF8, 0x80])  # a non-list byte, then a long list header
+    current_pos = 1
+    result = block_headers_decoder_module.eval(
+        f"self._skip_rlp_list_header({offset_header}, {current_pos})"
+    )
+    assert result == 3, "Long list header at pos 1 should return position 3"
+
 
 def test_skip_rlp_string(block_headers_decoder_module):
     """

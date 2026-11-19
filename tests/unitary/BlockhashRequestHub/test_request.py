@@ -1,4 +1,5 @@
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
 from conftest import (
     ARBITRUM_EID,
@@ -8,6 +9,7 @@ from conftest import (
     CCIP_RECEIVE_GAS_LIMIT,
     CCIP_SEND_GAS,
     CCIP_TWO,
+    HUNGRY_RECEIVE_ROUNDS,
     KAVA_EID,
     LZ_ONE,
     LZ_READ_GAS_LIMIT,
@@ -20,8 +22,11 @@ from conftest import (
     ccip_max_fee,
     cre_cost,
     lz_cost,
+    lz_max_fee,
     surcharge,
 )
+
+CONTRACT_CALLER = "tests/mocks/ContractCaller.vy"
 
 
 def _request(hub, caller, rails, eids, selectors, value, block_number=PINNED_BLOCK):
@@ -51,6 +56,8 @@ def test_lz_request_forwards_targets_and_pinned_block(hub, alice, mock_lz_relay)
     assert mock_lz_relay.last_lz_gas() == LZ_RECEIVE_GAS_LIMIT
     assert mock_lz_relay.last_read_gas() == LZ_READ_GAS_LIMIT
     assert mock_lz_relay.get_last_eids() == [BASE_EID, ARBITRUM_EID]
+    # The per-target caps, not just their total: the relay freezes these until the response lands
+    assert mock_lz_relay.get_last_fees() == [lz_max_fee(1)] * 2
 
 
 def test_lz_request_pays_no_surcharge(hub, alice, mock_lz_relay):
@@ -153,3 +160,67 @@ def test_owner_can_withdraw_surcharge(hub, alice, dev_deployer):
 
     assert boa.env.get_balance(hub.address) == 0
     assert boa.env.get_balance(dev_deployer) == before + accrued
+
+
+def test_withdraw_eth_to_contract_owner(hub, dev_deployer):
+    """A contract owner (multisig, DAO agent) needing more than send's 2300-gas stipend can withdraw."""
+    caller = boa.load(CONTRACT_CALLER, True)
+    with boa.env.prank(dev_deployer):
+        hub.transfer_ownership(caller.address)
+    boa.env.set_balance(hub.address, 10**18)
+
+    caller.execute(hub.address, hub.withdraw_eth.prepare_calldata(10**17))
+
+    assert caller.received() == 10**17
+    assert boa.env.get_balance(hub.address) == 9 * 10**17
+
+
+def test_failed_overpayment_refund_is_logged(hub, mock_lz_relay):
+    """The hub keeps what it cannot return, so it says so: withdraw_eth is otherwise unreconcilable."""
+    caller = boa.load(CONTRACT_CALLER, False)  # rejects ETH
+    boa.env.set_balance(caller.address, lz_cost(1) + 10**17)
+    data = hub.request.prepare_calldata(
+        RAIL_LZ,
+        LZ_ONE,
+        [],
+        PINNED_BLOCK,
+        CCIP_RECEIVE_GAS_LIMIT,
+        LZ_RECEIVE_GAS_LIMIT,
+        LZ_READ_GAS_LIMIT,
+    )
+
+    with boa.env.prank(caller.address):
+        caller.execute(hub.address, data, value=lz_cost(1) + 10**17)
+
+    failed = [e for e in caller.get_logs() if type(e).__name__ == "RefundFailed"]
+    assert len(failed) == 1
+    assert failed[0].amount == 10**17
+    assert boa.env.get_balance(hub.address) == 10**17
+
+
+def test_overpayment_refund_does_not_depend_on_the_callers_gas(hub, mock_lz_relay):
+    """A requester contract that anyone can trigger lets them pick the gas. That choice must not
+    decide whether the overpayment comes back or is logged as a refusal."""
+    caller = boa.load(CONTRACT_CALLER, True)
+    caller.set_burn_rounds(HUNGRY_RECEIVE_ROUNDS)
+    boa.env.set_balance(caller.address, lz_cost(1) + 10**17)
+    data = hub.request.prepare_calldata(
+        RAIL_LZ,
+        LZ_ONE,
+        [],
+        PINNED_BLOCK,
+        CCIP_RECEIVE_GAS_LIMIT,
+        LZ_RECEIVE_GAS_LIMIT,
+        LZ_READ_GAS_LIMIT,
+    )
+
+    refunded = set()
+    for gas in range(100_000, 800_000, 2_000):
+        with boa.env.anchor():
+            try:
+                with boa.env.prank(caller.address):
+                    caller.execute(hub.address, data, value=lz_cost(1) + 10**17, gas=gas)
+            except BoaError:
+                continue
+            refunded.add(caller.received() > 0)
+    assert len(refunded) == 1

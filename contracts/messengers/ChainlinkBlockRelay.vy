@@ -22,7 +22,6 @@ This contract should be deployed on multiple chains along with BlockOracle and M
 ################################################################
 
 from ..modules.chainlink.src import IReceiver
-from ethereum.ercs import IERC20
 
 implements: IReceiver
 
@@ -30,6 +29,7 @@ interface IBlockOracle:
     def commit_block(block_number: uint256, block_hash: bytes32) -> bool: nonpayable
     def last_confirmed_block_number() -> uint256: view
     def get_block_hash(block_number: uint256) -> bytes32: view
+    def committer_votes(committer: address, block_number: uint256) -> bytes32: view
 
 
 ################################################################
@@ -44,6 +44,18 @@ exports: (
     ownable.owner,
     ownable.transfer_ownership,
     ownable.renounce_ownership,
+)
+
+# Fixed-gas refunds, budget retunable by the owner, and the owner's withdrawals
+from ..modules import Funds
+
+initializes: Funds[ownable := ownable]
+exports: (
+    Funds.refund_gas,
+    Funds.refund_call_cost,
+    Funds.set_refund_gas,
+    Funds.withdraw_eth,
+    Funds.recover_erc20,
 )
 
 # Import CREReceiver module for cross-chain messaging
@@ -67,6 +79,9 @@ initializes: CCIP[ownable := ownable]
 exports: (
     CCIP.set_router,
     CCIP.router,
+    CCIP.set_router_call_gas,
+    CCIP.router_call_gas,
+    CCIP.router_call_cost,
     CCIP.selector_to_receiver,
     CCIP.selector_to_sender,
     CCIP.set_peer,
@@ -113,6 +128,12 @@ event BlockHashBroadcast:
 event SetBlockOracle:
     oracle: indexed(address)
 
+event BroadcastSkipped:
+    chain_selector: uint64
+    block_number: indexed(uint256)
+    max_fee: uint256
+
+
 event MessageSent:
     message_id: bytes32
     chain_selector: uint64
@@ -138,6 +159,7 @@ def __init__(
     """
     ownable.__init__()
     ownable._transfer_ownership(tx.origin)  # origin to enable createx deployment
+    Funds.__init__()
 
     CREReceiver.__init__(_forwarder_address)
 
@@ -175,30 +197,6 @@ def set_block_oracle(_oracle: address):
     log SetBlockOracle(oracle=_oracle)
 
 
-@external
-def withdraw_eth(_amount: uint256):
-    """
-    @notice Withdraw ETH from contract
-    @dev ETH can be accumulated from unused CCIP fees
-    @param _amount Amount to withdraw
-    """
-    ownable._check_owner()
-
-    assert self.balance >= _amount, "Insufficient balance"
-    send(msg.sender, _amount)
-
-
-@external
-def recover_erc20(_token: address, _to: address, _amount: uint256):
-    """
-    @notice Recover ERC20 tokens sent to this contract
-    @dev Data-only relay: token-bearing CCIP messages are rejected, but a direct transfer can still land here
-    """
-    ownable._check_owner()
-
-    assert extcall IERC20(_token).transfer(_to, _amount), "Transfer failed"
-
-
 ################################################################
 #                     INTERNAL FUNCTIONS                       #
 ################################################################
@@ -215,6 +213,9 @@ def _commit_block(_block_number: uint256, _block_hash: bytes32):
     if applied_blockhash == _block_hash:
         return
     assert applied_blockhash == empty(bytes32), "Different blockhash already applied"
+    # Skip a vote this relay already cast; if a lowered threshold now suffices, apply_block is permissionless
+    if staticcall self.block_oracle.committer_votes(self, _block_number) == _block_hash:
+        return
     extcall self.block_oracle.commit_block(_block_number, _block_hash)
 
 
@@ -231,22 +232,41 @@ def _broadcast_block(
     @param _broadcast_data Data for broadcasting
     """
     data: Bytes[64] = abi_encode(_block_number, _block_hash)
-    extra_args: Bytes[68] = CCIP.build_extra_args(_broadcast_data.gas_limit)
+    extra_args: Bytes[68] = CCIP._build_extra_args(_broadcast_data.gas_limit)
+    # Public callers pay per send and can re-quote, so a refused destination reverts for them;
+    # the CRE path skips instead: one bad lane must not undo the other sends or the commit
+    refunds: bool = _broadcast_data.requester != empty(address)
     successful_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
     unused_fees: uint256 = 0
 
     for target: BroadcastTarget in _broadcast_data.targets:
-        # Skip if peer is not set
+        # Skip if peer is not set; its fee goes back with the rest of the change
         receiver: address = CCIP.selector_to_receiver[target.chain_selector]
         if receiver == empty(address):
+            if refunds:
+                unused_fees += target.max_fee
+            log BroadcastSkipped(
+                chain_selector=target.chain_selector,
+                block_number=_block_number,
+                max_fee=target.max_fee,
+            )
             continue
 
-        # Send message
-        message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
+        message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(target.chain_selector, data, extra_args)
+        sent: bool = False
         message_id: bytes32 = empty(bytes32)
         fee: uint256 = 0
-        message_id, fee = CCIP._transmit(target.chain_selector, message, target.max_fee)
-        unused_fees += target.max_fee - fee
+        sent, message_id, fee = CCIP._try_transmit(target.chain_selector, message, target.max_fee)
+        if not sent:
+            assert not refunds, "Transmit failed"
+            log BroadcastSkipped(
+                chain_selector=target.chain_selector,
+                block_number=_block_number,
+                max_fee=target.max_fee,
+            )
+            continue
+        if refunds:
+            unused_fees += target.max_fee - fee
         log MessageSent(
             message_id=message_id,
             chain_selector=target.chain_selector,
@@ -257,13 +277,60 @@ def _broadcast_block(
         )
         successful_targets.append(target)
 
-    # Refund unused fee to a direct (public) requester; CRE path keeps it in the treasury
-    if _broadcast_data.requester != empty(address):
-        send(_broadcast_data.requester, unused_fees)
+    # Change goes back to a direct requester, non-fatally; the CRE path keeps it in the treasury
+    if refunds and unused_fees > 0:
+        Funds._refund(_broadcast_data.requester, unused_fees)
     log BlockHashBroadcast(
         block_number=_block_number,
         block_hash=_block_hash,
         targets=successful_targets,
+    )
+
+
+@view
+@internal
+def _latest_block_number() -> uint256:
+    """
+    @notice The oracle's latest confirmed block, checking the oracle is set before calling it
+    """
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    return staticcall self.block_oracle.last_confirmed_block_number()
+
+
+@internal
+def _broadcast_confirmed(
+    _block_number: uint256,
+    _target_chain_selectors: DynArray[uint64, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _ccip_receive_gas_limit: uint256,
+    _value: uint256,
+):
+    """
+    @notice Broadcast a confirmed block this relay received itself, fees paid by the caller
+    @dev Only broadcast what was received via onReport to prevent potentially malicious hashes from other sources
+    """
+    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
+    assert len(_target_chain_selectors) == len(_target_fees), "Length mismatch"
+
+    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(_block_number)
+    assert block_hash != empty(bytes32), "Block not confirmed"
+
+    # Only broadcast if this block was received via onReport
+    assert self.received_blocks[_block_number] == block_hash, "Unknown source"
+
+    # Prepare broadcast targets
+    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
+    sum_target_fees: uint256 = 0
+    for i: uint256 in range(0, len(_target_chain_selectors), bound=MAX_N_BROADCAST):
+        broadcast_targets.append(BroadcastTarget(chain_selector=_target_chain_selectors[i], max_fee=_target_fees[i]))
+        sum_target_fees += _target_fees[i]
+
+    assert sum_target_fees == _value, "Value must equal fee sum"
+
+    self._broadcast_block(
+        _block_number,
+        block_hash,
+        BroadcastData(targets=broadcast_targets, gas_limit=_ccip_receive_gas_limit, requester=msg.sender),
     )
 
 
@@ -276,8 +343,7 @@ def _broadcast_block(
 @reentrant
 def __default__():
     """
-    @notice Receive ETH: treasury funding and public overpayment
-    @dev CCIP does not refund Router overpayment, so any surplus accrues here (owner-withdrawable)
+    @notice Receive ETH: treasury funding; unspent CRE max_fee and failed refunds also stay here
     """
     pass
 
@@ -292,7 +358,9 @@ def quote_broadcast_fees(
     @notice Quote fees for broadcasting block hash to specified targets
     @param _target_chain_selectors List of chain selector IDs to broadcast to
     @param _ccip_receive_gas_limit Gas limit for ccipReceive
-    @return Array of fees per target chain (0 if target not configured)
+    @return Array of fees per target chain, 0 where there is no route (no receiver configured, or
+            the router does not support that chain). Quoting a batch must not revert because of one
+            unsupported destination; callers treat 0 as unreachable, as BlockhashRequestHub does
     """
     # Prepare dummy broadcast message (uint256 number, bytes32 hash)
     data: Bytes[64] = abi_encode(empty(uint256), empty(bytes32))
@@ -301,7 +369,7 @@ def quote_broadcast_fees(
     fees: DynArray[uint256, MAX_N_BROADCAST] = []
 
     # Prepare options (same for all targets)
-    extra_args: Bytes[68] = CCIP.build_extra_args(_ccip_receive_gas_limit)
+    extra_args: Bytes[68] = CCIP._build_extra_args(_ccip_receive_gas_limit)
 
     # Cycle through targets
     for selector: uint64 in _target_chain_selectors:
@@ -311,7 +379,7 @@ def quote_broadcast_fees(
             continue
 
         # Get fee for target chain selector and append to array
-        message: CCIP.EVM2AnyMessage = CCIP.build_simple_message(receiver, data, extra_args)
+        message: CCIP.EVM2AnyMessage = CCIP._build_simple_message(selector, data, extra_args)
         fees.append(CCIP._quote(selector, message, True))  # allow_unsupported
 
     return fees
@@ -329,59 +397,67 @@ def broadcast_latest_block(
     @param _target_chain_selectors List of CCIP chain selectors to broadcast to
     @param _target_fees List of fees per chain (must match _target_chain_selectors length)
     @param _ccip_receive_gas_limit Gas limit for ccipReceive (same for all targets)
-    @dev Only broadcast what was received via onReport to prevent potentially malicious hashes from other sources
+    @dev Reverts if another source confirmed the oracle's latest block; use broadcast_block then
     """
-
-    assert self.block_oracle != empty(IBlockOracle), "Oracle not configured"
-    assert len(_target_chain_selectors) == len(_target_fees), "Length mismatch"
-
-    # Get latest block from oracle
-    block_number: uint256 = staticcall self.block_oracle.last_confirmed_block_number()
-    block_hash: bytes32 = staticcall self.block_oracle.get_block_hash(block_number)
-    assert block_hash != empty(bytes32), "No confirmed blocks"
-
-    # Only broadcast if this block was received via onReport
-    assert self.received_blocks[block_number] == block_hash, "Unknown source"
-
-    # Prepare broadcast targets
-    broadcast_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
-    sum_target_fees: uint256 = 0
-    for i: uint256 in range(0, len(_target_chain_selectors), bound=MAX_N_BROADCAST):
-        broadcast_targets.append(BroadcastTarget(chain_selector=_target_chain_selectors[i], max_fee=_target_fees[i]))
-        sum_target_fees += _target_fees[i]
-
-    assert sum_target_fees == msg.value, "Insufficient message value"
-
-    self._broadcast_block(
-        block_number,
-        block_hash,
-        BroadcastData(targets=broadcast_targets, gas_limit=_ccip_receive_gas_limit, requester=msg.sender),
+    self._broadcast_confirmed(
+        self._latest_block_number(),
+        _target_chain_selectors,
+        _target_fees,
+        _ccip_receive_gas_limit,
+        msg.value,
     )
 
 
 @external
 @payable
+def broadcast_block(
+    _block_number: uint256,
+    _target_chain_selectors: DynArray[uint64, MAX_N_BROADCAST],
+    _target_fees: DynArray[uint256, MAX_N_BROADCAST],
+    _ccip_receive_gas_limit: uint256,
+):
+    """
+    @notice Broadcast a confirmed block this relay received to specified chains
+    @param _block_number Block to broadcast; any confirmed block received via onReport, not only the latest
+    @param _target_chain_selectors List of CCIP chain selectors to broadcast to
+    @param _target_fees List of fees per chain (must match _target_chain_selectors length)
+    @param _ccip_receive_gas_limit Gas limit for ccipReceive (same for all targets)
+    @dev A newer block confirmed by another source must not stop rebroadcasting the ones this relay received
+    """
+    self._broadcast_confirmed(
+        _block_number, _target_chain_selectors, _target_fees, _ccip_receive_gas_limit, msg.value
+    )
+
+
+@external
 def onReport(
     _metadata: Bytes[CREReceiver.MAX_METADATA_SIZE],
     _report: Bytes[CREReceiver.MAX_REPORT_SIZE]
 ):
     """
-    @notice Called by CRE Forwarder via CREReceiver after metadata validation
-    @param _report The encoded message payload containing block number and hash
+    @notice Called by the CRE Forwarder; authenticates the report via CREReceiver (strict mode)
+            before decoding it
+    @param _report ABI-encoded (relay, chain id, block number, block hash, target selectors,
+           target fees, ccip receive gas limit)
     """
-    # Verify message source
+    # Strict mode (default): reverts until a workflow id or author is configured.
+    # Never pass strict_mode=False in production, it accepts any workflow on the forwarder.
     CREReceiver._on_report(_metadata, _report)
 
     # Decode block hash and number from response
+    relay: address = empty(address)
+    chain_id: uint256 = 0
     block_number: uint256 = 0
     block_hash: bytes32 = empty(bytes32)
     target_chain_selectors: DynArray[uint64, MAX_N_BROADCAST] = []
     target_fees: DynArray[uint256, MAX_N_BROADCAST] = []
     ccip_receive_gas_limit: uint256 = 0
 
-    block_number, block_hash, target_chain_selectors, target_fees, ccip_receive_gas_limit = abi_decode(_report,
-        (uint256, bytes32, DynArray[uint64, MAX_N_BROADCAST], DynArray[uint256, MAX_N_BROADCAST], uint256)
+    relay, chain_id, block_number, block_hash, target_chain_selectors, target_fees, ccip_receive_gas_limit = abi_decode(_report,
+        (address, uint256, uint256, bytes32, DynArray[uint64, MAX_N_BROADCAST], DynArray[uint256, MAX_N_BROADCAST], uint256)
     )
+    # The forwarder does not sign the receiver, so the report names its own destination
+    assert relay == self and chain_id == chain.id, "Wrong destination"
     if block_hash == empty(bytes32):
         return  # Invalid response
     if len(target_chain_selectors) != len(target_fees):
@@ -396,8 +472,7 @@ def onReport(
     if len(target_chain_selectors) > 0:
         cached_targets: DynArray[BroadcastTarget, MAX_N_BROADCAST] = []
 
-        # Verify that attached value covers requested broadcast fees
-        total_fee: uint256 = 0
+        # No balance check up front: an unaffordable destination is skipped, one by one
         for i: uint256 in range(len(target_chain_selectors), bound=MAX_N_BROADCAST):
             cached_targets.append(
                 BroadcastTarget(
@@ -405,8 +480,6 @@ def onReport(
                     max_fee=target_fees[i]
                 )
             )
-            total_fee += target_fees[i]
-        assert self.balance >= total_fee, "Insufficient value"
         broadcast_data: BroadcastData = BroadcastData(
             targets=cached_targets,
             gas_limit=ccip_receive_gas_limit,
@@ -421,6 +494,8 @@ def onReport(
         )
 
 
+# Every destination gets one shared gas limit for this call, sized from per-chain measurements:
+# README "CCIP receive gas limit". Re-run scripts/ccip_gas_probe.py if this path changes.
 @external
 def ccipReceive(_message: CCIP.Any2EVMMessage):
     CCIP._ccipReceive(_message)
@@ -435,7 +510,9 @@ def ccipReceive(_message: CCIP.Any2EVMMessage):
     self._commit_block(block_number, block_hash)
 
 
+# Reentrant: the forwarder and the offramp ask before delivering, and a lock-reverted answer reads as no receiver
 @view
 @external
+@reentrant
 def supportsInterface(_interface_id: bytes4) -> bool:
     return _interface_id in CCIP.SUPPORTED_INTERFACES or _interface_id in CREReceiver.SUPPORTED_INTERFACES

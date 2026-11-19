@@ -111,8 +111,8 @@ def test_max_committers_limit(block_oracle, dev_deployer):
             block_oracle.add_committer(boa.env.generate_address())
 
 
-def test_committer_order_preservation(block_oracle, dev_deployer):
-    """Test that committer order is preserved after removals"""
+def test_committer_set_after_removals(block_oracle, dev_deployer):
+    """Removal is swap and pop, so the remaining set is what holds, not its order."""
     committers = []
 
     # Add 5 committers
@@ -127,9 +127,9 @@ def test_committer_order_preservation(block_oracle, dev_deployer):
         block_oracle.remove_committer(committers[1])
         block_oracle.remove_committer(committers[3])
 
-    # Check remaining committers are in correct order
     remaining = block_oracle.get_all_committers()
-    assert remaining == [committers[0], committers[2], committers[4]]
+    assert sorted(remaining) == sorted([committers[0], committers[2], committers[4]])
+    assert len(remaining) == 3  # no duplicate left behind by the swap
 
 
 def test_threshold_with_committer_removal(block_oracle, dev_deployer):
@@ -153,3 +153,17 @@ def test_threshold_with_committer_removal(block_oracle, dev_deployer):
     with boa.reverts("Threshold cannot be greater than number of committers"):
         with boa.env.prank(dev_deployer):
             block_oracle.set_threshold(3)
+
+
+def test_add_committer_logs_the_threshold_it_bumps(block_oracle, dev_deployer):
+    """A bump changes the threshold like set_threshold does, so it emits the same event."""
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(boa.env.generate_address())
+    assert not [e for e in block_oracle.get_logs() if type(e).__name__ == "SetThreshold"]
+
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(boa.env.generate_address(), True)
+    events = block_oracle.get_logs()
+    assert [e.new_threshold for e in events if type(e).__name__ == "SetThreshold"] == [
+        block_oracle.threshold()
+    ]
