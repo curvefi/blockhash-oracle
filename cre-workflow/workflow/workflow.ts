@@ -41,6 +41,11 @@ export const MAX_RELAYS_PER_REQUEST = 10
 // hub has its own log trigger
 export const MAX_REQUEST_HUBS = 5
 
+// ─── Pinned Source of Truth ─────────────────────────────────
+// Not config: whoever picks the source picks the hashes, so it is pinned into the workflow id
+export const BLOCK_VIEW_CHAIN = 'ethereum-mainnet'
+export const BLOCK_VIEW_ADDRESS = '0xb10cface00696B1390875DB2a0113B3ab99752a4' as Address
+
 // ─── Config Schema ──────────────────────────────────────────
 export const evmAddressSchema = z.custom<Address>(
   (val) => typeof val === "string" && isAddress(val),
@@ -56,8 +61,6 @@ type RequestHub = z.infer<typeof requestHubSchema>
 
 export const configSchema = z.object({
 	authorizedEVMAddress: evmAddressSchema,
-	blockViewChainSelectorName: z.string(),
-	blockViewContractAddress: evmAddressSchema,
 	// One log trigger per hub. The same address may repeat across chains (CreateX), but a repeated
 	// (chain, address) would register two triggers and deliver every request twice.
 	requestHubs: z
@@ -221,16 +224,11 @@ export function fetchBlockhash(
 	runtime: Runtime<Config>,
 	blockNumber?: bigint,
 ): [bigint, `0x${string}`] {
-	const config = runtime.config
-
-	const viewNetwork = getNetwork({
-		chainFamily: 'evm',
-		chainSelectorName: config.blockViewChainSelectorName,
-	})
-	if (!viewNetwork) throw new Error(`Network not found: ${config.blockViewChainSelectorName}`)
+	const viewNetwork = getNetwork({ chainFamily: 'evm', chainSelectorName: BLOCK_VIEW_CHAIN })
+	if (!viewNetwork) throw new Error(`Network not found: ${BLOCK_VIEW_CHAIN}`)
 
 	const evmClient = new cre.capabilities.EVMClient(viewNetwork.chainSelector.selector)
-	const mainnetBlockView = new MainnetBlockView(evmClient, config.blockViewContractAddress as Address)
+	const mainnetBlockView = new MainnetBlockView(evmClient, BLOCK_VIEW_ADDRESS)
 
 	// LATEST_BLOCK_NUMBER, not the finalized default: a finalized-tag eth_call sees an older head
 	// and can make a pinned block look "too recent" to MainnetBlockView

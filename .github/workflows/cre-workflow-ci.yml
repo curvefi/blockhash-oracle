@@ -1,0 +1,81 @@
+name: cre workflow ci
+
+# Rebuilds the workflow and reports the ID its artifacts would register. The build is byte
+# reproducible, so any change to workflow.ts or the config shows up here as a changed ID before it
+# is ever put on chain.
+
+on:
+  pull_request:
+    paths: ['cre-workflow/**', 'scripts/workflow_id.py', '.github/workflows/cre-workflow-ci.yml']
+  push:
+    branches: [main]
+    paths: ['cre-workflow/**']
+  workflow_dispatch:
+
+env:
+  CRE_CLI_VERSION: v1.30.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: '1.3.14' }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      # install.sh puts the binary at $CRE_INSTALL/bin/cre, defaulting to ~/.cre
+      - name: install the cre cli
+        run: |
+          curl -sSL https://app.chain.link/install.sh | bash -s -- "$CRE_CLI_VERSION"
+          echo "$HOME/.cre/bin" >> "$GITHUB_PATH"
+
+      # GITHUB_PATH only applies to later steps, so this is where a bad path surfaces
+      - name: check the cli is on PATH
+        run: cre version
+
+      - run: pip install eth-abi eth-utils brotli
+
+      # the generated bindings live under contracts/ and resolve viem and the sdk from its own
+      # node_modules, so both package roots need installing
+      - name: install deps
+        run: |
+          (cd cre-workflow/workflow && bun install --frozen-lockfile)
+          (cd cre-workflow/contracts && bun install --frozen-lockfile)
+
+      - name: typecheck
+        working-directory: cre-workflow/workflow
+        run: bun run typecheck
+
+      - name: unit tests
+        working-directory: cre-workflow/workflow
+        run: bun test
+
+      # cre workflow build is offline: it touches no credentials, so CI needs no login
+      - name: build wasm
+        working-directory: cre-workflow
+        run: cre workflow build workflow/ --target testnets-settings -o /tmp/binary.wasm
+
+      - name: package and hash
+        run: |
+          python scripts/workflow_id.py package --wasm /tmp/binary.wasm --out /tmp/binary.wasm.br.b64
+          ID=$(python scripts/workflow_id.py id \
+                 --binary /tmp/binary.wasm.br.b64 \
+                 --config cre-workflow/workflow/config.testnets.json \
+                 --name blockhash-relay-testnets)
+          echo "workflow id from this commit: $ID"
+          {
+            echo "### CRE workflow build"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| wasm sha256 | \`$(sha256sum /tmp/binary.wasm | cut -d' ' -f1)\` |"
+            echo "| artifact sha256 | \`$(sha256sum /tmp/binary.wasm.br.b64 | cut -d' ' -f1)\` |"
+            echo "| workflow id | \`$ID\` |"
+            echo ""
+            echo "Registering this build means publishing the artifact and upserting that ID."
+          } >> "$GITHUB_STEP_SUMMARY"

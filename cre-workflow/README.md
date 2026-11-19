@@ -42,8 +42,6 @@ block (not a finalized one). Production always pins it, so both rails vote on th
 
 ```yaml
 authorizedEVMAddress: "0x..."          # ECDSA key allowed to trigger the workflow
-blockViewChainSelectorName: "ethereum-mainnet"
-blockViewContractAddress: "0xb10cface00696B1390875DB2a0113B3ab99752a4"
 requestHubs:                           # optional, one log trigger each; omit for HTTP only
   - chainSelectorName: "ethereum-mainnet-base-1"
     address: "0x..."                   # BlockhashRequestHub, emits CREBlockhashRequested
@@ -53,7 +51,9 @@ requestHubs:                           # optional, one log trigger each; omit fo
 Without `requestHubs` the workflow registers only the HTTP trigger, so permissionless hub requests
 are never answered. See the limits below for how many hubs a workflow can carry.
 
-Testnets use `ethereum-testnet-sepolia` and the corresponding Sepolia deployment.
+The contract the hashes are read from is not config: `BLOCK_VIEW_CHAIN` and `BLOCK_VIEW_ADDRESS` in
+`workflow.ts` pin the Ethereum mainnet `MainnetBlockView` into the binary, so changing it takes a new
+binary. A testnets build therefore reads mainnet too, not the Sepolia deployment.
 
 ## CRE service limits
 
