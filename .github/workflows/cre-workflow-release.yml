@@ -13,18 +13,24 @@ on:
       tag:
         description: tag to create, e.g. cre-workflow-v2
         required: true
-      target:
-        description: cre target settings
-        default: testnets-settings
-      config:
-        description: config file the ID is computed against
-        default: cre-workflow/workflow/config.testnets.json
+      network:
+        description: workflow to release, picks the cre target, its config and its name together
+        type: choice
+        options: [mainnets, testnets]
+        default: mainnets
+      owner:
+        description: workflow owner the ID is computed for, the proxy once it owns the workflow
+        required: true
 
 permissions:
   contents: write
 
 env:
   CRE_CLI_VERSION: v1.30.0
+  CRE_TARGET: ${{ inputs.network }}-settings
+  CONFIG_PATH: cre-workflow/workflow/config.${{ inputs.network }}.json
+  # must match the target's workflow-name in workflow.yaml
+  WORKFLOW_NAME: ${{ inputs.network == 'mainnets' && 'blockhash-relay' || 'blockhash-relay-testnets' }}
 
 jobs:
   release:
@@ -60,7 +66,7 @@ jobs:
 
       - name: build and package
         working-directory: cre-workflow
-        run: cre workflow build workflow/ --target "${{ inputs.target }}" -o /tmp/binary.wasm
+        run: cre workflow build workflow/ --target "$CRE_TARGET" -o /tmp/binary.wasm
 
       - name: package
         run: |
@@ -84,18 +90,19 @@ jobs:
         run: |
           SHA=$(git rev-parse HEAD)
           BASE="https://raw.githubusercontent.com/${{ github.repository }}/$SHA/cre-workflow/workflow"
-          CFG="${{ inputs.config }}"
           BURL="$BASE/binary.wasm.br.b64"
-          CURL_="https://raw.githubusercontent.com/${{ github.repository }}/$SHA/$CFG"
+          CURL_="https://raw.githubusercontent.com/${{ github.repository }}/$SHA/$CONFIG_PATH"
           # hash the bytes as SERVED, which is what the nodes fetch
           ID=$(python scripts/workflow_id.py urls --binary-url "$BURL" --config-url "$CURL_" \
-                 --name blockhash-relay-testnets)
+                 --name "$WORKFLOW_NAME" --owner "${{ inputs.owner }}")
           {
             echo "### ${{ inputs.tag }} published"
             echo ""
             echo "| | |"
             echo "|---|---|"
             echo "| commit | \`$SHA\` |"
+            echo "| owner | \`${{ inputs.owner }}\` |"
+            echo "| name | \`$WORKFLOW_NAME\` |"
             echo "| binaryUrl | $BURL |"
             echo "| configUrl | $CURL_ |"
             echo "| workflowId | \`$ID\` |"

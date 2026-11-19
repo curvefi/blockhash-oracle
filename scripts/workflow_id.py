@@ -38,6 +38,13 @@ def fetch(url: str) -> bytes:
     ).read()
 
 
+def address(value: str) -> str:
+    # argparse type: a short or mistyped owner still hashes, to an ID no node will accept
+    if len(bytes.fromhex(value.removeprefix("0x"))) != 20:
+        raise ValueError
+    return value
+
+
 def compute(owner: str, name: str, binary_b64: bytes, config: bytes, secrets_url: str = "") -> str:
     digest = hashlib.sha256()
     digest.update(bytes.fromhex(owner.removeprefix("0x")))
@@ -124,7 +131,7 @@ def main():
 
     # on the subparsers, not the top level, so they are accepted after the subcommand
     ident = argparse.ArgumentParser(add_help=False)
-    ident.add_argument("--owner", default=OWNER)
+    ident.add_argument("--owner", default=OWNER, type=address)
     ident.add_argument("--name", default="blockhash-relay-testnets")
 
     sp = sub.add_parser("package", help="brotli + base64 a built wasm into the hostable artifact")
