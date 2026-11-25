@@ -4,6 +4,9 @@ import os
 from typing import Dict, Any
 from datetime import datetime
 
+# chains.json names LayerZero knows under another chainKey ("sepolia" there is a stub with no endpoint)
+CHAIN_KEY_ALIASES = {"sepolia": "sepolia-testnet"}
+
 
 class LZMetadata:
     # Handles LayerZero deployments metadata fetching and caching
@@ -61,6 +64,7 @@ class LZMetadata:
         if not self.metadata:
             self.load_from_file()
 
+        chain_key = CHAIN_KEY_ALIASES.get(chain_key, chain_key)
         for _, network_data in self.metadata.items():
             if network_data.get("chainKey") != chain_key:
                 continue
