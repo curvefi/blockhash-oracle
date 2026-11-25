@@ -18,9 +18,11 @@ BASE_CHAIN_SELECTOR = 15971525489660198786
 CCIP_RECEIVE_GAS_LIMIT = 150_000
 MAINNET_CHAIN_ID = 1
 
-# MainnetBlockView serves [head - 8191, head - 65]. A fork only has real hashes for blocks
-# older than 256, which come from the history contract's storage.
+# MainnetBlockView serves [head - 8191, head - 65]. By default a fork only has real hashes for
+# blocks older than 256, which come from the history contract's storage; the recent fixture
+# fills in the newer ones a live delivery lands on.
 BLOCK_AGE = 1_000
+RECENT_BLOCK_AGE = 100
 NEWEST_BLOCK_AGE = 65
 OLDEST_BLOCK_AGE = 8_191
 
@@ -58,6 +60,21 @@ def block(head, rpc_url):
     """(number, hash) of a block inside the view's window, the hash taken from the node"""
     number = head - BLOCK_AGE
     return number, bytes(Web3(Web3.HTTPProvider(rpc_url)).eth.get_block(number)["hash"])
+
+
+@pytest.fixture()
+def recent(head, rpc_url):
+    """{age: hash} of the newest blocks around the window's edge, the node's hashes written into the fork"""
+    w3 = Web3(Web3.HTTPProvider(rpc_url))
+    hashes = {
+        age: bytes(w3.eth.get_block(head - age)["hash"])
+        for age in (NEWEST_BLOCK_AGE - 1, NEWEST_BLOCK_AGE, RECENT_BLOCK_AGE)
+    }
+    prev_hashes = list(boa.env.evm.patch.prev_hashes)
+    for age, block_hash in hashes.items():
+        prev_hashes[age - 1] = block_hash
+    boa.env.evm.patch.prev_hashes = prev_hashes
+    return hashes
 
 
 @pytest.fixture()

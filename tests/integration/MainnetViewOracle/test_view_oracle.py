@@ -3,7 +3,13 @@
 import boa
 import pytest
 
-from conftest import EMPTY_ADDRESS, EMPTY_HASH, NEWEST_BLOCK_AGE, OLDEST_BLOCK_AGE
+from conftest import (
+    EMPTY_ADDRESS,
+    EMPTY_HASH,
+    NEWEST_BLOCK_AGE,
+    OLDEST_BLOCK_AGE,
+    RECENT_BLOCK_AGE,
+)
 
 pytestmark = pytest.mark.mainnet
 
@@ -27,8 +33,18 @@ def test_hash_is_empty_outside_the_window(view_oracle, head, age):
     assert view_oracle.get_block_hash(head - age) == EMPTY_HASH
 
 
-def test_block_zero_has_no_hash(view_oracle):
+@pytest.mark.parametrize("age", [NEWEST_BLOCK_AGE, RECENT_BLOCK_AGE])
+def test_hash_is_the_chains_own_for_a_recent_block(view_oracle, head, recent, age):
+    assert view_oracle.get_block_hash(head - age) == recent[age]
+
+
+def test_hash_is_empty_one_block_inside_the_reorg_margin(view_oracle, head, recent):
+    assert view_oracle.get_block_hash(head - NEWEST_BLOCK_AGE + 1) == EMPTY_HASH
+
+
+def test_block_zero_has_no_hash(view_oracle, mainnet_block_view, recent):
     """The view reads 0 as its default block; the oracle must not hand that hash out for block 0."""
+    assert mainnet_block_view.get_blockhash(0, True)[1] == recent[NEWEST_BLOCK_AGE]
     assert view_oracle.get_block_hash(0) == EMPTY_HASH
 
 

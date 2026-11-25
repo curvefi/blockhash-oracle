@@ -72,6 +72,37 @@ def test_report_with_a_wrong_hash_reverts(chainlink_relay, dev_deployer, block):
     assert boa.env.get_balance(chainlink_relay.address) == sum(fees)
 
 
+def test_report_for_the_newest_block_the_view_serves_is_received(chainlink_relay, head, recent):
+    number, block_hash = head - NEWEST_BLOCK_AGE, recent[NEWEST_BLOCK_AGE]
+
+    with boa.env.prank(CRE_FORWARDER):
+        chainlink_relay.onReport(
+            VALID_METADATA, _encode_report(chainlink_relay, number, block_hash)
+        )
+
+    assert received(chainlink_relay, number) == block_hash
+
+
+def test_report_with_a_wrong_hash_for_the_newest_block_reverts(chainlink_relay, head, recent):
+    report = _encode_report(chainlink_relay, head - NEWEST_BLOCK_AGE, WRONG_HASH)
+
+    with boa.env.prank(CRE_FORWARDER):
+        with boa.reverts("Different blockhash already applied"):
+            chainlink_relay.onReport(VALID_METADATA, report)
+
+
+def test_report_with_the_chains_hash_one_block_too_recent_reverts(chainlink_relay, head, recent):
+    number, block_hash = head - NEWEST_BLOCK_AGE + 1, recent[NEWEST_BLOCK_AGE - 1]
+
+    with boa.env.prank(CRE_FORWARDER):
+        with boa.reverts("Block outside view window"):
+            chainlink_relay.onReport(
+                VALID_METADATA, _encode_report(chainlink_relay, number, block_hash)
+            )
+
+    assert received(chainlink_relay, number) == EMPTY_HASH
+
+
 @pytest.mark.parametrize("age", [NEWEST_BLOCK_AGE - 1, 9_000])
 def test_report_for_a_block_outside_the_window_reverts(chainlink_relay, head, age):
     """Nothing to check the hash against, so the relay falls through to commit_block, which reverts."""

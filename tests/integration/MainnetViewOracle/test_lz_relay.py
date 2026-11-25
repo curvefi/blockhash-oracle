@@ -4,7 +4,7 @@ whether LayerZero delivers a read of Ethereum to Ethereum is not something a for
 import boa
 import pytest
 
-from conftest import EMPTY_HASH, LZ_ENDPOINT, LZ_READ_CHANNEL, received
+from conftest import EMPTY_HASH, LZ_ENDPOINT, LZ_READ_CHANNEL, NEWEST_BLOCK_AGE, received
 
 pytestmark = pytest.mark.mainnet
 
@@ -22,6 +22,15 @@ def _deliver(relay, src_eid, block_number, block_hash):
 
 def test_read_response_with_the_chains_hash_is_received(lz_relay, block):
     number, block_hash = block
+
+    _deliver(lz_relay, LZ_READ_CHANNEL, number, block_hash)
+
+    assert received(lz_relay, number) == block_hash
+
+
+def test_read_response_for_the_newest_block_the_view_serves_is_received(lz_relay, head, recent):
+    """The view's default block, which is what a read without a block number answers with."""
+    number, block_hash = head - NEWEST_BLOCK_AGE, recent[NEWEST_BLOCK_AGE]
 
     _deliver(lz_relay, LZ_READ_CHANNEL, number, block_hash)
 
