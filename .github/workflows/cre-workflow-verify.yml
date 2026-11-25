@@ -1,0 +1,48 @@
+name: cre workflow verify live
+
+# Reads the deployed workflow off the mainnet registry, fetches the artifacts its URLs point at, and
+# checks they still hash to the registered ID. The registry stores a URL and no integrity guarantee,
+# so a dead or altered artifact is otherwise a silent liveness failure with no on-chain signal.
+# Read-only: no secrets, no writes.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  push:
+    branches: [main]
+    paths: ['scripts/workflow_id.py', '.github/workflows/cre-workflow-verify.yml']
+  workflow_dispatch:
+    inputs:
+      name:
+        description: workflow name to verify
+        default: blockhash-relay-testnets
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workflow: [blockhash-relay-testnets]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      # eth_utils.keccak needs a hashing backend; without it the import dies at runtime
+      - run: pip install eth-abi eth-utils "eth-hash[pycryptodome]"
+
+      - name: verify ${{ matrix.workflow }}
+        run: |
+          # bash -e is the default, not pipefail: without this tee swallows a failed verify
+          set -o pipefail
+          python scripts/workflow_id.py verify \
+            --name "${{ github.event.inputs.name || matrix.workflow }}" \
+            | tee /tmp/verify.txt
+          {
+            echo "### ${{ matrix.workflow }}"
+            echo '```'
+            cat /tmp/verify.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

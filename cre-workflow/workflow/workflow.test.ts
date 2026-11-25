@@ -12,6 +12,7 @@ import {
 } from 'viem'
 import { type MainnetBlockViewMock, newMainnetBlockViewMock } from '../contracts/evm/ts/generated/MainnetBlockView_mock'
 import {
+	BLOCK_VIEW_ADDRESS,
 	configSchema,
 	MAX_RELAYS_PER_REQUEST,
 	MAX_TARGETS_PER_RELAY,
@@ -25,14 +26,15 @@ import {
 import vector from '../../tests/fixtures/cre_report_vector.json'
 import type { ResultPayload } from './types/types'
 
-const CHAIN_SELECTOR = 16015286601757825753n // ethereum-testnet-sepolia
+// The pinned view is on L1, the relay is not, so the read and the write are separate capabilities
+const VIEW_SELECTOR = 5009297550715157269n   // ethereum-mainnet
+const RELAY_SELECTOR = 16015286601757825753n // ethereum-testnet-sepolia
 const CHAIN_ID = 11155111n // ethereum-testnet-sepolia
 const BASE_SEPOLIA_SELECTOR = 10344971235874465080n // ethereum-testnet-sepolia-base-1
 
 // The test runtime prefixes each signed report with a fixed-length metadata header
 const REPORT_METADATA_HEADER_LENGTH = 109
 
-const BLOCK_VIEW_ADDRESS = '0x0000000000000000000000000000000000000001' as Address
 const RELAY_ADDRESS = '0x0000000000000000000000000000000000000002' as Address
 const AUTHORIZED_KEY = '0x0000000000000000000000000000000000000003' as Address
 const HUB_ADDRESS = '0x0000000000000000000000000000000000000004' as Address
@@ -46,8 +48,6 @@ type WriteReportHandler = NonNullable<EvmMock['writeReport']>
 
 const makeConfig = () => ({
 	authorizedEVMAddress: AUTHORIZED_KEY,
-	blockViewChainSelectorName: 'ethereum-testnet-sepolia',
-	blockViewContractAddress: BLOCK_VIEW_ADDRESS,
 	requestHubs: [] as { chainSelectorName: string; address: Address; relayAddress: Address }[],
 })
 
@@ -148,8 +148,9 @@ const txFail = (message = 'reverted'): ReturnType<WriteReportHandler> => ({
 
 describe('onNewBlock', () => {
 	test('happy path: latest block committed to all targets', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
@@ -164,8 +165,9 @@ describe('onNewBlock', () => {
 	})
 
 	test('specific block number: routes to getBlockhash0 overload', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
@@ -178,8 +180,9 @@ describe('onNewBlock', () => {
 	})
 
 	test('zero blockhash: throws before broadcasting', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, ZERO_BLOCKHASH])
 
@@ -190,8 +193,9 @@ describe('onNewBlock', () => {
 	})
 
 	test('all broadcasts fail: throws with error details', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txFail('out of gas')
@@ -203,8 +207,9 @@ describe('onNewBlock', () => {
 	})
 
 	test('partial failure: returns JSON with anySuccess true', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 
@@ -225,8 +230,9 @@ describe('onNewBlock', () => {
 
 describe('onNewBlock best effort', () => {
 	test('an undefined receiver status is a failure, a write reported as success is the costly mistake', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () =>
 			({ txStatus: TxStatus.SUCCESS, txHash: new Uint8Array(32) }) as unknown as ReturnType<
@@ -238,8 +244,9 @@ describe('onNewBlock best effort', () => {
 
 
 	test('a relay whose write throws is reported and the next relay is still written', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		let writes = 0
 		evmMock.writeReport = () => {
@@ -258,8 +265,9 @@ describe('onNewBlock best effort', () => {
 	})
 
 	test('every relay throwing still fails the execution, with each error', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () => {
 			throw new Error('capability unavailable')
@@ -274,8 +282,9 @@ describe('onNewBlock best effort', () => {
 describe('onNewBlock payload validation', () => {
 	// A request is refused whole, before the first report is written
 	const expectRefusedBeforeAnyWrite = (data: unknown[]) => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		let writes = 0
 		evmMock.writeReport = () => {
@@ -323,8 +332,9 @@ describe('onNewBlock payload validation', () => {
 	})
 
 	test('an unknown key is refused, a misspelled blockNumber must not deliver unpinned', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
 
@@ -333,8 +343,9 @@ describe('onNewBlock payload validation', () => {
 	})
 
 	test('a zero-padded blockNumber is refused too, it is still zero', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
 
@@ -343,8 +354,9 @@ describe('onNewBlock payload validation', () => {
 	})
 
 	test('a zero blockNumber is refused rather than delivering the default block', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
 
@@ -359,8 +371,9 @@ describe('onNewBlock payload validation', () => {
 
 describe('onBlockhashRequested', () => {
 	test('a log with no block number is refused, the hub cannot emit one', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 		let writes = 0
 		evmMock.writeReport = () => {
@@ -375,8 +388,9 @@ describe('onBlockhashRequested', () => {
 	})
 
 	test('happy path: decodes the log and broadcasts to its targets', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
@@ -391,8 +405,9 @@ describe('onBlockhashRequested', () => {
 	})
 
 	test('carries every target from the log through to the broadcast', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txSuccess()
@@ -406,8 +421,9 @@ describe('onBlockhashRequested', () => {
 	})
 
 	test('zero blockhash: throws before broadcasting', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, ZERO_BLOCKHASH])
 
@@ -416,8 +432,9 @@ describe('onBlockhashRequested', () => {
 	})
 
 	test('failed write: throws with error details', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 		evmMock.writeReport = () => txFail('out of gas')
@@ -427,9 +444,10 @@ describe('onBlockhashRequested', () => {
 	})
 
 	test('same hub address on two chains: each trigger answers on its own relay', () => {
-		const sepoliaMock = EvmMock.testInstance(CHAIN_SELECTOR)
+		const sepoliaMock = EvmMock.testInstance(RELAY_SELECTOR)
 		const baseMock = EvmMock.testInstance(BASE_SEPOLIA_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, sepoliaMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
 		setBlockhash(blockViewMock, (bn: unknown) => [bn as bigint, REAL_BLOCKHASH])
 
 		const writes: { chain: string; receiver: string }[] = []
@@ -525,8 +543,9 @@ describe('report', () => {
 	})
 
 	test('broadcast signs the relay and its chain id, the forwarder does not sign the receiver', () => {
-		const evmMock = EvmMock.testInstance(CHAIN_SELECTOR)
-		const blockViewMock = newMainnetBlockViewMock(BLOCK_VIEW_ADDRESS, evmMock)
+		const blockViewMock = newMainnetBlockViewMock(
+			BLOCK_VIEW_ADDRESS, EvmMock.testInstance(VIEW_SELECTOR))
+		const evmMock = EvmMock.testInstance(RELAY_SELECTOR)
 		setBlockhash(blockViewMock, () => [BLOCK_NUMBER, REAL_BLOCKHASH])
 
 		let rawReport: Uint8Array | undefined
