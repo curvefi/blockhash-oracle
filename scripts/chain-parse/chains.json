@@ -221,8 +221,31 @@
       "ankr": "https://rpc.ankr.com/etherlink_mainnet/{}",
       "drpc": null,
       "public": "https://node.mainnet.etherlink.com"
+    },
+    "robinhood": {
+      "chain_id": 4663,
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": null,
+      "drpc": null,
+      "public": "https://rpc.mainnet.chain.robinhood.com"
+    },
+    "stable": {
+      "chain_id": 988,
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": null,
+      "drpc": null,
+      "public": "https://rpc.stable.xyz"
+    },
+    "arc": {
+      "chain_id": 5042,
+      "evm_version": "cancun",
+      "explorer": "https://api.etherscan.io/v2/api",
+      "ankr": null,
+      "drpc": null,
+      "public": "https://rpc.mainnet.arc.io"
     }
-
   },
   "testnets": {
     "sepolia": {
