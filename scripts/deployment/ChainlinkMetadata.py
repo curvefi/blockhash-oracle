@@ -35,6 +35,9 @@ _CHAIN_KEY_TO_CL_NAME: Dict[str, str] = {
     "plumephoenix": "plume-mainnet",
     "taiko": "ethereum-mainnet-taiko-1",
     "mp1": "corn-mainnet",
+    "robinhood": "robinhood-mainnet",
+    "stable": "stable-mainnet",
+    "arc": "arc-mainnet",
     # Testnets
     "sepolia": "ethereum-testnet-sepolia",
     "base-sepolia": "ethereum-testnet-sepolia-base-1",
