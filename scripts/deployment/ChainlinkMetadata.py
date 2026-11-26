@@ -130,22 +130,22 @@ class ChainlinkMetadata:
         if prod_idx == -1:
             raise ValueError("Could not locate 'Production Forwarders' section in CRE docs page")
 
-        # Extract from production section only (50 kB is more than enough)
-        section = html[prod_idx : prod_idx + 50_000]
-
-        # Each table row has <code>cl-chain-name</code> then <code>0xADDR</code> in order.
-        cl_names = re.findall(r"<code>([a-z][a-z0-9_\-]+-(?:mainnet|testnet)[^<]*)</code>", section)
-        addresses = re.findall(r"<code>(0x[a-fA-F0-9]{40})</code>", section)
-
-        if len(cl_names) != len(addresses):
-            raise ValueError(
-                f"CRE forwarder parse mismatch: {len(cl_names)} chain names vs {len(addresses)} addresses"
-            )
+        # The production section to the end of the page: a fixed slice cut off the later rows, and
+        # names and addresses are paired within each table row, never by position
+        section = html[prod_idx:]
+        pairs = []
+        for row in re.findall(r"<tr>(.*?)</tr>", section, flags=re.S):
+            cl_name = re.search(r"<code>([a-z][a-z0-9_\-]+-(?:mainnet|testnet)[^<]*)</code>", row)
+            address = re.search(r"<code>(0x[a-fA-F0-9]{40})</code>", row)
+            if cl_name and address:
+                pairs.append((cl_name.group(1), address.group(1)))
+        if not pairs:
+            raise ValueError("No forwarder rows found in the 'Production Forwarders' section")
 
         mainnets: Dict[str, str] = {}
         testnets: Dict[str, str] = {}
 
-        for cl_name, address in zip(cl_names, addresses):
+        for cl_name, address in pairs:
             chain_key = _CL_NAME_TO_CHAIN_KEY.get(cl_name)
             if chain_key is None:
                 # Chain not in our chains.json – skip silently

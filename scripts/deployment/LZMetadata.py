@@ -4,6 +4,8 @@ import os
 from typing import Dict, Any
 from datetime import datetime
 
+from eth_utils import to_checksum_address
+
 # chains.json names LayerZero knows under another chainKey ("sepolia" there is a stub with no endpoint)
 CHAIN_KEY_ALIASES = {"sepolia": "sepolia-testnet"}
 
@@ -77,11 +79,12 @@ class LZMetadata:
             if not v2_deployment:
                 raise ValueError(f"No v2 deployment for {chain_key}")
 
-            # Extract addresses from deployment
+            # Extract addresses from deployment, checksummed: the cache holds them in lowercase,
+            # which web3 refuses
             deployment_addresses = {"eid": int(v2_deployment["eid"])}
             deployment_addresses.update(
                 {
-                    k: v["address"]
+                    k: to_checksum_address(v["address"])
                     for k, v in v2_deployment.items()
                     if k not in ["eid", "version", "chainKey", "stage"]
                     and isinstance(v, dict)
