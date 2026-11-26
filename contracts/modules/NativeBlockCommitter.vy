@@ -21,6 +21,7 @@
 interface IBlockOracle:
     def commit_block(_block_number: uint256, _block_hash: bytes32) -> bool: nonpayable
     def get_block_hash(_block_number: uint256) -> bytes32: view
+    def committer_votes(_committer: address, _block_number: uint256) -> bytes32: view
 
 
 # Same bound the header decoder uses
@@ -30,33 +31,29 @@ MAX_HEADERS: constant(uint256) = 128
 
 @pure
 @internal
-def _walk(
-    _block_number: uint256,
-    _block_hash: bytes32,
-    _headers: DynArray[Bytes[HEADER_SIZE], MAX_HEADERS],
-) -> (uint256, bytes32):
+def _parent_hash(_header: Bytes[HEADER_SIZE], _block_hash: bytes32) -> bytes32:
     """
-    @notice Follow block headers down from a known block
-    @param _block_number Number of the known block
-    @param _block_hash Its hash
-    @param _headers RLP headers from that block downwards, one per step
-    @return Number and hash of the parent of the last header, or the known block if there are none
+    @notice One step of a walk down the chain: check a header against its block's hash
+    @dev Takes one header, not the list: an internal call copies its arguments, and a copy of
+         the whole list costs over 100k gas in memory whatever its length
+    @param _header RLP header of the block
+    @param _block_hash The block's hash, already proven
+    @return The parent's hash, proven by this header
     """
-    block_number: uint256 = _block_number
-    block_hash: bytes32 = _block_hash
-    for header: Bytes[HEADER_SIZE] in _headers:
-        assert keccak256(header) == block_hash, "Header does not match"
-        # A header is an RLP list over 255 bytes: 0xf9, two length bytes, 0xa0, then the parent hash
-        block_hash = extract32(header, 4)
-        block_number -= 1
-    return block_number, block_hash
+    assert keccak256(_header) == _block_hash, "Header does not match"
+    # A header is an RLP list over 255 bytes: 0xf9, two length bytes, 0xa0, then the parent hash
+    return extract32(_header, 4)
 
 
 @internal
 def _commit(_block_oracle: IBlockOracle, _block_number: uint256, _block_hash: bytes32):
     """
-    @notice Commit a block to the oracle unless it already holds that hash
-    @dev A different hash already applied reverts in the oracle
+    @notice Vote for a block unless the oracle already holds that hash or this vote
+    @dev A different hash already applied reverts in the oracle. Above threshold 1 a vote alone
+         applies nothing, and repeating it would only log it again.
     """
-    if staticcall _block_oracle.get_block_hash(_block_number) != _block_hash:
-        extcall _block_oracle.commit_block(_block_number, _block_hash)
+    if staticcall _block_oracle.get_block_hash(_block_number) == _block_hash:
+        return
+    if staticcall _block_oracle.committer_votes(self, _block_number) == _block_hash:
+        return
+    extcall _block_oracle.commit_block(_block_number, _block_hash)

@@ -72,10 +72,11 @@ def commit(
     """
     @notice Commit an Ethereum block Taiko holds a checkpoint for, or an ancestor of it
     @dev Reverts if Taiko holds no checkpoint for the block. Committing a block twice is a no-op.
+         Above the oracle's threshold 1 this is a vote: the block applies once enough committers agree.
     @param _checkpoint_number Ethereum block number of the checkpoint to start from
     @param _headers RLP headers from that block downwards, one per step. The block committed is
                     the parent of the last one; none commits the checkpoint's block
-    @return Number and hash of the committed block
+    @return Number and hash of the block committed or voted for
     """
     checkpoint: Checkpoint = staticcall SIGNAL_SERVICE.getCheckpoint(
         convert(_checkpoint_number, uint48)
@@ -83,9 +84,11 @@ def commit(
     assert convert(checkpoint.blockNumber, uint256) == _checkpoint_number, "Wrong checkpoint"
     assert checkpoint.blockHash != empty(bytes32), "Empty block hash"
 
-    block_number: uint256 = 0
-    block_hash: bytes32 = empty(bytes32)
-    block_number, block_hash = native._walk(_checkpoint_number, checkpoint.blockHash, _headers)
+    block_number: uint256 = _checkpoint_number
+    block_hash: bytes32 = checkpoint.blockHash
+    for header: Bytes[native.HEADER_SIZE] in _headers:
+        block_hash = native._parent_hash(header, block_hash)
+        block_number -= 1
 
     state: BlockState = staticcall ANCHOR.getBlockState()
     assert (

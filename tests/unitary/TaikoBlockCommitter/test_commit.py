@@ -164,6 +164,44 @@ def test_committing_a_block_twice_is_a_noop(committer, block_oracle, signal_serv
     assert block_oracle.get_block_hash(OLD_BLOCK) == BLOCK_HASH
 
 
+def test_above_threshold_one_a_commit_is_one_vote_and_a_repeat_adds_nothing(
+    committer, block_oracle, signal_service, dev_deployer
+):
+    with boa.env.prank(dev_deployer):
+        block_oracle.add_committer(boa.env.generate_address(), True)
+    signal_service.set_checkpoint(OLD_BLOCK, OLD_BLOCK, BLOCK_HASH)
+    committer.commit(OLD_BLOCK)
+    assert len(_commits(committer)) == 1
+
+    committer.commit(OLD_BLOCK)
+
+    assert _commits(committer) == []
+    assert block_oracle.committer_votes(committer.address, OLD_BLOCK) == BLOCK_HASH
+    assert block_oracle.get_block_hash(OLD_BLOCK) == EMPTY_HASH
+
+
+def test_one_header_more_than_a_commit_carries_reverts(committer, signal_service):
+    headers, newest_hash, _ = header_chain(MAX_HEADERS + 1)
+    signal_service.set_checkpoint(OLD_BLOCK, OLD_BLOCK, newest_hash)
+
+    with boa.reverts():
+        committer.commit(OLD_BLOCK, headers)
+
+
+def test_header_over_the_size_bound_reverts(committer, signal_service):
+    header = b"\xf9\x04\x01\xa0" + b"\x01" * 32 + b"\x00" * 989
+    assert len(header) == 1025
+    signal_service.set_checkpoint(OLD_BLOCK, OLD_BLOCK, keccak(header))
+
+    with boa.reverts():
+        committer.commit(OLD_BLOCK, [header])
+
+
+def test_checkpoint_number_past_taikos_range_reverts(committer):
+    with boa.reverts():
+        committer.commit(2**48)
+
+
 def test_block_the_oracle_holds_another_hash_for_reverts(
     committer, block_oracle, signal_service, dev_deployer
 ):
